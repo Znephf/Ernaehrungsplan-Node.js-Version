@@ -9,16 +9,35 @@ if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
 }
 
+// --- Starup-Diagnose ---
 console.log('--- Starte Server und prüfe Umgebungsvariablen ---');
 console.log('Wert für COOKIE_SECRET:', process.env.COOKIE_SECRET ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
 console.log('Wert für APP_PASSWORD:', process.env.APP_PASSWORD ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
 console.log('Wert für API_KEY:', process.env.API_KEY ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
 console.log('--- Diagnose Ende ---');
 
+// --- Überprüfung der Umgebungsvariablen ---
+const APP_PASSWORD = process.env.APP_PASSWORD;
+const COOKIE_SECRET = process.env.COOKIE_SECRET;
+const API_KEY = process.env.API_KEY;
 
+if (!COOKIE_SECRET || !APP_PASSWORD || !API_KEY) {
+    const missing = [];
+    if (!COOKIE_SECRET) missing.push('COOKIE_SECRET');
+    if (!APP_PASSWORD) missing.push('APP_PASSWORD');
+    if (!API_KEY) missing.push('API_KEY');
+    console.error(`FATAL ERROR: Die Umgebungsvariable(n) ${missing.join(', ')} sind nicht gesetzt. Bitte fügen Sie diese in der Plesk Node.js-Verwaltung hinzu. Die Anwendung wird beendet.`);
+    process.exit(1);
+}
+
+// --- App-Setup ---
 const app = express();
 const port = process.env.PORT || 3001;
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser(COOKIE_SECRET));
 
+// --- Hilfsfunktionen für die KI-Anfragen ---
 const MAX_RETRIES = 4;
 const INITIAL_BACKOFF_MS = 1000;
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -49,23 +68,14 @@ async function generateWithRetry(ai, generationParams) {
     throw new Error(`Das KI-Modell ist derzeit überlastet. Bitte versuchen Sie es in ein paar Minuten erneut.`);
 }
 
-const APP_PASSWORD = process.env.APP_PASSWORD;
-const COOKIE_SECRET = process.env.COOKIE_SECRET;
+// ======================================================
+// --- ÖFFENTLICHE ROUTEN (Keine Authentifizierung nötig) ---
+// ======================================================
 
-if (!COOKIE_SECRET || !APP_PASSWORD) {
-    console.error('FATAL ERROR: Die Umgebungsvariablen COOKIE_SECRET und/oder APP_PASSWORD sind nicht gesetzt. Bitte fügen Sie diese in der Plesk Node.js-Verwaltung hinzu. Die Anwendung wird beendet.');
-    process.exit(1);
-}
-
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser(COOKIE_SECRET));
-
-// --- Public Routes (No Authentication Required) ---
-// Serve static files from 'public' folder (contains login.html).
+// Stellt statische Dateien aus dem 'public'-Ordner bereit (enthält login.html).
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Login endpoint.
+// Login-Endpunkt.
 app.post('/login', (req, res) => {
     const { password } = req.body;
     if (password === APP_PASSWORD) {
@@ -73,7 +83,7 @@ app.post('/login', (req, res) => {
             signed: true,
             httpOnly: true,
             path: '/',
-            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 Tage
         });
         res.redirect('/');
     } else {
@@ -81,46 +91,51 @@ app.post('/login', (req, res) => {
     }
 });
 
-// Logout endpoint.
+// Logout-Endpunkt.
 app.post('/logout', (req, res) => {
     res.clearCookie('isAuthenticated');
     res.status(200).json({ message: 'Abmeldung erfolgreich.' });
 });
 
-// --- Authentication Wall Middleware ---
-// All requests below this point require authentication.
-app.use((req, res, next) => {
+// ======================================================
+// --- GESCHÜTZTER BEREICH (Authentifizierung nötig) ---
+// ======================================================
+
+const protectedRouter = express.Router();
+
+// 1. Authentifizierungs-Middleware (Die "Firewall")
+// Dies ist die erste Funktion, die für jede Anfrage an den protectedRouter ausgeführt wird.
+protectedRouter.use((req, res, next) => {
     if (req.signedCookies.isAuthenticated === 'true') {
-        return next(); // User is authenticated, proceed.
+        return next(); // Benutzer ist authentifiziert, fahre mit der nächsten Funktion fort.
     }
-    // If user is not authenticated:
+    
+    // Benutzer ist NICHT authentifiziert.
+    // Wenn es ein API-Aufruf ist, sende einen 401-Fehler (Nicht autorisiert).
     if (req.path.startsWith('/api/')) {
-        // For API calls, send a 401 Unauthorized error.
         return res.status(401).json({ error: 'Nicht authentifiziert. Bitte melden Sie sich an.' });
     }
-    // For any other page requests, redirect to the login page.
+    
+    // Für jede andere Anfrage (z.B. Seitenaufruf), leite zur Login-Seite um.
     res.redirect('/login.html');
 });
 
+// 2. Statische Dateien der React-App bereitstellen
+// Dies wird nur ausgeführt, wenn die Authentifizierungs-Middleware 'next()' aufruft.
+protectedRouter.use(express.static(path.join(__dirname, 'dist')));
 
-// --- Protected Routes ---
-// Only authenticated requests can reach this part of the application.
 
-// Serve the static assets of the React app (JS, CSS, images).
-app.use(express.static(path.join(__dirname, 'dist')));
-
-app.post('/api/generate-plan', async (req, res) => {
+// 3. Geschützte API-Endpunkte
+// Diese werden nur ausgeführt, wenn die Authentifizierung erfolgreich war.
+protectedRouter.post('/api/generate-plan', async (req, res) => {
     const { settings, previousPlanRecipes } = req.body;
     
-    if (!process.env.API_KEY) {
-        return res.status(500).json({ error: 'API-Schlüssel ist auf dem Server nicht konfiguriert.' });
-    }
     if (!settings) {
         return res.status(400).json({ error: 'Einstellungen fehlen in der Anfrage.' });
     }
 
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: API_KEY });
         
         const { persons, kcal, dietaryPreference, dietType, excludedIngredients, desiredIngredients, breakfastOption, customBreakfast } = settings;
 
@@ -158,7 +173,8 @@ app.post('/api/generate-plan', async (req, res) => {
             const previousRecipeTitles = previousPlanRecipes.map(r => r.title).join(', ');
             varietyInstruction = `\nWICHTIG: Um für Abwechslung zu sorgen, erstelle bitte völlig andere Gerichte als im vorherigen Plan. Vermeide insbesondere Gerichte, die diesen ähneln: ${previousRecipeTitles}.`;
         }
-
+        
+        // --- PROMPT 1: Plan & Rezepte generieren ---
         const planPrompt = `Erstelle einen ${planType} für eine ganze Woche (Montag bis Sonntag) für ${persons} Personen.
         Das tägliche Kalorienziel pro Person ist ${kcal} kcal. Halte dich streng an dieses Ziel. Die Summe der Kalorien von Frühstück und Abendessen pro Tag muss sehr nah an diesem Wert liegen (Abweichung max. 100 kcal).
         ${dietTypeInstruction}
@@ -167,33 +183,66 @@ app.post('/api/generate-plan', async (req, res) => {
         Der Plan soll einfach und schnell umsetzbar sein.${varietyInstruction}
         ${breakfastInstruction}
         Das Abendessen soll jeden Tag ein anderes warmes Gericht sein.
-        Generiere eine detaillierte und vollständige Einkaufsliste für ALLE Zutaten der Woche für ${persons} Personen. Gruppiere die Einkaufsliste nach sinnvollen Kategorien.
         Erstelle detaillierte Rezepte für jedes Abendessen.
         WICHTIG: Alle Nährwertangaben müssen IMMER PRO PERSON berechnet werden. Die Zutatenlisten sind für ${persons} Personen. Die Angabe von Kalorien ist zwingend erforderlich. Die Angabe von Protein, Kohlenhydraten und Fett für die Rezepte ist optional, aber sehr erwünscht.
         `;
 
-        const responseSchema = {
+        const planSchema = {
             type: Type.OBJECT,
             properties: {
                 name: { type: Type.STRING, description: "Ein kurzer, kreativer und einprägsamer Name für diesen Ernährungsplan auf Deutsch, basierend auf den generierten Gerichten. Antworte NUR mit dem Namen, ohne Anführungszeichen oder zusätzliche Erklärungen." },
-                shoppingList: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, items: { type: Type.ARRAY, items: { type: Type.STRING } } } } },
                 weeklyPlan: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { day: { type: Type.STRING }, breakfast: { type: Type.STRING }, breakfastCalories: { type: Type.NUMBER }, dinner: { type: Type.STRING }, dinnerCalories: { type: Type.NUMBER } } } },
                 recipes: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { day: { type: Type.STRING }, title: { type: Type.STRING }, ingredients: { type: Type.ARRAY, items: { type: Type.STRING } }, instructions: { type: Type.ARRAY, items: { type: Type.STRING } }, totalCalories: { type: Type.NUMBER }, protein: { type: Type.NUMBER }, carbs: { type: Type.NUMBER }, fat: { type: Type.NUMBER } } } }
             },
-            required: ["name", "shoppingList", "weeklyPlan", "recipes"]
+            required: ["name", "weeklyPlan", "recipes"]
         };
 
         const planResponse = await generateWithRetry(ai, {
             model: 'gemini-2.5-flash',
             contents: [{ parts: [{ text: planPrompt }] }],
-            config: { responseMimeType: 'application/json', responseSchema: responseSchema }
+            config: { responseMimeType: 'application/json', responseSchema: planSchema }
         });
         
-        const parsedData = JSON.parse(planResponse.text);
+        const planData = JSON.parse(planResponse.text);
+
+        // --- PROMPT 2: Einkaufsliste aus Rezepten generieren ---
+        const shoppingListPrompt = `Basierend auf dem folgenden JSON-Objekt mit Rezepten für einen wöchentlichen Ernährungsplan für ${persons} Personen, erstelle eine detaillierte und vollständige Einkaufsliste. Alle Zutaten aus allen Rezepten und dem Frühstück müssen enthalten sein. Fasse die Artikel zusammen, wo es sinnvoll ist (z.B. wenn ein Rezept 1 Zwiebel und ein anderes 2 benötigt, sollte die Liste 3 Zwiebeln enthalten). Gruppiere die Einkaufsliste nach sinnvollen Supermarkt-Kategorien (z.B. "Obst & Gemüse", "Molkereiprodukte & Eier", "Trockensortiment & Konserven"). Hier sind die Daten: ${JSON.stringify({ weeklyPlan: planData.weeklyPlan, recipes: planData.recipes })}`;
+        
+        const shoppingListSchema = {
+            type: Type.OBJECT,
+            properties: {
+                shoppingList: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            category: { type: Type.STRING },
+                            items: { type: Type.ARRAY, items: { type: Type.STRING } }
+                        },
+                         required: ["category", "items"]
+                    }
+                }
+            },
+            required: ["shoppingList"]
+        };
+
+        const shoppingListResponse = await generateWithRetry(ai, {
+            model: 'gemini-2.5-flash',
+            contents: [{ parts: [{ text: shoppingListPrompt }] }],
+            config: { responseMimeType: 'application/json', responseSchema: shoppingListSchema }
+        });
+
+        const shoppingListData = JSON.parse(shoppingListResponse.text);
+
+        // --- Kombinieren und senden ---
+        const finalPlan = {
+            ...planData,
+            shoppingList: shoppingListData.shoppingList
+        };
 
         res.json({ 
-            data: parsedData,
-            debug: { planPrompt }
+            data: finalPlan,
+            debug: { planPrompt, shoppingListPrompt }
         });
 
     } catch (error) {
@@ -202,18 +251,15 @@ app.post('/api/generate-plan', async (req, res) => {
     }
 });
 
-app.post('/api/generate-image', async (req, res) => {
+protectedRouter.post('/api/generate-image', async (req, res) => {
     const { recipe, attempt } = req.body;
 
-    if (!process.env.API_KEY) {
-        return res.status(500).json({ error: 'API-Schlüssel ist auf dem Server nicht konfiguriert.' });
-    }
     if (!recipe) {
         return res.status(400).json({ error: 'Rezept fehlt in der Anfrage.' });
     }
     
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: API_KEY });
         const prompt = attempt <= 2
           ? `Professionelle Food-Fotografie im Magazin-Stil, ultra-realistisches Foto von: "${recipe.title}". Das Gericht ist wunderschön auf einem Keramikteller angerichtet. Dramatisches, seitliches Studiolicht, das Dampf und Texturen betont. Bokeh-Hintergrund mit dezenten Küchenelementen. Kräftige Farben, extrem appetitlich.`
           : `Eine andere Perspektive, Food-Fotografie im Magazin-Stil, ultra-realistisches Foto von: "${recipe.title}". Schön angerichtet auf einem rustikalen Holztisch mit frischen Kräutern. Weiches, natürliches Licht. Kräftige, leuchtende Farben, extrem köstlich.`;
@@ -236,12 +282,19 @@ app.post('/api/generate-image', async (req, res) => {
 });
 
 
-// For any other authenticated GET request, send the main index.html file.
-// This handles the initial page load and allows for client-side routing if added later.
-app.get('*', (req, res) => {
+// 4. Fallback für die Haupt-App
+// Jede andere GET-Anfrage, die keine statische Datei war, lädt die Haupt-index.html.
+// Dies ist entscheidend für das Laden der App und für client-seitiges Routing.
+// MUSS die letzte Route im geschützten Router sein.
+protectedRouter.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
+// Hänge den gesamten geschützten Router an die Haupt-App an.
+// Jede Anfrage, die nicht von den öffentlichen Routen oben behandelt wurde, wird hierher geleitet.
+app.use('/', protectedRouter);
+
+// --- Server starten ---
 app.listen(port, () => {
     console.log(`Server läuft auf Port ${port}`);
 });

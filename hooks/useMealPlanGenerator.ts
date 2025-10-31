@@ -40,11 +40,13 @@ export const useMealPlanGenerator = (
 
             const { data: newPlanData, debug: debugInfo } = await response.json();
 
-            console.groupCollapsed('[DEBUG] Ernährungsplan-Generierung');
+            console.groupCollapsed('[DEBUG] Ernährungsplan-Generierung (2-stufig)');
             console.log('--- Gesendete Einstellungen ---');
             console.log(settings);
-            console.log('--- Prompt für den Plan ---');
+            console.log('--- Prompt 1: Plan & Rezepte ---');
             console.log(debugInfo.planPrompt);
+            console.log('--- Prompt 2: Einkaufsliste ---');
+            console.log(debugInfo.shoppingListPrompt);
             console.groupEnd();
 
 
