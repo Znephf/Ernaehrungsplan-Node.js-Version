@@ -20,7 +20,11 @@ console.log('--- Diagnose Ende ---');
 
 
 // Umgebungsvariablen laden (für lokale Entwicklung)
-dotenv.config();
+// In der Plesk-Produktionsumgebung werden die Variablen direkt vom Server gesetzt.
+// dotenv wird hier nur für die lokale Entwicklung ohne Plesk benötigt.
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
 
 const app = express();
 const port = process.env.PORT || 3001; // Port für Plesk/Phusion Passenger
