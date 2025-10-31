@@ -20,54 +20,82 @@ export const useMealPlanGenerator = () => {
     const [plan, setPlan] = useState<PlanData>(initialPlan);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const [generationStatus, setGenerationStatus] = useState<string>('idle');
 
     const generateNewPlan = async (settings: PlanSettings): Promise<GenerationResult> => {
         setIsLoading(true);
         setError(null);
+        setGenerationStatus('pending');
 
         try {
-            const response = await fetch('/api/generate-plan', {
+            const jobResponse = await fetch('/api/generate-plan-job', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ 
                     settings,
-                    // Send previous recipe titles to ensure variety
                     previousPlanRecipes: (plan && plan.name !== initialPlan.name) ? plan.recipes : [] 
                 }),
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `Serverfehler: ${response.statusText}`);
+            if (!jobResponse.ok) {
+                const errorData = await jobResponse.json();
+                throw new Error(errorData.error || `Serverfehler: ${jobResponse.statusText}`);
             }
 
-            const { data: newPlanData, id: newPlanId, debug: debugInfo } = await response.json();
+            const { jobId } = await jobResponse.json();
 
-            console.groupCollapsed('[DEBUG] Ernährungsplan-Generierung (2-stufig)');
-            console.log('--- Gesendete Einstellungen ---');
-            console.log(settings);
-            console.log('--- Prompt 1: Plan & Rezepte ---');
-            console.log(debugInfo.planPrompt);
-            console.log('--- Prompt 2: Einkaufsliste ---');
-            console.log(debugInfo.shoppingListPrompt);
-            console.groupEnd();
+            return new Promise((resolve) => {
+                const pollInterval = 5000; // 5 Sekunden
+                let attempts = 0;
+                const maxAttempts = (10 * 60 * 1000) / pollInterval; // 10 Minuten Timeout
 
+                const intervalId = setInterval(async () => {
+                    if (attempts++ > maxAttempts) {
+                        clearInterval(intervalId);
+                        setError('Die Anfrage hat zu lange gedauert und wurde abgebrochen.');
+                        setIsLoading(false);
+                        setGenerationStatus('idle');
+                        resolve({ success: false, newPlan: null, newPlanId: null });
+                        return;
+                    }
 
-            if (!newPlanData.recipes || !newPlanData.weeklyPlan || !newPlanData.shoppingList || newPlanData.recipes.length === 0) {
-                throw new Error("Die von der KI generierte Antwort war unvollständig.");
-            }
-            
-            setPlan(newPlanData);
-            return { success: true, newPlan: newPlanData, newPlanId };
+                    try {
+                        const statusResponse = await fetch(`/api/job-status/${jobId}`);
+                        if (!statusResponse.ok) {
+                           console.warn(`Job-Status-Abfrage fehlgeschlagen: ${statusResponse.status}`);
+                           return; 
+                        }
 
-        } catch (e) {
-            console.error(e);
-            setError(`Der Ernährungsplan konnte nicht erstellt werden: ${(e as Error).message}. Bitte versuchen Sie es später erneut.`);
-            return { success: false, newPlan: null, newPlanId: null };
-        } finally {
+                        const { status, planId, error: jobError } = await statusResponse.json();
+                        setGenerationStatus(status);
+
+                        if (status === 'complete') {
+                            clearInterval(intervalId);
+                            setIsLoading(false);
+                            setGenerationStatus('idle');
+                            resolve({ success: true, newPlan: null, newPlanId: planId });
+                        }
+
+                        if (status === 'error') {
+                            clearInterval(intervalId);
+                            setError(`Der Ernährungsplan konnte nicht erstellt werden: ${jobError}`);
+                            setIsLoading(false);
+                            setGenerationStatus('idle');
+                            resolve({ success: false, newPlan: null, newPlanId: null });
+                        }
+                    } catch (pollError) {
+                        console.warn("Netzwerkfehler beim Abrufen des Job-Status:", pollError);
+                    }
+                }, pollInterval);
+            });
+
+        } catch (startJobError) {
+            setError(`Der Generierungs-Job konnte nicht gestartet werden: ${(startJobError as Error).message}`);
             setIsLoading(false);
+            setGenerationStatus('idle');
+            return { success: false, newPlan: null, newPlanId: null };
         }
     };
     
@@ -81,5 +109,5 @@ export const useMealPlanGenerator = () => {
         });
     };
 
-    return { plan, setPlan: setPlanFromArchive, isLoading, error, generateNewPlan };
+    return { plan, setPlan: setPlanFromArchive, isLoading, error, generateNewPlan, generationStatus };
 };

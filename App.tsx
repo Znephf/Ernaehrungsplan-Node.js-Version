@@ -37,7 +37,7 @@ const App: React.FC = () => {
 
 
     const { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive } = useArchive();
-    const { plan, setPlan, isLoading, error, generateNewPlan } = useMealPlanGenerator();
+    const { plan, setPlan, isLoading, error, generateNewPlan, generationStatus } = useMealPlanGenerator();
     const { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState, setImageUrlsFromArchive } = useImageGenerator();
 
     useEffect(() => {
@@ -58,22 +58,6 @@ const App: React.FC = () => {
         checkAuth();
     }, []);
 
-    const handleGenerateRequest = async () => {
-        const result = await generateNewPlan(panelSettings);
-        if (result.success && result.newPlanId) {
-            setCurrentPlanId(result.newPlanId);
-            // Ein neuer Plan hat per Definition keine Bilder, also wird der Image-State zurückgesetzt
-            resetImageState();
-            // Lade das Archiv neu, um den gerade erstellten Plan anzuzeigen
-            fetchArchive();
-        }
-    };
-
-    const handleSelectRecipe = (day: string) => {
-        setSelectedRecipeDay(day);
-        setCurrentView('recipes');
-    };
-
     const handleLoadPlan = useCallback((id: string) => {
         const planToLoad = loadPlanFromArchive(id);
         if (planToLoad) {
@@ -81,8 +65,28 @@ const App: React.FC = () => {
             setCurrentPlanId(id);
             setImageUrlsFromArchive(planToLoad.imageUrls || {});
             setCurrentView('plan');
+            // Scroll to top to see the new plan
+            window.scrollTo(0, 0);
         }
     }, [loadPlanFromArchive, setPlan, setImageUrlsFromArchive]);
+
+    const handleGenerateRequest = async () => {
+        const result = await generateNewPlan(panelSettings);
+        if (result.success && result.newPlanId) {
+            setCurrentPlanId(result.newPlanId);
+            resetImageState();
+            // Refetch the archive to include the newly created plan
+            await fetchArchive();
+            // Load the new plan into the view. `handleLoadPlan` will find it
+            // in the now-updated archive state.
+            handleLoadPlan(result.newPlanId);
+        }
+    };
+
+    const handleSelectRecipe = (day: string) => {
+        setSelectedRecipeDay(day);
+        setCurrentView('recipes');
+    };
     
     useEffect(() => {
         if (currentView === 'recipes' && selectedRecipeDay) {
@@ -177,7 +181,7 @@ const App: React.FC = () => {
 
     return (
         <div className="bg-slate-100 min-h-screen font-sans">
-            {isLoading && <LoadingOverlay />}
+            {isLoading && <LoadingOverlay status={generationStatus} />}
             <header className="bg-white shadow-md sticky top-0 z-10">
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
                     <h1 className="text-2xl font-bold text-slate-800">

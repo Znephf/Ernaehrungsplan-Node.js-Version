@@ -3,6 +3,7 @@ const path = require('path');
 const dotenv = require('dotenv');
 const cookieParser = require('cookie-parser');
 const mysql = require('mysql2/promise');
+const crypto = require('crypto');
 const { GoogleGenAI, Modality, Type } = require('@google/genai');
 
 // Lade Umgebungsvariablen aus der .env-Datei, ABER nur wenn wir NICHT in Produktion sind.
@@ -55,6 +56,22 @@ async function initializeDatabase() {
             );
         `);
         console.log('Tabelle "archived_plans" ist bereit.');
+
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS generation_jobs (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                jobId VARCHAR(36) NOT NULL UNIQUE,
+                status VARCHAR(50) NOT NULL DEFAULT 'pending',
+                payload JSON,
+                planId INT NULL,
+                errorMessage TEXT NULL,
+                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (planId) REFERENCES archived_plans(id) ON DELETE SET NULL
+            );
+        `);
+        console.log('Tabelle "generation_jobs" ist bereit.');
+
         connection.release();
     } catch (error) {
         console.error('FATAL ERROR: Konnte die Datenbankverbindung nicht herstellen oder Tabelle nicht erstellen.', error);
@@ -106,134 +123,19 @@ async function generateWithRetry(ai, generationParams) {
 }
 
 // ======================================================
-// --- ÖFFENTLICHE API-ROUTEN ---
+// --- ASYNCHRONER GENERIERUNGS-WORKER ---
 // ======================================================
 
-app.post('/login', (req, res) => {
-    const { password } = req.body;
-    if (password === APP_PASSWORD) {
-        res.cookie('isAuthenticated', 'true', {
-            signed: true,
-            httpOnly: true,
-            path: '/',
-            maxAge: 30 * 24 * 60 * 60 * 1000, // 30 Tage
-            secure: process.env.NODE_ENV === 'production',
-        });
-        res.status(200).json({ message: 'Anmeldung erfolgreich.' });
-    } else {
-        res.status(401).json({ error: 'Das eingegebene Passwort ist falsch.' });
-    }
-});
-
-app.post('/logout', (req, res) => {
-    res.clearCookie('isAuthenticated');
-    res.status(200).json({ message: 'Abmeldung erfolgreich.' });
-});
-
-app.get('/api/check-auth', (req, res) => {
-    if (req.signedCookies.isAuthenticated === 'true') {
-        res.json({ isAuthenticated: true });
-    } else {
-        res.json({ isAuthenticated: false });
-    }
-});
-
-// ======================================================
-// --- GESCHÜTZTE API-ROUTEN ---
-// ======================================================
-
-const requireAuth = (req, res, next) => {
-    if (req.signedCookies.isAuthenticated === 'true') {
-        return next();
-    }
-    res.status(401).json({ error: 'Nicht authentifiziert. Bitte melden Sie sich an.' });
-};
-
-// --- Archiv-Routen ---
-app.get('/api/archive', requireAuth, async (req, res) => {
+async function processGenerationJob(jobId) {
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    let connection;
     try {
-        const [rows] = await pool.query('SELECT * FROM archived_plans ORDER BY createdAt DESC');
-        
-        const archive = rows.map(row => {
-            const settings = typeof row.settings === 'string' ? JSON.parse(row.settings) : row.settings;
-            const planData = typeof row.planData === 'string' ? JSON.parse(row.planData) : row.planData;
-            
-            // FIX: Gracefully handle entries where planData might be null or malformed.
-            // This prevents a single corrupt entry from breaking the entire archive view.
-            if (!planData || typeof planData !== 'object') {
-                console.warn(`Ungültiger oder fehlender planData-Eintrag für Archiv-ID ${row.id} wird übersprungen.`);
-                return null; // We will filter this out later
-            }
-
-            return {
-                id: row.id.toString(),
-                createdAt: new Date(row.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                name: planData.name || 'Unbenannter Plan', // Provide a fallback name
-                ...settings,
-                ...planData
-            };
-        }).filter(entry => entry !== null); // Remove any entries that failed validation
-        
-        res.json(archive);
-    } catch (error) {
-        console.error('Fehler beim Abrufen des Archivs:', error);
-        res.status(500).json({ error: 'Archiv konnte nicht geladen werden.' });
-    }
-});
-
-app.delete('/api/archive/:id', requireAuth, async (req, res) => {
-    const { id } = req.params;
-    try {
-        const [result] = await pool.query('DELETE FROM archived_plans WHERE id = ?', [id]);
-        if (result.affectedRows > 0) {
-            res.status(200).json({ message: 'Eintrag erfolgreich gelöscht.' });
-        } else {
-            res.status(404).json({ error: 'Eintrag nicht gefunden.' });
+        connection = await pool.getConnection();
+        const [jobs] = await connection.query('SELECT payload FROM generation_jobs WHERE jobId = ?', [jobId]);
+        if (jobs.length === 0) {
+            throw new Error(`Job ${jobId} nicht in der Datenbank gefunden.`);
         }
-    } catch (error) {
-        console.error(`Fehler beim Löschen von Eintrag ${id}:`, error);
-        res.status(500).json({ error: 'Eintrag konnte nicht gelöscht werden.' });
-    }
-});
-
-app.put('/api/archive/image', requireAuth, async (req, res) => {
-    const { planId, day, imageUrl } = req.body;
-    if (!planId || !day || !imageUrl) {
-        return res.status(400).json({ error: 'Fehlende Daten zum Speichern des Bildes.' });
-    }
-
-    try {
-        const [rows] = await pool.query('SELECT planData FROM archived_plans WHERE id = ?', [planId]);
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'Plan nicht gefunden.' });
-        }
-
-        const planData = typeof rows[0].planData === 'string' ? JSON.parse(rows[0].planData) : rows[0].planData;
-
-        if (!planData.imageUrls) {
-            planData.imageUrls = {};
-        }
-        planData.imageUrls[day] = imageUrl;
-
-        await pool.query('UPDATE archived_plans SET planData = ? WHERE id = ?', [JSON.stringify(planData), planId]);
-
-        res.status(200).json({ message: 'Bild erfolgreich gespeichert.' });
-    } catch (error) {
-        console.error(`Fehler beim Speichern des Bildes für Plan ${planId}:`, error);
-        res.status(500).json({ error: 'Bild konnte nicht in der Datenbank gespeichert werden.' });
-    }
-});
-
-
-app.post('/api/generate-plan', requireAuth, async (req, res) => {
-    const { settings, previousPlanRecipes } = req.body;
-    
-    if (!settings) {
-        return res.status(400).json({ error: 'Einstellungen fehlen in der Anfrage.' });
-    }
-
-    try {
-        const ai = new GoogleGenAI({ apiKey: API_KEY });
+        const { settings, previousPlanRecipes } = jobs[0].payload;
         
         const { persons, kcal, dietaryPreference, dietType, excludedIngredients, desiredIngredients, breakfastOption, customBreakfast } = settings;
 
@@ -293,6 +195,8 @@ app.post('/api/generate-plan', requireAuth, async (req, res) => {
             },
             required: ["name", "weeklyPlan", "recipes"]
         };
+        
+        await connection.query("UPDATE generation_jobs SET status = 'generating_plan' WHERE jobId = ?", [jobId]);
 
         const planResponse = await generateWithRetry(ai, {
             model: TEXT_MODEL_NAME,
@@ -302,6 +206,8 @@ app.post('/api/generate-plan', requireAuth, async (req, res) => {
         
         const planData = JSON.parse(planResponse.text);
         
+        await connection.query("UPDATE generation_jobs SET status = 'generating_shopping_list' WHERE jobId = ?", [jobId]);
+
         const shoppingListPrompt = `Basierend auf dem folgenden JSON-Objekt mit Rezepten für einen wöchentlichen Ernährungsplan für ${persons} Personen, erstelle eine detaillierte und vollständige Einkaufsliste. Alle Zutaten aus allen Rezepten und dem Frühstück müssen enthalten sein. Fasse die Artikel zusammen, wo es sinnvoll ist (z.B. wenn ein Rezept 1 Zwiebel und ein anderes 2 benötigt, sollte die Liste 3 Zwiebeln enthalten). Gruppiere die Einkaufsliste nach sinnvollen Supermarkt-Kategorien (z.B. "Obst & Gemüse", "Molkereiprodukte & Eier", "Trockensortiment & Konserven"). Hier sind die Daten: ${JSON.stringify({ weeklyPlan: planData.weeklyPlan, recipes: planData.recipes })}`;
         
         const shoppingListSchema = {
@@ -336,23 +242,177 @@ app.post('/api/generate-plan', requireAuth, async (req, res) => {
             imageUrls: {} // Initialize with empty images object
         };
         
-        // Den neuen Plan in der Datenbank speichern
-        const [result] = await pool.query(
+        const [result] = await connection.query(
             'INSERT INTO archived_plans (name, settings, planData) VALUES (?, ?, ?)',
             [finalPlan.name, JSON.stringify(settings), JSON.stringify(finalPlan)]
         );
+        const newPlanId = result.insertId;
 
-        res.json({ 
-            data: finalPlan,
-            id: result.insertId.toString(),
-            debug: { planPrompt, shoppingListPrompt }
-        });
+        await connection.query("UPDATE generation_jobs SET status = 'complete', planId = ? WHERE jobId = ?", [newPlanId, jobId]);
+        console.log(`Job ${jobId} erfolgreich abgeschlossen. Plan-ID: ${newPlanId}`);
 
     } catch (error) {
-        console.error('[API Error] Kritischer Fehler bei der Plan-Generierung:', error);
-        res.status(503).json({ error: `Fehler bei der Kommunikation mit der KI: ${error.message}` });
+        console.error(`[Job ${jobId}] Fehler bei der Verarbeitung:`, error);
+        if (connection) {
+            await connection.query("UPDATE generation_jobs SET status = 'error', errorMessage = ? WHERE jobId = ?", [error.message, jobId]);
+        }
+    } finally {
+        if (connection) connection.release();
+    }
+}
+
+
+// ======================================================
+// --- ÖFFENTLICHE API-ROUTEN ---
+// ======================================================
+
+app.post('/login', (req, res) => {
+    const { password } = req.body;
+    if (password === APP_PASSWORD) {
+        res.cookie('isAuthenticated', 'true', {
+            signed: true,
+            httpOnly: true,
+            path: '/',
+            maxAge: 30 * 24 * 60 * 60 * 1000, // 30 Tage
+            secure: process.env.NODE_ENV === 'production',
+        });
+        res.status(200).json({ message: 'Anmeldung erfolgreich.' });
+    } else {
+        res.status(401).json({ error: 'Das eingegebene Passwort ist falsch.' });
     }
 });
+
+app.post('/logout', (req, res) => {
+    res.clearCookie('isAuthenticated');
+    res.status(200).json({ message: 'Abmeldung erfolgreich.' });
+});
+
+app.get('/api/check-auth', (req, res) => {
+    if (req.signedCookies.isAuthenticated === 'true') {
+        res.json({ isAuthenticated: true });
+    } else {
+        res.json({ isAuthenticated: false });
+    }
+});
+
+// ======================================================
+// --- GESCHÜTZTE API-ROUTEN ---
+// ======================================================
+
+const requireAuth = (req, res, next) => {
+    if (req.signedCookies.isAuthenticated === 'true') {
+        return next();
+    }
+    res.status(401).json({ error: 'Nicht authentifiziert. Bitte melden Sie sich an.' });
+};
+
+// --- Archiv-Routen ---
+app.get('/api/archive', requireAuth, async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM archived_plans ORDER BY createdAt DESC');
+        
+        const archive = rows.map(row => {
+            const settings = typeof row.settings === 'string' ? JSON.parse(row.settings) : row.settings;
+            const planData = typeof row.planData === 'string' ? JSON.parse(row.planData) : row.planData;
+            
+            if (!planData || typeof planData !== 'object') {
+                console.warn(`Ungültiger oder fehlender planData-Eintrag für Archiv-ID ${row.id} wird übersprungen.`);
+                return null;
+            }
+
+            return {
+                id: row.id.toString(),
+                createdAt: new Date(row.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                name: planData.name || 'Unbenannter Plan',
+                ...settings,
+                ...planData
+            };
+        }).filter(entry => entry !== null);
+        
+        res.json(archive);
+    } catch (error) {
+        console.error('Fehler beim Abrufen des Archivs:', error);
+        res.status(500).json({ error: 'Archiv konnte nicht geladen werden.' });
+    }
+});
+
+app.delete('/api/archive/:id', requireAuth, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [result] = await pool.query('DELETE FROM archived_plans WHERE id = ?', [id]);
+        if (result.affectedRows > 0) {
+            res.status(200).json({ message: 'Eintrag erfolgreich gelöscht.' });
+        } else {
+            res.status(404).json({ error: 'Eintrag nicht gefunden.' });
+        }
+    } catch (error) {
+        console.error(`Fehler beim Löschen von Eintrag ${id}:`, error);
+        res.status(500).json({ error: 'Eintrag konnte nicht gelöscht werden.' });
+    }
+});
+
+app.put('/api/archive/image', requireAuth, async (req, res) => {
+    const { planId, day, imageUrl } = req.body;
+    if (!planId || !day || !imageUrl) {
+        return res.status(400).json({ error: 'Fehlende Daten zum Speichern des Bildes.' });
+    }
+
+    try {
+        const [rows] = await pool.query('SELECT planData FROM archived_plans WHERE id = ?', [planId]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Plan nicht gefunden.' });
+        }
+
+        const planData = typeof rows[0].planData === 'string' ? JSON.parse(rows[0].planData) : rows[0].planData;
+
+        if (!planData.imageUrls) {
+            planData.imageUrls = {};
+        }
+        planData.imageUrls[day] = imageUrl;
+
+        await pool.query('UPDATE archived_plans SET planData = ? WHERE id = ?', [JSON.stringify(planData), planId]);
+
+        res.status(200).json({ message: 'Bild erfolgreich gespeichert.' });
+    } catch (error) {
+        console.error(`Fehler beim Speichern des Bildes für Plan ${planId}:`, error);
+        res.status(500).json({ error: 'Bild konnte nicht in der Datenbank gespeichert werden.' });
+    }
+});
+
+
+app.post('/api/generate-plan-job', requireAuth, async (req, res) => {
+    const payload = req.body;
+     if (!payload.settings) {
+        return res.status(400).json({ error: 'Einstellungen fehlen in der Anfrage.' });
+    }
+    const jobId = crypto.randomUUID();
+    try {
+        await pool.query('INSERT INTO generation_jobs (jobId, payload) VALUES (?, ?)', [jobId, JSON.stringify(payload)]);
+        
+        processGenerationJob(jobId);
+
+        res.status(202).json({ jobId });
+    } catch (error) {
+        console.error('Fehler beim Erstellen des Generierungs-Jobs:', error);
+        res.status(500).json({ error: 'Job konnte nicht erstellt werden.' });
+    }
+});
+
+app.get('/api/job-status/:jobId', requireAuth, async (req, res) => {
+    const { jobId } = req.params;
+    try {
+        const [rows] = await pool.query('SELECT status, planId, errorMessage FROM generation_jobs WHERE jobId = ?', [jobId]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Job nicht gefunden.' });
+        }
+        const { status, planId, errorMessage } = rows[0];
+        res.json({ status, planId: planId?.toString(), error: errorMessage });
+    } catch (error) {
+        console.error(`Fehler beim Abrufen des Status für Job ${jobId}:`, error);
+        res.status(500).json({ error: 'Job-Status konnte nicht abgerufen werden.' });
+    }
+});
+
 
 app.post('/api/generate-image', requireAuth, async (req, res) => {
     const { recipe, attempt } = req.body;
@@ -400,9 +460,10 @@ app.get('*', (req, res) => {
 // --- Server starten ---
 async function startServer() {
     await initializeDatabase();
-    app.listen(port, () => {
+    const server = app.listen(port, () => {
         console.log(`Server läuft auf Port ${port}`);
     });
+    server.setTimeout(600000);
 }
 
 startServer();
