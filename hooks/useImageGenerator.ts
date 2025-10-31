@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { Recipe } from '../types';
 
-export const useImageGenerator = () => {
+export const useImageGenerator = (onImageSaved?: () => void) => {
     const [imageUrls, setImageUrls] = useState<{ [key: string]: string }>({});
     const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
     const [imageErrors, setImageErrors] = useState<{ [key: string]: string | null }>({});
@@ -93,17 +93,20 @@ export const useImageGenerator = () => {
 
         if (newImageUrl) {
             try {
-                await fetch('/api/archive/image', {
+                const response = await fetch('/api/archive/image', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ planId, day: recipe.day, imageUrl: newImageUrl })
                 });
+                if (response.ok && onImageSaved) {
+                    onImageSaved();
+                }
             } catch (e) {
                 console.error("Konnte Bild-URL nicht im Backend speichern:", e);
                 // Optional: UI-Feedback geben, dass Speichern fehlgeschlagen ist.
             }
         }
-    }, [loadingImages, executeImageGeneration]);
+    }, [loadingImages, executeImageGeneration, onImageSaved]);
 
     const generateMissingImages = useCallback(async (recipes: Recipe[], onProgress?: (status: string) => void): Promise<{[key: string]: string}> => {
         const recipesToGenerate = recipes.filter(r => !imageUrls[r.day] && !loadingImages.has(r.day));

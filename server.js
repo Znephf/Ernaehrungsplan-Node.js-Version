@@ -144,7 +144,7 @@ async function processGenerationJob(jobId) {
             throw new Error('Die Job-Daten sind unvollständig und enthalten keine Einstellungen (settings).');
         }
 
-        const { persons, kcal, dietaryPreference, dietType, excludedIngredients, desiredIngredients, breakfastOption, customBreakfast } = settings;
+        const { persons, kcal, dietaryPreference, dietType, excludedIngredients, desiredIngredients, breakfastOption, customBreakfast, isGlutenFree, isLactoseFree } = settings;
 
         let planType = "Ernährungsplan";
         if (dietaryPreference === 'vegetarian') planType = "vegetarischen Ernährungsplan";
@@ -152,6 +152,16 @@ async function processGenerationJob(jobId) {
 
         const exclusionText = excludedIngredients.trim() ? `Folgende Zutaten oder Zutaten-Gruppen sollen explizit vermieden werden: ${excludedIngredients}.` : '';
         const desiredIngredientsText = desiredIngredients.trim() ? `Folgende Zutaten sollen bevorzugt werden und in mindestens einem Abendessen-Rezept vorkommen, aber nicht zwangsläufig in allen: ${desiredIngredients}.` : '';
+        
+        let specialDietInstructions = '';
+        if (isGlutenFree && isLactoseFree) {
+            specialDietInstructions = 'Alle Gerichte und Zutaten müssen strikt glutenfrei UND laktosefrei sein.';
+        } else if (isGlutenFree) {
+            specialDietInstructions = 'Alle Gerichte und Zutaten müssen strikt glutenfrei sein.';
+        } else if (isLactoseFree) {
+            specialDietInstructions = 'Alle Gerichte und Zutaten müssen strikt laktosefrei sein.';
+        }
+
 
         let breakfastInstruction = '';
         switch (breakfastOption) {
@@ -184,6 +194,7 @@ async function processGenerationJob(jobId) {
         const planPrompt = `Erstelle einen ${planType} für eine ganze Woche (Montag bis Sonntag) für ${persons} Personen.
         Das tägliche Kalorienziel pro Person ist ${kcal} kcal. Halte dich streng an dieses Ziel. Die Summe der Kalorien von Frühstück und Abendessen pro Tag muss sehr nah an diesem Wert liegen (Abweichung max. 100 kcal).
         ${dietTypeInstruction}
+        ${specialDietInstructions}
         ${desiredIngredientsText}
         ${exclusionText}
         Der Plan soll einfach und schnell umsetzbar sein.${varietyInstruction}
@@ -205,10 +216,16 @@ async function processGenerationJob(jobId) {
         
         await connection.query("UPDATE generation_jobs SET status = 'generating_plan' WHERE jobId = ?", [jobId]);
 
+        const temperature = parseFloat((Math.random() * (1.0 - 0.7) + 0.7).toFixed(2));
+
         const planResponse = await generateWithRetry(ai, {
             model: TEXT_MODEL_NAME,
             contents: [{ parts: [{ text: planPrompt }] }],
-            config: { responseMimeType: 'application/json', responseSchema: planSchema }
+            config: { 
+                responseMimeType: 'application/json', 
+                responseSchema: planSchema,
+                temperature: temperature
+            }
         });
         
         const planData = JSON.parse(planResponse.text);

@@ -45,6 +45,22 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, im
       const contentW = pageW - margin * 2;
       const contentH = pageH - margin * 2;
       
+      const style = document.createElement('style');
+      style.id = 'pdf-recipe-styles';
+      style.innerHTML = `
+        .recipe-card-for-pdf.pdf-export-mode { box-shadow: none !important; border: 1px solid #e2e8f0; --tw-text-opacity: 1; color: rgb(15 23 42 / var(--tw-text-opacity)); }
+        .recipe-card-for-pdf.pdf-export-mode img { max-height: 250px !important; width: 100% !important; object-fit: cover !important; }
+        .recipe-card-for-pdf.pdf-export-mode .p-6 { padding: 1rem !important; }
+        .recipe-card-for-pdf.pdf-export-mode h3 { font-size: 1.25rem !important; }
+        .recipe-card-for-pdf.pdf-export-mode h4 { font-size: 1rem !important; }
+        .recipe-card-for-pdf.pdf-export-mode li, .recipe-card-for-pdf.pdf-export-mode p { font-size: 0.8rem !important; line-height: 1.3 !important; }
+        .recipe-card-for-pdf.pdf-export-mode span { font-size: 0.75rem !important; }
+        .recipe-card-for-pdf.pdf-export-mode .mt-3 { margin-top: 0.5rem !important; }
+        .recipe-card-for-pdf.pdf-export-mode .mt-4 { margin-top: 0.75rem !important; }
+        .recipe-card-for-pdf.pdf-export-mode .mt-6 { margin-top: 1rem !important; }
+      `;
+      document.head.appendChild(style);
+
       for (let i = 0; i < recipeElements.length; i++) {
         if (i > 0) {
           pdf.addPage();
@@ -52,23 +68,29 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, im
         
         const element = recipeElements[i] as HTMLElement;
         const originalWidth = element.style.width;
-        element.style.width = '700px';
+        element.style.width = '680px';
+        element.classList.add('pdf-export-mode');
+
+        // Allow browser time to apply new styles
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
         
         element.style.width = originalWidth;
+        element.classList.remove('pdf-export-mode');
         
         const imgData = canvas.toDataURL('image/png');
         const imgProps = pdf.getImageProperties(imgData);
 
-        const finalW = contentW * (2 / 3);
+        const finalW = contentW * (2/3); // Make the card smaller on the page
         const finalH = (imgProps.height * finalW) / imgProps.width;
         const x = (pageW - finalW) / 2;
 
         if (finalH <= contentH) {
-            const y = (pageH - finalH) / 2;
+            const y = (pageH - finalH) / 2; // Center vertically if it fits
             pdf.addImage(imgData, 'PNG', x, y, finalW, finalH);
         } else {
+            // If it's too tall, align to top and let it flow onto next pages
             let y = margin;
             pdf.addImage(imgData, 'PNG', x, y, finalW, finalH);
 
@@ -84,6 +106,9 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, im
         }
       }
       
+      const tempStyle = document.getElementById('pdf-recipe-styles');
+      if (tempStyle) tempStyle.remove();
+
       pdf.save('rezepte.pdf');
       setIsCreatingPdf(false);
       setPdfStatus('');

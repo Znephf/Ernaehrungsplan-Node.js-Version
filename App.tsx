@@ -21,6 +21,8 @@ const defaultSettings: PlanSettings = {
     dietType: 'low-carb',
     excludedIngredients: '',
     desiredIngredients: '',
+    isGlutenFree: false,
+    isLactoseFree: false,
     breakfastOption: 'quark',
     customBreakfast: ''
 };
@@ -38,7 +40,7 @@ const App: React.FC = () => {
 
     const { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive } = useArchive();
     const { plan, setPlan, isLoading, error, generateNewPlan, generationStatus } = useMealPlanGenerator();
-    const { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState, setImageUrlsFromArchive } = useImageGenerator();
+    const { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState, setImageUrlsFromArchive } = useImageGenerator(fetchArchive);
 
     useEffect(() => {
         const checkAuth = async () => {

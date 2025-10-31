@@ -31,16 +31,32 @@ const ShoppingListComponent: React.FC<ShoppingListComponentProps> = ({ shoppingL
 
     setIsCreatingPdf(true);
 
+    const style = document.createElement('style');
+    style.id = 'pdf-export-styles';
+    style.innerHTML = `
+      .pdf-export-mode { --tw-text-opacity: 1; color: rgb(15 23 42 / var(--tw-text-opacity)); }
+      .pdf-export-mode h3 { font-size: 16px !important; }
+      .pdf-export-mode li span { font-size: 12px !important; }
+      .pdf-export-mode.grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    `;
+    document.head.appendChild(style);
+    element.classList.add('pdf-export-mode');
+
+
     const checkboxes = Array.from(element.querySelectorAll('input[type="checkbox"]')) as HTMLInputElement[];
-    const elementRect = element.getBoundingClientRect();
     
+    // Checkboxes unsichtbar machen, aber Layout beibehalten
+    checkboxes.forEach(cb => { cb.style.opacity = '0'; });
+    
+    // Give browser time to apply styles before capturing
+    await new Promise(resolve => setTimeout(resolve, 50)); 
+    
+    const elementRect = element.getBoundingClientRect();
     const checkboxData = checkboxes.map(cb => ({
         rect: cb.getBoundingClientRect(),
         checked: cb.checked,
     }));
 
-    // Checkboxes unsichtbar machen, aber Layout beibehalten
-    checkboxes.forEach(cb => { cb.style.opacity = '0'; });
 
     try {
       const canvas = await html2canvas(element, { 
@@ -98,7 +114,10 @@ const ShoppingListComponent: React.FC<ShoppingListComponentProps> = ({ shoppingL
     } catch (error) {
       console.error("Konnte PDF nicht erstellen", error);
     } finally {
-      // Checkbox-Sichtbarkeit wiederherstellen, auch im Fehlerfall
+      // Restore styles and visibility
+      element.classList.remove('pdf-export-mode');
+      const tempStyle = document.getElementById('pdf-export-styles');
+      if (tempStyle) tempStyle.remove();
       checkboxes.forEach(cb => { cb.style.opacity = '1'; });
       setIsCreatingPdf(false);
     }

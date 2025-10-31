@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { PlanSettings } from '../types';
 
@@ -12,10 +11,19 @@ interface SettingsPanelProps {
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChange, onGeneratePlan, isLoading }) => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
+    
+    // Assert that the target is an HTMLInputElement for checkbox handling
+    const isCheckbox = type === 'checkbox';
+    const target = e.target as HTMLInputElement;
+
     onSettingsChange({
-      ...settings,
-      [name]: (name === 'persons' || name === 'kcal') ? Number(value) : value,
+        ...settings,
+        [name]: isCheckbox
+            ? target.checked
+            : (name === 'persons' || name === 'kcal')
+                ? Number(value)
+                : value,
     });
   };
   
@@ -79,6 +87,32 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
             <input type="text" name="customBreakfast" id="customBreakfast" value={settings.customBreakfast} onChange={handleChange} placeholder="z.B. Rührei mit Speck" className={inputStyles} />
           </div>
         )}
+      </div>
+
+      {/* New Checkbox Row */}
+      <div className="md:col-span-2 lg:col-span-3 flex items-center space-x-6 pt-2">
+            <label htmlFor="isGlutenFree" className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700">
+                <input
+                    type="checkbox"
+                    name="isGlutenFree"
+                    id="isGlutenFree"
+                    checked={settings.isGlutenFree}
+                    onChange={handleChange}
+                    className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span>Glutenfrei</span>
+            </label>
+            <label htmlFor="isLactoseFree" className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700">
+                <input
+                    type="checkbox"
+                    name="isLactoseFree"
+                    id="isLactoseFree"
+                    checked={settings.isLactoseFree}
+                    onChange={handleChange}
+                    className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span>Laktosefrei</span>
+            </label>
       </div>
       
       {/* Full width rows */}

@@ -128,6 +128,10 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
                       <span className="text-slate-300">&bull;</span>
                       <span className="capitalize">{entry.dietaryPreference === 'omnivore' ? 'Alles' : entry.dietaryPreference}</span>
                   </div>
+                  <div className="text-xs text-emerald-700 font-semibold mt-2 flex flex-wrap gap-x-2">
+                    {entry.isGlutenFree && <span className="bg-emerald-50 px-2 py-0.5 rounded-full">Glutenfrei</span>}
+                    {entry.isLactoseFree && <span className="bg-emerald-50 px-2 py-0.5 rounded-full">Laktosefrei</span>}
+                  </div>
                   <div className="mt-3 space-y-1 text-sm text-slate-600">
                       <p>
                           <span className="font-semibold">Diät-Typ:</span> {dietTypeLabels[entry.dietType] || 'Standard'}

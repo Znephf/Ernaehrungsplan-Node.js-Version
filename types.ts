@@ -40,6 +40,8 @@ export interface PlanSettings {
     dietType: DietType;
     excludedIngredients: string;
     desiredIngredients: string;
+    isGlutenFree: boolean;
+    isLactoseFree: boolean;
     breakfastOption: BreakfastOption;
     customBreakfast: string;
 }
