@@ -5,6 +5,16 @@ import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import { GoogleGenAI, Modality, Type } from '@google/genai';
 
+// --- Diagnostischer Code-Block ---
+// Dieser Block wird sofort beim Start ausgeführt, um zu prüfen, welche Umgebungsvariablen
+// der Node.js-Prozess tatsächlich von Plesk erhält.
+console.log('--- Starte Server und prüfe Umgebungsvariablen ---');
+console.log('Wert für COOKIE_SECRET:', process.env.COOKIE_SECRET ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
+console.log('Wert für APP_PASSWORD:', process.env.APP_PASSWORD ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
+console.log('Wert für API_KEY:', process.env.API_KEY ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
+console.log('--- Diagnose Ende ---');
+
+
 // Umgebungsvariablen laden (für lokale Entwicklung)
 dotenv.config();
 
@@ -115,7 +125,7 @@ app.post('/api/generate-plan', async (req, res) => {
             case 'custom':
                 breakfastInstruction = customBreakfast.trim()
                     ? `Das Frühstück soll jeden Tag gleich sein und dieser Beschreibung folgen: "${customBreakfast}". Falls es sinnvoll ist, variiere die Toppings oder kleine Beilagen.`
-                    : 'Das Frühstück kann eine beliebige, einfache Mahlzeit sein und soll jeden Tag gleich sein.';
+                    : 'Das Frühstück kann eine beliebige, einfache Mahlezeit sein und soll jeden Tag gleich sein.';
                 break;
         }
         
