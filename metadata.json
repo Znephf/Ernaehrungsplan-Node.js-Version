@@ -1,0 +1,5 @@
+{
+  "name": "Ernährungsplan App - Node.js Funktion",
+  "description": "Eine App zur Anzeige eines wöchentlichen vegetarischen Ernährungsplans, einschließlich Einkaufsliste, Wochenübersicht und Rezepten. Der Plan ist für 2 Personen ausgelegt und zielt auf ca. 1500 kcal pro Person ab.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,126 @@
+import { useState, useCallback } from 'react';
+import type { Recipe } from '../types';
+
+export const useImageGenerator = () => {
+    const [imageUrls, setImageUrls] = useState<{ [key: string]: string }>({});
+    const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
+    const [imageErrors, setImageErrors] = useState<{ [key: string]: string | null }>({});
+    
+    const executeImageGeneration = useCallback(async (recipe: Recipe): Promise<string | null> => {
+        const maxAttempts = 10;
+        let lastKnownError: Error | null = null;
+        
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                const apiResponse = await fetch('/api/generate-image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recipe, attempt })
+                });
+
+                if (!apiResponse.ok) {
+                    const errorData = await apiResponse.json();
+                    throw new Error(errorData.error || `Serverfehler: ${apiResponse.statusText}`);
+                }
+                
+                const response = await apiResponse.json();
+
+                if (response.promptFeedback?.blockReason) {
+                    throw new Error(`Anfrage blockiert (${response.promptFeedback.blockReason})`);
+                }
+
+                const candidate = response?.candidates?.[0];
+                if (!candidate) {
+                    throw new Error("Keine Bild-Vorschläge von der API erhalten.");
+                }
+
+                if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+                    if (candidate.finishReason === 'SAFETY') throw new Error("Aus Sicherheitsgründen blockiert.");
+                    throw new Error(`Generierung gestoppt: ${candidate.finishReason}`);
+                }
+
+                const imagePart = candidate.content?.parts?.find((p: any) => p.inlineData);
+                if (imagePart?.inlineData) {
+                    const base64ImageBytes: string = imagePart.inlineData.data;
+                    const url = `data:image/png;base64,${base64ImageBytes}`;
+                    setImageUrls(prev => ({ ...prev, [recipe.day]: url }));
+                    setLoadingImages(prev => {
+                        const newSet = new Set(prev);
+                        newSet.delete(recipe.day);
+                        return newSet;
+                    });
+                    return url;
+                } else {
+                    throw new Error("Antwort enthält keine Bilddaten.");
+                }
+            } catch (e) {
+                lastKnownError = e as Error;
+                console.warn(`Bildgenerierungsversuch ${attempt} für "${recipe.title}" fehlgeschlagen:`, e);
+                if (lastKnownError.message.includes('blockiert') || lastKnownError.message.includes('Sicherheit')) break; // Don't retry on safety blocks
+            }
+        }
+
+        let errorMessage = lastKnownError?.message || "Unbekannter Fehler";
+        if (errorMessage.includes('NO_IMAGE')) errorMessage = "Das Modell konnte auch nach einem weiteren Versuch kein Bild generieren.";
+        else if (errorMessage.includes('gestoppt')) errorMessage = `Generierung gestoppt: ${errorMessage.split(':').pop()?.trim()}`;
+
+        setImageErrors(prev => ({ ...prev, [recipe.day]: `Fehler: ${errorMessage}` }));
+        setLoadingImages(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(recipe.day);
+            return newSet;
+        });
+
+        return null;
+    }, []);
+
+    const generateImage = useCallback(async (recipe: Recipe) => {
+        if (loadingImages.has(recipe.day)) return;
+
+        setLoadingImages(prev => new Set(prev).add(recipe.day));
+        setImageErrors(prev => ({ ...prev, [recipe.day]: null }));
+
+        await executeImageGeneration(recipe);
+    }, [loadingImages, executeImageGeneration]);
+
+    const generateMissingImages = useCallback(async (recipes: Recipe[], onProgress?: (status: string) => void): Promise<{[key: string]: string}> => {
+        const recipesToGenerate = recipes.filter(r => !imageUrls[r.day] && !loadingImages.has(r.day));
+        const finalUrls = { ...imageUrls };
+
+        if (recipesToGenerate.length === 0) {
+            return finalUrls;
+        }
+
+        for (let i = 0; i < recipesToGenerate.length; i++) {
+            const recipe = recipesToGenerate[i];
+            if (onProgress) {
+                onProgress(`Generiere Bild ${i + 1} von ${recipesToGenerate.length}...`);
+            }
+            
+            setLoadingImages(prev => new Set(prev).add(recipe.day));
+            setImageErrors(prev => ({ ...prev, [recipe.day]: null }));
+            
+            const newUrl = await executeImageGeneration(recipe);
+            if (newUrl) {
+                finalUrls[recipe.day] = newUrl;
+            }
+
+            // Add delay if it's not the last image
+            if (i < recipesToGenerate.length - 1) {
+                if (onProgress) {
+                   onProgress(`Warte 3s...`);
+                }
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+        }
+        return finalUrls;
+    }, [imageUrls, loadingImages, executeImageGeneration]);
+    
+    const resetImageState = useCallback(() => {
+        setImageUrls({});
+        setLoadingImages(new Set());
+        setImageErrors({});
+    }, []);
+
+    return { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState };
+};
