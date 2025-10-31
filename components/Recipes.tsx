@@ -48,12 +48,26 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, im
       style.id = 'pdf-recipe-styles';
       style.innerHTML = `
         .recipe-card-for-pdf.pdf-export-mode { box-shadow: none !important; border: 1px solid #e2e8f0; --tw-text-opacity: 1; color: rgb(15 23 42 / var(--tw-text-opacity)); }
-        .recipe-card-for-pdf.pdf-export-mode img { 
-            width: 100% !important; 
-            height: 100% !important; /* Fill container */
-            object-fit: cover !important; /* Maintain aspect ratio */
-            max-height: none !important;
+        
+        /* START: Fix for distorted images */
+        .recipe-card-for-pdf.pdf-export-mode .aspect-video {
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            height: 250px !important;
+            padding-bottom: 0 !important;
+            overflow: hidden !important;
+            background-color: #f8fafc !important;
         }
+        .recipe-card-for-pdf.pdf-export-mode img { 
+            position: static !important;
+            width: auto !important;
+            height: auto !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+        }
+        /* END: Fix for distorted images */
+
         .recipe-card-for-pdf.pdf-export-mode .p-6 { padding: 1rem !important; }
         .recipe-card-for-pdf.pdf-export-mode h3 { font-size: 1.25rem !important; }
         .recipe-card-for-pdf.pdf-export-mode h4 { font-size: 1rem !important; }
