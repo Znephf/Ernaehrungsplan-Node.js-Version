@@ -5,6 +5,7 @@ import RecipesComponent from './components/Recipes';
 import ArchiveComponent from './components/Archive';
 import SettingsPanel from './components/SettingsPanel';
 import LoginComponent from './components/Login';
+import LoadingOverlay from './components/LoadingOverlay';
 import type { View, PlanSettings, PlanData } from './types';
 import { useArchive } from './hooks/useArchive';
 import { useMealPlanGenerator } from './hooks/useMealPlanGenerator';
@@ -176,6 +177,7 @@ const App: React.FC = () => {
 
     return (
         <div className="bg-slate-100 min-h-screen font-sans">
+            {isLoading && <LoadingOverlay />}
             <header className="bg-white shadow-md sticky top-0 z-10">
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
                     <h1 className="text-2xl font-bold text-slate-800">
