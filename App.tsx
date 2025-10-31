@@ -72,15 +72,30 @@ const App: React.FC = () => {
 
     const handleGenerateRequest = async () => {
         const result = await generateNewPlan(panelSettings);
-        if (result.success && result.newPlanId) {
-            setCurrentPlanId(result.newPlanId);
-            resetImageState();
-            // Refetch the archive to include the newly created plan
-            await fetchArchive();
-            // Load the new plan into the view. `handleLoadPlan` will find it
-            // in the now-updated archive state.
-            handleLoadPlan(result.newPlanId);
+    
+        if (result.success) {
+            if (result.newPlan) {
+                // BEST CASE: We got the full plan data directly.
+                // Load it into state, bypassing the archive fetch race condition.
+                setPlan(result.newPlan); 
+                setCurrentPlanId(result.newPlan.id);
+                setImageUrlsFromArchive(result.newPlan.imageUrls || {});
+                setCurrentView('plan');
+                window.scrollTo(0, 0);
+    
+                // Update the archive list in the background for the archive view.
+                fetchArchive();
+    
+            } else if (result.newPlanId) {
+                // FALLBACK: We only got an ID. Use the old (potentially racy) logic.
+                console.warn("Fallback-Logik wird verwendet, um den Plan zu laden. Dies könnte fehlschlagen.");
+                setCurrentPlanId(result.newPlanId);
+                resetImageState(); 
+                await fetchArchive(); 
+                handleLoadPlan(result.newPlanId);
+            }
         }
+        // Error is handled by the hook and displayed in the UI already.
     };
 
     const handleSelectRecipe = (day: string) => {

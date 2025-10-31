@@ -408,12 +408,34 @@ app.post('/api/generate-plan-job', requireAuth, async (req, res) => {
 app.get('/api/job-status/:jobId', requireAuth, async (req, res) => {
     const { jobId } = req.params;
     try {
-        const [rows] = await pool.query('SELECT status, planId, errorMessage FROM generation_jobs WHERE jobId = ?', [jobId]);
-        if (rows.length === 0) {
+        const [jobRows] = await pool.query('SELECT status, planId, errorMessage FROM generation_jobs WHERE jobId = ?', [jobId]);
+        if (jobRows.length === 0) {
             return res.status(404).json({ error: 'Job nicht gefunden.' });
         }
-        const { status, planId, errorMessage } = rows[0];
+        const { status, planId, errorMessage } = jobRows[0];
+
+        if (status === 'complete' && planId) {
+            const [planRows] = await pool.query('SELECT * FROM archived_plans WHERE id = ?', [planId]);
+            if (planRows.length > 0) {
+                const row = planRows[0];
+                const settings = typeof row.settings === 'string' ? JSON.parse(row.settings) : row.settings;
+                const planData = typeof row.planData === 'string' ? JSON.parse(row.planData) : row.planData;
+
+                const newPlanEntry = {
+                    id: row.id.toString(),
+                    createdAt: new Date(row.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                    name: planData.name || 'Unbenannter Plan',
+                    ...settings,
+                    ...planData
+                };
+
+                return res.json({ status, plan: newPlanEntry, error: errorMessage });
+            }
+        }
+        
+        // For other statuses or if plan not found (edge case), return original response
         res.json({ status, planId: planId?.toString(), error: errorMessage });
+
     } catch (error) {
         console.error(`Fehler beim Abrufen des Status für Job ${jobId}:`, error);
         res.status(500).json({ error: 'Job-Status konnte nicht abgerufen werden.' });

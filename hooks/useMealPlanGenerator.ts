@@ -12,7 +12,7 @@ const initialPlan = {
 
 interface GenerationResult {
     success: boolean;
-    newPlan: PlanData | null;
+    newPlan: ArchiveEntry | null;
     newPlanId: string | null;
 }
 
@@ -68,14 +68,19 @@ export const useMealPlanGenerator = () => {
                            return; 
                         }
 
-                        const { status, planId, error: jobError } = await statusResponse.json();
+                        const { status, plan: newPlanData, planId, error: jobError } = await statusResponse.json();
                         setGenerationStatus(status);
 
                         if (status === 'complete') {
                             clearInterval(intervalId);
                             setIsLoading(false);
                             setGenerationStatus('idle');
-                            resolve({ success: true, newPlan: null, newPlanId: planId });
+                            if (newPlanData) {
+                                resolve({ success: true, newPlan: newPlanData, newPlanId: newPlanData.id });
+                            } else {
+                                console.warn('Plan-Generierung erfolgreich, aber Plandaten fehlten. Refetch wird benötigt.');
+                                resolve({ success: true, newPlan: null, newPlanId: planId });
+                            }
                         }
 
                         if (status === 'error') {
