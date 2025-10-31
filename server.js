@@ -69,13 +69,9 @@ async function generateWithRetry(ai, generationParams) {
 }
 
 // ======================================================
-// --- ÖFFENTLICHE ROUTEN (Keine Authentifizierung nötig) ---
+// --- ÖFFENTLICHE API-ROUTEN ---
 // ======================================================
 
-// Stellt statische Dateien aus dem 'public'-Ordner bereit (enthält login.html).
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Login-Endpunkt.
 app.post('/login', (req, res) => {
     const { password } = req.body;
     if (password === APP_PASSWORD) {
@@ -83,51 +79,40 @@ app.post('/login', (req, res) => {
             signed: true,
             httpOnly: true,
             path: '/',
-            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 Tage
+            maxAge: 30 * 24 * 60 * 60 * 1000, // 30 Tage
+            secure: process.env.NODE_ENV === 'production',
         });
-        res.redirect('/');
+        res.status(200).json({ message: 'Anmeldung erfolgreich.' });
     } else {
-        res.redirect('/login.html?error=1');
+        res.status(401).json({ error: 'Das eingegebene Passwort ist falsch.' });
     }
 });
 
-// Logout-Endpunkt.
 app.post('/logout', (req, res) => {
     res.clearCookie('isAuthenticated');
     res.status(200).json({ message: 'Abmeldung erfolgreich.' });
 });
 
-// ======================================================
-// --- GESCHÜTZTER BEREICH (Authentifizierung nötig) ---
-// ======================================================
-
-const protectedRouter = express.Router();
-
-// 1. Authentifizierungs-Middleware (Die "Firewall")
-// Dies ist die erste Funktion, die für jede Anfrage an den protectedRouter ausgeführt wird.
-protectedRouter.use((req, res, next) => {
+app.get('/api/check-auth', (req, res) => {
     if (req.signedCookies.isAuthenticated === 'true') {
-        return next(); // Benutzer ist authentifiziert, fahre mit der nächsten Funktion fort.
+        res.json({ isAuthenticated: true });
+    } else {
+        res.json({ isAuthenticated: false });
     }
-    
-    // Benutzer ist NICHT authentifiziert.
-    // Wenn es ein API-Aufruf ist, sende einen 401-Fehler (Nicht autorisiert).
-    if (req.path.startsWith('/api/')) {
-        return res.status(401).json({ error: 'Nicht authentifiziert. Bitte melden Sie sich an.' });
-    }
-    
-    // Für jede andere Anfrage (z.B. Seitenaufruf), leite zur Login-Seite um.
-    res.redirect('/login.html');
 });
 
-// 2. Statische Dateien der React-App bereitstellen
-// Dies wird nur ausgeführt, wenn die Authentifizierungs-Middleware 'next()' aufruft.
-protectedRouter.use(express.static(path.join(__dirname, 'dist')));
+// ======================================================
+// --- GESCHÜTZTE API-ROUTEN ---
+// ======================================================
 
+const requireAuth = (req, res, next) => {
+    if (req.signedCookies.isAuthenticated === 'true') {
+        return next();
+    }
+    res.status(401).json({ error: 'Nicht authentifiziert. Bitte melden Sie sich an.' });
+};
 
-// 3. Geschützte API-Endpunkte
-// Diese werden nur ausgeführt, wenn die Authentifizierung erfolgreich war.
-protectedRouter.post('/api/generate-plan', async (req, res) => {
+app.post('/api/generate-plan', requireAuth, async (req, res) => {
     const { settings, previousPlanRecipes } = req.body;
     
     if (!settings) {
@@ -174,7 +159,6 @@ protectedRouter.post('/api/generate-plan', async (req, res) => {
             varietyInstruction = `\nWICHTIG: Um für Abwechslung zu sorgen, erstelle bitte völlig andere Gerichte als im vorherigen Plan. Vermeide insbesondere Gerichte, die diesen ähneln: ${previousRecipeTitles}.`;
         }
         
-        // --- PROMPT 1: Plan & Rezepte generieren ---
         const planPrompt = `Erstelle einen ${planType} für eine ganze Woche (Montag bis Sonntag) für ${persons} Personen.
         Das tägliche Kalorienziel pro Person ist ${kcal} kcal. Halte dich streng an dieses Ziel. Die Summe der Kalorien von Frühstück und Abendessen pro Tag muss sehr nah an diesem Wert liegen (Abweichung max. 100 kcal).
         ${dietTypeInstruction}
@@ -204,8 +188,7 @@ protectedRouter.post('/api/generate-plan', async (req, res) => {
         });
         
         const planData = JSON.parse(planResponse.text);
-
-        // --- PROMPT 2: Einkaufsliste aus Rezepten generieren ---
+        
         const shoppingListPrompt = `Basierend auf dem folgenden JSON-Objekt mit Rezepten für einen wöchentlichen Ernährungsplan für ${persons} Personen, erstelle eine detaillierte und vollständige Einkaufsliste. Alle Zutaten aus allen Rezepten und dem Frühstück müssen enthalten sein. Fasse die Artikel zusammen, wo es sinnvoll ist (z.B. wenn ein Rezept 1 Zwiebel und ein anderes 2 benötigt, sollte die Liste 3 Zwiebeln enthalten). Gruppiere die Einkaufsliste nach sinnvollen Supermarkt-Kategorien (z.B. "Obst & Gemüse", "Molkereiprodukte & Eier", "Trockensortiment & Konserven"). Hier sind die Daten: ${JSON.stringify({ weeklyPlan: planData.weeklyPlan, recipes: planData.recipes })}`;
         
         const shoppingListSchema = {
@@ -233,8 +216,7 @@ protectedRouter.post('/api/generate-plan', async (req, res) => {
         });
 
         const shoppingListData = JSON.parse(shoppingListResponse.text);
-
-        // --- Kombinieren und senden ---
+        
         const finalPlan = {
             ...planData,
             shoppingList: shoppingListData.shoppingList
@@ -251,7 +233,7 @@ protectedRouter.post('/api/generate-plan', async (req, res) => {
     }
 });
 
-protectedRouter.post('/api/generate-image', async (req, res) => {
+app.post('/api/generate-image', requireAuth, async (req, res) => {
     const { recipe, attempt } = req.body;
 
     if (!recipe) {
@@ -281,18 +263,14 @@ protectedRouter.post('/api/generate-image', async (req, res) => {
     }
 });
 
+// ======================================================
+// --- BEREITSTELLUNG DER REACT-APP ---
+// ======================================================
+app.use(express.static(path.join(__dirname, 'dist')));
 
-// 4. Fallback für die Haupt-App
-// Jede andere GET-Anfrage, die keine statische Datei war, lädt die Haupt-index.html.
-// Dies ist entscheidend für das Laden der App und für client-seitiges Routing.
-// MUSS die letzte Route im geschützten Router sein.
-protectedRouter.get('*', (req, res) => {
+app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
-
-// Hänge den gesamten geschützten Router an die Haupt-App an.
-// Jede Anfrage, die nicht von den öffentlichen Routen oben behandelt wurde, wird hierher geleitet.
-app.use('/', protectedRouter);
 
 // --- Server starten ---
 app.listen(port, () => {

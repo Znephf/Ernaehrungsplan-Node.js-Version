@@ -7,10 +7,9 @@ export default defineConfig({
   server: {
     proxy: {
       // Leitet alle Anfragen von /api an den Backend-Server weiter
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-      },
+      '/api': 'http://localhost:3001',
+      '/login': 'http://localhost:3001',
+      '/logout': 'http://localhost:3001',
     },
   },
 })

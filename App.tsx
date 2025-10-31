@@ -4,6 +4,7 @@ import WeeklyPlanComponent from './components/WeeklyPlan';
 import RecipesComponent from './components/Recipes';
 import ArchiveComponent from './components/Archive';
 import SettingsPanel from './components/SettingsPanel';
+import LoginComponent from './components/Login';
 import type { View, PlanSettings, PlanData } from './types';
 import { useArchive } from './hooks/useArchive';
 import { useMealPlanGenerator } from './hooks/useMealPlanGenerator';
@@ -24,6 +25,7 @@ const defaultSettings: PlanSettings = {
 };
 
 const App: React.FC = () => {
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
     const [currentView, setCurrentView] = useState<View>('plan');
     const [selectedRecipeDay, setSelectedRecipeDay] = useState<string | null>(null);
     const [isSettingsVisible, setIsSettingsVisible] = useState(true);
@@ -35,7 +37,24 @@ const App: React.FC = () => {
     const { plan, setPlan, isLoading, error, generateNewPlan } = useMealPlanGenerator(addPlanToArchive);
     const { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState } = useImageGenerator();
 
-    // Reset generated images when the plan changes
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                const response = await fetch('/api/check-auth');
+                if (response.ok) {
+                    const data = await response.json();
+                    setIsAuthenticated(data.isAuthenticated);
+                } else {
+                    setIsAuthenticated(false);
+                }
+            } catch (err) {
+                console.error("Auth check failed", err);
+                setIsAuthenticated(false);
+            }
+        };
+        checkAuth();
+    }, []);
+
     useEffect(() => {
         resetImageState();
     }, [plan, resetImageState]);
@@ -57,7 +76,6 @@ const App: React.FC = () => {
         }
     }, [loadPlanFromArchive, setPlan]);
     
-    // This effect scrolls to the selected recipe when the view changes to 'recipes'
     useEffect(() => {
         if (currentView === 'recipes' && selectedRecipeDay) {
             const timer = setTimeout(() => {
@@ -65,7 +83,7 @@ const App: React.FC = () => {
                 if (element) {
                     element.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
-                setSelectedRecipeDay(null); // Reset after scrolling
+                setSelectedRecipeDay(null);
             }, 100);
             return () => clearTimeout(timer);
         }
@@ -93,18 +111,25 @@ const App: React.FC = () => {
 
     const handleLogout = async () => {
         try {
-            const response = await fetch('/logout', { method: 'POST' });
-            if (response.ok) {
-                window.location.reload(); // Seite neu laden, um den Auth-Check auszulösen
-            } else {
-                throw new Error('Logout fehlgeschlagen');
-            }
+            await fetch('/logout', { method: 'POST' });
+            setIsAuthenticated(false);
         } catch (error) {
             console.error('Fehler beim Abmelden:', error);
             alert('Abmeldung fehlgeschlagen.');
         }
     };
 
+    if (isAuthenticated === null) {
+        return (
+            <div className="flex items-center justify-center h-screen bg-slate-100">
+                <div className="text-xl font-semibold text-slate-600">Lade...</div>
+            </div>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return <LoginComponent onLoginSuccess={() => setIsAuthenticated(true)} />;
+    }
 
     const renderView = () => {
         switch (currentView) {
