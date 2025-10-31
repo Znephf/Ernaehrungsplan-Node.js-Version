@@ -183,14 +183,14 @@ const App: React.FC = () => {
                     <h1 className="text-2xl font-bold text-slate-800">
                         KI Ernährungsplaner
                     </h1>
-                    <div className="flex items-center gap-2">
-                        <nav className="flex items-center justify-center gap-2 sm:gap-4 p-1 bg-slate-100 rounded-lg">
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                        <nav className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 p-1 bg-slate-100 rounded-lg">
                             <NavButton view="plan" label="Wochenplan" />
                             <NavButton view="shopping" label="Einkaufsliste" />
                             <NavButton view="recipes" label="Rezepte" />
                             <NavButton view="archive" label="Archiv" />
                         </nav>
-                        <div className="h-8 border-l border-slate-300 mx-2"></div>
+                        <div className="hidden sm:block h-8 border-l border-slate-300 mx-2"></div>
                          <button
                             onClick={handleDownload}
                             disabled={isDownloading}
