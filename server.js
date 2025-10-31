@@ -20,7 +20,7 @@ const APP_PASSWORD = process.env.APP_PASSWORD;
 const COOKIE_SECRET = process.env.COOKIE_SECRET;
 
 if (!COOKIE_SECRET || !APP_PASSWORD) {
-    console.error('FATAL ERROR: COOKIE_SECRET oder APP_PASSWORD ist nicht in den Umgebungsvariablen gesetzt. Die Anwendung kann nicht sicher gestartet werden.');
+    console.error('FATAL ERROR: Die Umgebungsvariablen COOKIE_SECRET und/oder APP_PASSWORD sind nicht gesetzt. Bitte fügen Sie diese in der Plesk Node.js-Verwaltung hinzu. Die Anwendung wird beendet.');
     process.exit(1);
 }
 

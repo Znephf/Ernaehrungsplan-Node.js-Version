@@ -78,7 +78,9 @@ Dies ist der wichtigste Schritt für die Sicherheit. Alle drei Variablen sind **
     -   **Wert:** Legen Sie hier das Passwort fest, das für den Login auf der Webseite verwendet werden soll.
 6.  Klicken Sie auf **OK**, nachdem Sie alle drei Variablen hinzugefügt haben.
 
-**Wichtig:** Verwenden Sie niemals eine `.env`-Datei in der Produktionsumgebung auf Plesk. Die Plesk-eigenen Umgebungsvariablen sind sicherer.
+**WICHTIG: Wenn diese drei Umgebungsvariablen nicht korrekt gesetzt sind, wird der Server absichtlich nicht starten! Dies ist die häufigste Ursache für Fehler nach dem Deployment. Überprüfen Sie die Server-Logs (`stderr`) in Plesk auf Fehlermeldungen.**
+
+Verwenden Sie niemals eine `.env`-Datei in der Produktionsumgebung auf Plesk. Die Plesk-eigenen Umgebungsvariablen sind sicherer.
 
 ## Schritt 5: Anwendung starten
 
@@ -87,9 +89,9 @@ Dies ist der wichtigste Schritt für die Sicherheit. Alle drei Variablen sind **
 
 ## Fehlerbehebung
 
--   **502/503 Fehler:** Die Node.js-Anwendung konnte nicht starten.
+-   **502/503 Fehler oder keine Passwort-Abfrage:** Die Node.js-Anwendung konnte nicht starten oder stürzt ab.
+    -   **Prüfen Sie als Erstes die Umgebungsvariablen!** Eine fehlende `COOKIE_SECRET`- oder `APP_PASSWORD`-Variable ist die häufigste Ursache.
     -   Überprüfen Sie die Log-Dateien. Sie finden den Link zu den Logs (`stderr`) direkt auf der Node.js-Verwaltungsseite in Plesk.
-    -   Ein häufiger Fehler ist eine fehlende `COOKIE_SECRET`- oder `APP_PASSWORD`-Umgebungsvariable.
     -   Stellen Sie sicher, dass alle Abhängigkeiten mit `npm install` korrekt installiert wurden.
     -   Prüfen Sie, ob die `Anwendungsstartdatei` auf `server.js` gesetzt ist.
 -   **API-Fehler:** Wenn die App läuft, aber die Plangenerierung fehlschlägt, prüfen Sie:
