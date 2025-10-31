@@ -108,16 +108,14 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
         }
     }, [loadingImages, executeImageGeneration, onImageSaved]);
 
-    const generateMissingImages = useCallback(async (recipes: Recipe[], onProgress?: (status: string) => void): Promise<{[key: string]: string}> => {
+    const generateMissingImages = useCallback(async (recipes: Recipe[], planId: string | null, onProgress?: (status: string) => void): Promise<{[key: string]: string}> => {
         const recipesToGenerate = recipes.filter(r => !imageUrls[r.day] && !loadingImages.has(r.day));
         const finalUrls = { ...imageUrls };
 
         if (recipesToGenerate.length === 0) {
             return finalUrls;
         }
-
-        // Bilder werden hier nicht persistent gespeichert, da kein Plan-Kontext vorhanden ist.
-        // Das persistente Speichern erfolgt nur über die einzelne `generateImage`-Funktion.
+        
         for (let i = 0; i < recipesToGenerate.length; i++) {
             const recipe = recipesToGenerate[i];
             if (onProgress) {
@@ -130,9 +128,24 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
             const newUrl = await executeImageGeneration(recipe);
             if (newUrl) {
                 finalUrls[recipe.day] = newUrl;
+                 if (planId) {
+                    try {
+                        const response = await fetch('/api/archive/image', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ planId, day: recipe.day, imageUrl: newUrl })
+                        });
+                        if (response.ok && onImageSaved) {
+                            onImageSaved();
+                        } else if (!response.ok) {
+                            console.warn(`Bild-URL für ${recipe.day} konnte nicht im Backend gespeichert werden. Status: ${response.status}`);
+                        }
+                    } catch (e) {
+                        console.error(`Konnte Bild für ${recipe.day} nicht im Backend speichern:`, e);
+                    }
+                }
             }
 
-            // Add delay if it's not the last image
             if (i < recipesToGenerate.length - 1) {
                 if (onProgress) {
                    onProgress(`Warte 3s...`);
@@ -141,7 +154,7 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
             }
         }
         return finalUrls;
-    }, [imageUrls, loadingImages, executeImageGeneration]);
+    }, [imageUrls, loadingImages, executeImageGeneration, onImageSaved]);
     
     const resetImageState = useCallback(() => {
         setImageUrls({});

@@ -27,6 +27,8 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDiet, setSelectedDiet] = useState<DietType | 'all'>('all');
   const [selectedPreference, setSelectedPreference] = useState<Diet | 'all'>('all');
+  const [filterGlutenFree, setFilterGlutenFree] = useState(false);
+  const [filterLactoseFree, setFilterLactoseFree] = useState(false);
 
 
   const filteredArchive = useMemo(() => {
@@ -40,10 +42,12 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
 
       const matchesDiet = selectedDiet === 'all' || entry.dietType === selectedDiet;
       const matchesPreference = selectedPreference === 'all' || entry.dietaryPreference === selectedPreference;
-      
-      return matchesSearch && matchesDiet && matchesPreference;
+      const matchesGlutenFree = !filterGlutenFree || entry.isGlutenFree;
+      const matchesLactoseFree = !filterLactoseFree || entry.isLactoseFree;
+
+      return matchesSearch && matchesDiet && matchesPreference && matchesGlutenFree && matchesLactoseFree;
     });
-  }, [archive, searchTerm, selectedDiet, selectedPreference]);
+  }, [archive, searchTerm, selectedDiet, selectedPreference, filterGlutenFree, filterLactoseFree]);
 
 
   if (archive.length === 0) {
@@ -106,6 +110,27 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
                 {Object.entries(dietTypeLabels).map(([key, label]) => (
                     <FilterButton key={key} value={key as DietType} label={label} currentValue={selectedDiet} onClick={setSelectedDiet} />
                 ))}
+            </div>
+             <div className="flex flex-wrap items-center gap-2 pt-2">
+                <span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Optionen:</span>
+                <label className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700 bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded-full transition-colors has-[:checked]:bg-emerald-600 has-[:checked]:text-white has-[:checked]:shadow-sm">
+                    <input
+                        type="checkbox"
+                        checked={filterGlutenFree}
+                        onChange={(e) => setFilterGlutenFree(e.target.checked)}
+                        className="h-0 w-0 absolute opacity-0"
+                    />
+                    <span>Nur Glutenfrei</span>
+                </label>
+                 <label className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700 bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded-full transition-colors has-[:checked]:bg-emerald-600 has-[:checked]:text-white has-[:checked]:shadow-sm">
+                    <input
+                        type="checkbox"
+                        checked={filterLactoseFree}
+                        onChange={(e) => setFilterLactoseFree(e.target.checked)}
+                        className="h-0 w-0 absolute opacity-0"
+                    />
+                    <span>Nur Laktosefrei</span>
+                </label>
             </div>
         </div>
       </div>

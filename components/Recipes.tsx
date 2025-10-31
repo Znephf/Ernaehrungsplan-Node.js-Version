@@ -14,8 +14,7 @@ interface RecipesComponentProps {
   loadingImages: Set<string>;
   imageErrors: { [key: string]: string | null };
   generateImage: (recipe: Recipe, planId: string | null) => Promise<void>;
-  // FIX: The return type of `generateMissingImages` is updated to reflect that it returns a promise resolving to a dictionary of image URLs, aligning it with the `useImageGenerator` hook's implementation.
-  generateMissingImages: (recipes: Recipe[], onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
+  generateMissingImages: (recipes: Recipe[], planId: string | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
 }
 
 const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages }) => {
@@ -27,7 +26,7 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, im
     setIsCreatingPdf(true);
     setPdfStatus('Prüfe Bilder...');
     
-    await generateMissingImages(recipes, setPdfStatus);
+    await generateMissingImages(recipes, planId, setPdfStatus);
     
     setIsPdfGenerationQueued(true);
   };
@@ -49,7 +48,12 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, im
       style.id = 'pdf-recipe-styles';
       style.innerHTML = `
         .recipe-card-for-pdf.pdf-export-mode { box-shadow: none !important; border: 1px solid #e2e8f0; --tw-text-opacity: 1; color: rgb(15 23 42 / var(--tw-text-opacity)); }
-        .recipe-card-for-pdf.pdf-export-mode img { max-height: 250px !important; width: 100% !important; object-fit: cover !important; }
+        .recipe-card-for-pdf.pdf-export-mode img { 
+            width: 100% !important; 
+            height: 100% !important; /* Fill container */
+            object-fit: cover !important; /* Maintain aspect ratio */
+            max-height: none !important;
+        }
         .recipe-card-for-pdf.pdf-export-mode .p-6 { padding: 1rem !important; }
         .recipe-card-for-pdf.pdf-export-mode h3 { font-size: 1.25rem !important; }
         .recipe-card-for-pdf.pdf-export-mode h4 { font-size: 1rem !important; }
@@ -118,7 +122,7 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, im
     const timer = setTimeout(createPdfFromElements, 500);
     return () => clearTimeout(timer);
 
-  }, [isPdfGenerationQueued, recipes, imageUrls]);
+  }, [isPdfGenerationQueued, recipes, imageUrls, planId, generateMissingImages]);
 
   return (
     <div className="space-y-8">

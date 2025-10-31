@@ -121,8 +121,8 @@ const App: React.FC = () => {
         setIsDownloading(true);
         setDownloadStatus('Prüfe Bilder...');
         
-        // FIX: Pass the full plan object to the exporter, as it expects a PlanData compatible structure.
-        const finalImageUrls = await generateMissingImages(plan.recipes, setDownloadStatus);
+        // FIX: Pass the plan ID to save generated images to the archive.
+        const finalImageUrls = await generateMissingImages(plan.recipes, plan.id, setDownloadStatus);
         
         setDownloadStatus('Erstelle Datei...');
 
