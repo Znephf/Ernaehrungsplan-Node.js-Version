@@ -54,7 +54,7 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, im
             display: flex !important;
             justify-content: center !important;
             align-items: center !important;
-            height: 250px !important;
+            height: 500px !important;
             padding-bottom: 0 !important;
             overflow: hidden !important;
             background-color: #f8fafc !important;
