@@ -6,7 +6,7 @@ import ArchiveComponent from './components/Archive';
 import SettingsPanel from './components/SettingsPanel';
 import LoginComponent from './components/Login';
 import LoadingOverlay from './components/LoadingOverlay';
-import type { View, PlanSettings, PlanData } from './types';
+import type { View, PlanSettings, ArchiveEntry } from './types';
 import { useArchive } from './hooks/useArchive';
 import { useMealPlanGenerator } from './hooks/useMealPlanGenerator';
 import { useImageGenerator } from './hooks/useImageGenerator';
@@ -35,12 +35,13 @@ const App: React.FC = () => {
     const [panelSettings, setPanelSettings] = useState<PlanSettings>(defaultSettings);
     const [isDownloading, setIsDownloading] = useState(false);
     const [downloadStatus, setDownloadStatus] = useState('Speichern');
-    const [currentPlanId, setCurrentPlanId] = useState<string | null>(null);
 
 
     const { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive } = useArchive();
     const { plan, setPlan, isLoading, error, generateNewPlan, generationStatus } = useMealPlanGenerator();
     const { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState, setImageUrlsFromArchive } = useImageGenerator(fetchArchive);
+
+    const currentPlanId = plan ? plan.id : null;
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -64,7 +65,6 @@ const App: React.FC = () => {
         const planToLoad = loadPlanFromArchive(id);
         if (planToLoad) {
             setPlan(planToLoad);
-            setCurrentPlanId(id);
             setImageUrlsFromArchive(planToLoad.imageUrls || {});
             setCurrentView('plan');
             // Scroll to top to see the new plan
@@ -80,7 +80,6 @@ const App: React.FC = () => {
                 // BEST CASE: We got the full plan data directly.
                 // Load it into state, bypassing the archive fetch race condition.
                 setPlan(result.newPlan); 
-                setCurrentPlanId(result.newPlan.id);
                 setImageUrlsFromArchive(result.newPlan.imageUrls || {});
                 setCurrentView('plan');
                 window.scrollTo(0, 0);
@@ -91,7 +90,6 @@ const App: React.FC = () => {
             } else if (result.newPlanId) {
                 // FALLBACK: We only got an ID. Use the old (potentially racy) logic.
                 console.warn("Fallback-Logik wird verwendet, um den Plan zu laden. Dies könnte fehlschlagen.");
-                setCurrentPlanId(result.newPlanId);
                 resetImageState(); 
                 await fetchArchive(); 
                 handleLoadPlan(result.newPlanId);
@@ -123,6 +121,7 @@ const App: React.FC = () => {
         setIsDownloading(true);
         setDownloadStatus('Prüfe Bilder...');
         
+        // FIX: Pass the full plan object to the exporter, as it expects a PlanData compatible structure.
         const finalImageUrls = await generateMissingImages(plan.recipes, setDownloadStatus);
         
         setDownloadStatus('Erstelle Datei...');
@@ -165,7 +164,13 @@ const App: React.FC = () => {
             case 'shopping':
                 return plan ? <ShoppingListComponent shoppingList={plan.shoppingList} /> : null;
             case 'plan':
-                return plan ? <WeeklyPlanComponent weeklyPlan={plan.weeklyPlan} planName={plan.name} onSelectRecipe={handleSelectRecipe} /> : null;
+                return plan ? <WeeklyPlanComponent 
+                                weeklyPlan={plan.weeklyPlan} 
+                                planName={plan.name} 
+                                onSelectRecipe={handleSelectRecipe}
+                                isGlutenFree={plan.isGlutenFree}
+                                isLactoseFree={plan.isLactoseFree}
+                             /> : null;
             case 'recipes':
                 return plan ? <RecipesComponent 
                             recipes={plan.recipes} 

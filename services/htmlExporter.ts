@@ -1,5 +1,6 @@
 
-import type { PlanData, ShoppingList, WeeklyPlan, Recipes, Recipe } from '../types';
+
+import type { PlanData, ShoppingList, WeeklyPlan, Recipes, Recipe, ArchiveEntry } from '../types';
 
 // Helper function to escape HTML special characters
 const escapeHtml = (unsafe: string) => {
@@ -167,7 +168,7 @@ function renderRecipes(recipes: Recipes, imageUrls: { [key: string]: string }): 
 }
 
 // Main function to generate and trigger download
-export const generateAndDownloadHtml = async (plan: PlanData, imageUrls: { [key: string]: string }) => {
+export const generateAndDownloadHtml = async (plan: PlanData | ArchiveEntry, imageUrls: { [key: string]: string }) => {
     
     const compressedImageUrls: { [key: string]: string } = {};
     const imagePromises = Object.keys(imageUrls).map(async day => {
@@ -284,4 +285,3 @@ export const generateAndDownloadHtml = async (plan: PlanData, imageUrls: { [key:
     document.body.removeChild(a);
     URL.revokeObjectURL(href);
 };
-

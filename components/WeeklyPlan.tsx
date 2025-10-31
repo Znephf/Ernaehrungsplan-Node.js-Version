@@ -6,15 +6,25 @@ interface WeeklyPlanComponentProps {
   weeklyPlan: WeeklyPlan;
   planName: string;
   onSelectRecipe: (day: string) => void;
+  isGlutenFree?: boolean;
+  isLactoseFree?: boolean;
 }
 
-const WeeklyPlanComponent: React.FC<WeeklyPlanComponentProps> = ({ weeklyPlan, planName, onSelectRecipe }) => {
+const WeeklyPlanComponent: React.FC<WeeklyPlanComponentProps> = ({ weeklyPlan, planName, onSelectRecipe, isGlutenFree, isLactoseFree }) => {
   return (
     <div className="space-y-8">
-        <h2 className="text-3xl font-bold text-center text-slate-700">{planName}</h2>
+        <div className="text-center space-y-2">
+            <h2 className="text-3xl font-bold text-slate-700">{planName}</h2>
+            {(isGlutenFree || isLactoseFree) && (
+                <div className="flex justify-center flex-wrap gap-2">
+                    {isGlutenFree && <span className="text-xs text-emerald-700 font-semibold bg-emerald-50 px-3 py-1 rounded-full">Glutenfrei</span>}
+                    {isLactoseFree && <span className="text-xs text-emerald-700 font-semibold bg-emerald-50 px-3 py-1 rounded-full">Laktosefrei</span>}
+                </div>
+            )}
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {weeklyPlan.map((plan) => {
-                const totalCalories = plan.breakfastCalories + plan.dinnerCalories;
+                const totalCalories = (plan.breakfastCalories || 0) + (plan.dinnerCalories || 0);
                 return (
                     <div key={plan.day} className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col transition-transform transform hover:scale-105">
                         <div className="bg-emerald-600 text-white p-4 flex justify-between items-center">

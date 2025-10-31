@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { PlanSettings, ArchiveEntry, PlanData } from '../types';
+import type { PlanSettings, ArchiveEntry } from '../types';
 
 interface GenerationResult {
     success: boolean;
@@ -8,7 +8,8 @@ interface GenerationResult {
 }
 
 export const useMealPlanGenerator = () => {
-    const [plan, setPlan] = useState<PlanData | null>(null);
+    // FIX: The state now holds the complete ArchiveEntry to include settings, not just plan data.
+    const [plan, setPlan] = useState<ArchiveEntry | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [generationStatus, setGenerationStatus] = useState<string>('idle');
@@ -95,15 +96,5 @@ export const useMealPlanGenerator = () => {
         }
     };
     
-    const setPlanFromArchive = (archiveEntry: ArchiveEntry) => {
-        setPlan({
-            name: archiveEntry.name,
-            shoppingList: archiveEntry.shoppingList,
-            weeklyPlan: archiveEntry.weeklyPlan,
-            recipes: archiveEntry.recipes,
-            imageUrls: archiveEntry.imageUrls || {}
-        });
-    };
-
-    return { plan, setPlan: setPlanFromArchive, isLoading, error, generateNewPlan, generationStatus };
+    return { plan, setPlan, isLoading, error, generateNewPlan, generationStatus };
 };

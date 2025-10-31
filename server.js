@@ -201,7 +201,7 @@ async function processGenerationJob(jobId) {
         ${breakfastInstruction}
         Das Abendessen soll jeden Tag ein anderes warmes Gericht sein.
         Erstelle detaillierte Rezepte für jedes Abendessen.
-        WICHTIG: Alle Nährwertangaben müssen IMMER PRO PERSON berechnet werden. Die Zutatenlisten sind für ${persons} Personen. Die Angabe von Kalorien ist zwingend erforderlich. Die Angabe von Protein, Kohlenhydraten und Fett für die Rezepte ist optional, aber sehr erwünscht.
+        WICHTIG: Alle Nährwertangaben (Kalorien, Makros) müssen IMMER PRO PERSON berechnet werden. Die Zutatenlisten in den Rezepten sind für ${persons} Personen. Die Angabe von 'breakfastCalories' und 'dinnerCalories' als Zahlen ist für jeden Tag zwingend erforderlich.
         `;
 
         const planSchema = {
@@ -229,6 +229,51 @@ async function processGenerationJob(jobId) {
         });
         
         const planData = JSON.parse(planResponse.text);
+
+        // --- START VALIDATION ---
+        const validatePlanData = (data) => {
+            if (!data.name || typeof data.name !== 'string' || data.name.trim() === '') {
+                throw new Error("Validierung fehlgeschlagen: Der Planname (name) fehlt oder ist leer.");
+            }
+            if (!Array.isArray(data.weeklyPlan) || data.weeklyPlan.length === 0) {
+                 throw new Error(`Validierung fehlgeschlagen: Der Wochenplan ist leer oder kein Array.`);
+            }
+            for (const dayPlan of data.weeklyPlan) {
+                if (
+                    typeof dayPlan.day !== 'string' ||
+                    typeof dayPlan.breakfast !== 'string' ||
+                    typeof dayPlan.breakfastCalories !== 'number' ||
+                    typeof dayPlan.dinner !== 'string' ||
+                    typeof dayPlan.dinnerCalories !== 'number'
+                ) {
+                    console.error("Fehlerhaftes Tagesplan-Objekt von der KI erhalten:", dayPlan);
+                    throw new Error(`Validierung fehlgeschlagen: Ein Tagesplan-Objekt ist unvollständig. Es fehlen Felder oder die Typen sind falsch (z.B. Kalorien müssen Zahlen sein).`);
+                }
+            }
+            if (!Array.isArray(data.recipes) || data.recipes.length === 0) {
+                throw new Error("Validierung fehlgeschlagen: Rezepte sind leer oder kein Array.");
+            }
+            for (const recipe of data.recipes) {
+                if (
+                    typeof recipe.day !== 'string' ||
+                    typeof recipe.title !== 'string' ||
+                    !Array.isArray(recipe.ingredients) ||
+                    !Array.isArray(recipe.instructions) ||
+                    typeof recipe.totalCalories !== 'number'
+                ) {
+                    console.error("Fehlerhaftes Rezept-Objekt von der KI erhalten:", recipe);
+                    throw new Error(`Validierung fehlgeschlagen: Ein Rezept-Objekt ist unvollständig. Es fehlen Felder oder die Typen sind falsch.`);
+                }
+            }
+        };
+
+        try {
+            validatePlanData(planData);
+        } catch (validationError) {
+            console.error("Die von der KI generierten Plandaten sind fehlerhaft und entsprechen nicht dem Schema.", validationError);
+            throw validationError;
+        }
+        // --- END VALIDATION ---
         
         await connection.query("UPDATE generation_jobs SET status = 'generating_shopping_list' WHERE jobId = ?", [jobId]);
 
