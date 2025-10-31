@@ -17,7 +17,7 @@ const requiredVars = ['COOKIE_SECRET', 'APP_PASSWORD', 'API_KEY', 'DB_HOST', 'DB
 requiredVars.forEach(v => {
     console.log(`Wert für ${v}:`, process.env[v] ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
 });
-console.log(`Wert für DB_PORT:`, process.env[DB_PORT] ? process.env[DB_PORT] : 'Nicht gesetzt, Standard: 3306');
+console.log(`Wert für DB_PORT:`, process.env.DB_PORT ? process.env.DB_PORT : 'Nicht gesetzt, Standard: 3306');
 console.log('--- Diagnose Ende ---');
 
 // --- Überprüfung der Umgebungsvariablen ---
@@ -335,10 +335,14 @@ async function processGenerationJob(jobId) {
 // --- AUTHENTICATION & ROUTING ---
 // ======================================================
 
-// Serve static files from the 'public' directory (e.g., login.html)
-app.use(express.static(path.join(__dirname, 'public')));
+const requireAuth = (req, res, next) => {
+  if (req.signedCookies.isAuthenticated === 'true') {
+    return next();
+  }
+  res.status(401).json({ error: 'Nicht authentifiziert.' });
+};
 
-// Login handler for form submissions from login.html
+// Handle login via API request from the React component
 app.post('/login', (req, res) => {
     const { password } = req.body;
     if (password === APP_PASSWORD) {
@@ -349,30 +353,34 @@ app.post('/login', (req, res) => {
             maxAge: 30 * 24 * 60 * 60 * 1000, // 30 Tage
             secure: process.env.NODE_ENV === 'production',
         });
-        res.redirect('/');
+        res.status(200).json({ message: 'Anmeldung erfolgreich.' });
     } else {
-        res.redirect('/login.html?error=1');
+        res.status(401).json({ error: 'Falsches Passwort.' });
     }
 });
 
-// Auth wall: All requests below this point require authentication.
-app.use((req, res, next) => {
-    if (req.signedCookies.isAuthenticated === 'true') {
-        return next();
-    }
-    // If not authenticated, redirect to the static login page.
-    res.redirect('/login.html');
+// Handle logout via API request
+app.post('/logout', (req, res) => {
+    res.clearCookie('isAuthenticated');
+    res.status(200).json({ message: 'Abmeldung erfolgreich.' });
 });
+
+// Endpoint for the client to check if it's already authenticated
+app.get('/api/check-auth', (req, res) => {
+    if (req.signedCookies.isAuthenticated === 'true') {
+        res.status(200).json({ isAuthenticated: true });
+    } else {
+        res.status(401).json({ isAuthenticated: false });
+    }
+});
+
+// Protect all subsequent API routes
+app.use('/api', requireAuth);
 
 
 // ======================================================
 // --- GESCHÜTZTE API-ROUTEN ---
 // ======================================================
-
-app.post('/logout', (req, res) => {
-    res.clearCookie('isAuthenticated');
-    res.redirect('/login.html');
-});
 
 // --- Archiv-Routen ---
 app.get('/api/archive', async (req, res) => {
