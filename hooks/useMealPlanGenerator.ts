@@ -45,8 +45,6 @@ export const useMealPlanGenerator = (
             console.log(settings);
             console.log('--- Prompt für den Plan ---');
             console.log(debugInfo.planPrompt);
-            console.log('--- Prompt für den Namen ---');
-            console.log(debugInfo.namePrompt);
             console.groupEnd();
 
 

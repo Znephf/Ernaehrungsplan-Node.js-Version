@@ -4,17 +4,11 @@ const dotenv = require('dotenv');
 const cookieParser = require('cookie-parser');
 const { GoogleGenAI, Modality, Type } = require('@google/genai');
 
-// In CommonJS ist __dirname eine globale Variable und benötigt keinen speziellen Import.
-
 // Lade Umgebungsvariablen aus der .env-Datei, ABER nur wenn wir NICHT in Produktion sind.
-// In der Plesk-Produktionsumgebung werden die Variablen direkt vom Server gesetzt.
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
 }
 
-// --- Diagnostischer Code-Block ---
-// Dieser Block wird sofort beim Start ausgeführt, um zu prüfen, welche Umgebungsvariablen
-// der Node.js-Prozess kennt.
 console.log('--- Starte Server und prüfe Umgebungsvariablen ---');
 console.log('Wert für COOKIE_SECRET:', process.env.COOKIE_SECRET ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
 console.log('Wert für APP_PASSWORD:', process.env.APP_PASSWORD ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
@@ -23,27 +17,18 @@ console.log('--- Diagnose Ende ---');
 
 
 const app = express();
-const port = process.env.PORT || 3001; // Port für Plesk/Phusion Passenger
+const port = process.env.PORT || 3001;
 
-// --- API Retry Logic Helper ---
-const MAX_RETRIES = 4; // Total attempts = 1 initial + 3 retries
+const MAX_RETRIES = 4;
 const INITIAL_BACKOFF_MS = 1000;
-
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-/**
- * Wraps a Gemini API call with a retry mechanism for transient errors.
- * @param {GoogleGenAI} ai - The GoogleGenAI client instance.
- * @param {object} generationParams - The parameters for the generateContent call.
- * @returns {Promise<any>}
- */
 async function generateWithRetry(ai, generationParams) {
     let lastError = null;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         try {
-            // FIX: The parameters for `generateContent` must be passed as a single object. The original code incorrectly passed `ai` and `generationParams` as separate arguments.
             const result = await ai.models.generateContent(generationParams);
-            return result; // Success
+            return result;
         } catch (error) {
             lastError = error;
             const errorMessage = (error.message || '').toLowerCase();
@@ -64,8 +49,6 @@ async function generateWithRetry(ai, generationParams) {
     throw new Error(`Das KI-Modell ist derzeit überlastet. Bitte versuchen Sie es in ein paar Minuten erneut.`);
 }
 
-
-// --- Security Configuration ---
 const APP_PASSWORD = process.env.APP_PASSWORD;
 const COOKIE_SECRET = process.env.COOKIE_SECRET;
 
@@ -74,30 +57,26 @@ if (!COOKIE_SECRET || !APP_PASSWORD) {
     process.exit(1);
 }
 
-// --- Middlewares ---
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser(COOKIE_SECRET));
 
-
 // --- Public Routes & Assets (No Authentication Required) ---
-// Serve static files from 'public' folder (e.g., login.html).
+// Serve static files from 'public' folder (login.html).
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Login endpoint.
 app.post('/login', (req, res) => {
     const { password } = req.body;
     if (password === APP_PASSWORD) {
-        // Bei Erfolg wird ein sicheres, signiertes Cookie für 30 Tage gesetzt.
         res.cookie('isAuthenticated', 'true', {
             signed: true,
             httpOnly: true,
             path: '/',
-            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 Tage
+            maxAge: 30 * 24 * 60 * 60 * 1000
         });
         res.redirect('/');
     } else {
-        // Bei Misserfolg wird der Benutzer mit einer Fehlermeldung zurück zur Login-Seite geleitet.
         res.redirect('/login.html?error=1');
     }
 });
@@ -108,21 +87,20 @@ app.post('/logout', (req, res) => {
     res.status(200).json({ message: 'Abmeldung erfolgreich.' });
 });
 
+// Serve static assets from the React app build folder (JS, CSS, images).
+// Do NOT serve index.html from here automatically for the root path.
+app.use(express.static(path.join(__dirname, 'dist'), { index: false }));
 
 // --- Authentication Wall Middleware ---
 // All requests below this point require authentication.
 app.use((req, res, next) => {
-    // If the cookie is valid, the user has access.
     if (req.signedCookies.isAuthenticated === 'true') {
         return next();
     }
-
-    // If the user is not authenticated and tries to access an API, reject with an error.
     if (req.path.startsWith('/api/')) {
         return res.status(401).json({ error: 'Nicht authentifiziert. Bitte melden Sie sich an.' });
     }
-
-    // For all other unauthenticated requests, redirect to the login page.
+    // For any other unauthenticated requests (like '/'), redirect to the login page.
     res.redirect('/login.html');
 });
 
@@ -130,7 +108,6 @@ app.use((req, res, next) => {
 // --- Protected Routes ---
 // Only authenticated requests reach this part of the application.
 
-// API proxy endpoint for plan generation.
 app.post('/api/generate-plan', async (req, res) => {
     const { settings, previousPlanRecipes } = req.body;
     
@@ -150,30 +127,19 @@ app.post('/api/generate-plan', async (req, res) => {
         if (dietaryPreference === 'vegetarian') planType = "vegetarischen Ernährungsplan";
         else if (dietaryPreference === 'vegan') planType = "veganen Ernährungsplan";
 
-        const exclusionText = excludedIngredients.trim()
-            ? `Folgende Zutaten oder Zutaten-Gruppen sollen explizit vermieden werden: ${excludedIngredients}.`
-            : '';
-        
-        const desiredIngredientsText = desiredIngredients.trim()
-            ? `Folgende Zutaten sollen bevorzugt werden und in mindestens einem Abendessen-Rezept vorkommen, aber nicht zwangsläufig in allen: ${desiredIngredients}.`
-            : '';
+        const exclusionText = excludedIngredients.trim() ? `Folgende Zutaten oder Zutaten-Gruppen sollen explizit vermieden werden: ${excludedIngredients}.` : '';
+        const desiredIngredientsText = desiredIngredients.trim() ? `Folgende Zutaten sollen bevorzugt werden und in mindestens einem Abendessen-Rezept vorkommen, aber nicht zwangsläufig in allen: ${desiredIngredients}.` : '';
 
         let breakfastInstruction = '';
         switch (breakfastOption) {
             case 'quark':
-                breakfastInstruction = dietaryPreference === 'vegan'
-                    ? "Das Frühstück soll jeden Tag nur aus einer veganen Quark-Alternative bestehen. Füge absolut keine weiteren Zutaten wie Toppings, Früchte oder Nüsse hinzu. Gib die Kalorien für die vegane Quark-Alternative entsprechend an."
-                    : "Das Frühstück soll jeden Tag nur aus 'CremeQuark von Edeka' bestehen. Füge absolut keine weiteren Zutaten wie Toppings, Früchte oder Nüsse hinzu. Gib die Kalorien für dieses spezifische Produkt entsprechend an.";
+                breakfastInstruction = dietaryPreference === 'vegan' ? "Das Frühstück soll jeden Tag nur aus einer veganen Quark-Alternative bestehen. Füge absolut keine weiteren Zutaten wie Toppings, Früchte oder Nüsse hinzu. Gib die Kalorien für die vegane Quark-Alternative entsprechend an." : "Das Frühstück soll jeden Tag nur aus 'CremeQuark von Edeka' bestehen. Füge absolut keine weiteren Zutaten wie Toppings, Früchte oder Nüsse hinzu. Gib die Kalorien für dieses spezifische Produkt entsprechend an.";
                 break;
             case 'muesli':
-                breakfastInstruction = dietaryPreference === 'vegan'
-                    ? 'Das Frühstück soll jeden Tag gleich sein und auf einem veganen Müsli (z.B. mit Hafermilch und Früchten) basieren, variiere aber die Toppings.'
-                    : 'Das Frühstück soll jeden Tag gleich sein und auf Müsli basieren, variiere aber die Toppings.';
+                breakfastInstruction = dietaryPreference === 'vegan' ? 'Das Frühstück soll jeden Tag gleich sein und auf einem veganen Müsli (z.B. mit Hafermilch und Früchten) basieren, variiere aber die Toppings.' : 'Das Frühstück soll jeden Tag gleich sein und auf Müsli basieren, variiere aber die Toppings.';
                 break;
             case 'custom':
-                breakfastInstruction = customBreakfast.trim()
-                    ? `Das Frühstück soll jeden Tag gleich sein und dieser Beschreibung folgen: "${customBreakfast}". Falls es sinnvoll ist, variiere die Toppings oder kleine Beilagen.`
-                    : 'Das Frühstück kann eine beliebige, einfache Mahlezeit sein und soll jeden Tag gleich sein.';
+                breakfastInstruction = customBreakfast.trim() ? `Das Frühstück soll jeden Tag gleich sein und dieser Beschreibung folgen: "${customBreakfast}". Falls es sinnvoll ist, variiere die Toppings oder kleine Beilagen.` : 'Das Frühstück kann eine beliebige, einfache Mahlezeit sein und soll jeden Tag gleich sein.';
                 break;
         }
         
@@ -208,11 +174,12 @@ app.post('/api/generate-plan', async (req, res) => {
         const responseSchema = {
             type: Type.OBJECT,
             properties: {
+                name: { type: Type.STRING, description: "Ein kurzer, kreativer und einprägsamer Name für diesen Ernährungsplan auf Deutsch, basierend auf den generierten Gerichten. Antworte NUR mit dem Namen, ohne Anführungszeichen oder zusätzliche Erklärungen." },
                 shoppingList: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, items: { type: Type.ARRAY, items: { type: Type.STRING } } } } },
                 weeklyPlan: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { day: { type: Type.STRING }, breakfast: { type: Type.STRING }, breakfastCalories: { type: Type.NUMBER }, dinner: { type: Type.STRING }, dinnerCalories: { type: Type.NUMBER } } } },
                 recipes: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { day: { type: Type.STRING }, title: { type: Type.STRING }, ingredients: { type: Type.ARRAY, items: { type: Type.STRING } }, instructions: { type: Type.ARRAY, items: { type: Type.STRING } }, totalCalories: { type: Type.NUMBER }, protein: { type: Type.NUMBER }, carbs: { type: Type.NUMBER }, fat: { type: Type.NUMBER } } } }
             },
-            required: ["shoppingList", "weeklyPlan", "recipes"]
+            required: ["name", "shoppingList", "weeklyPlan", "recipes"]
         };
 
         const planResponse = await generateWithRetry(ai, {
@@ -223,20 +190,9 @@ app.post('/api/generate-plan', async (req, res) => {
         
         const parsedData = JSON.parse(planResponse.text);
 
-        const recipeTitles = parsedData.recipes.map((r) => r.title).join(', ');
-        const namePrompt = `Basierend auf diesen Abendessen-Rezepten für eine Woche: ${recipeTitles}. Erstelle einen kurzen, kreativen und einprägsamen Namen für diesen Ernährungsplan auf Deutsch.`;
-
-        const nameResponse = await generateWithRetry(ai, {
-            model: 'gemini-2.5-flash',
-            contents: [{ parts: [{ text: namePrompt }] }],
-            config: { systemInstruction: "Antworte NUR mit dem Namen. Keine Erklärungen, keine Anführungszeichen." }
-        });
-
-        const newName = nameResponse.text.trim().replace(/"/g, '');
-
         res.json({ 
-            data: { name: newName, ...parsedData },
-            debug: { planPrompt, namePrompt }
+            data: parsedData,
+            debug: { planPrompt }
         });
 
     } catch (error) {
@@ -245,7 +201,6 @@ app.post('/api/generate-plan', async (req, res) => {
     }
 });
 
-// API proxy endpoint for image generation.
 app.post('/api/generate-image', async (req, res) => {
     const { recipe, attempt } = req.body;
 
@@ -280,10 +235,7 @@ app.post('/api/generate-image', async (req, res) => {
 });
 
 
-// Serve the static files from the 'dist' folder (React app).
-app.use(express.static(path.join(__dirname, 'dist')));
-
-// For any other request, send the index.html file (for client-side routing).
+// For any other authenticated request, send the index.html file (for client-side routing).
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
