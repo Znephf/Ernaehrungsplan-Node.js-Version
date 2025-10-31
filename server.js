@@ -1,9 +1,9 @@
-import express from 'express';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
-import cookieParser from 'cookie-parser';
-import { GoogleGenAI, Modality, Type } from '@google/genai';
+
+const express = require('express');
+const path = require('path');
+const dotenv = require('dotenv');
+const cookieParser = require('cookie-parser');
+const { GoogleGenAI, Modality, Type } = require('@google/genai');
 
 // --- Diagnostischer Code-Block ---
 // Dieser Block wird sofort beim Start ausgeführt, um zu prüfen, welche Umgebungsvariablen
@@ -18,12 +18,10 @@ console.log('--- Diagnose Ende ---');
 // Umgebungsvariablen laden (für lokale Entwicklung)
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname_fix = path.dirname(require.main.filename);
 
 const app = express();
-// Plesk stellt den Port über eine Umgebungsvariable bereit
-const port = process.env.PORT || 3001;
+const port = process.env.PORT || 3001; // Port für Plesk/Phusion Passenger
 
 // --- Security Configuration ---
 const APP_PASSWORD = process.env.APP_PASSWORD;
@@ -75,7 +73,7 @@ app.use((req, res, next) => {
     }
 
     // ...für alle anderen Anfragen wird die Login-Seite angezeigt.
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+    res.sendFile(path.join(__dirname_fix, 'public', 'login.html'));
 });
 
 
@@ -227,11 +225,11 @@ app.post('/api/generate-image', async (req, res) => {
 
 
 // Statische Dateien aus dem 'dist'-Ordner bereitstellen
-app.use(express.static(path.join(__dirname, 'dist')));
+app.use(express.static(path.join(__dirname_fix, 'dist')));
 
 // Alle anderen Anfragen an die index.html weiterleiten (für Client-Side-Routing)
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    res.sendFile(path.join(__dirname_fix, 'dist', 'index.html'));
 });
 
 app.listen(port, () => {

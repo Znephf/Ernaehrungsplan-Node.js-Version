@@ -57,7 +57,7 @@ Stellen Sie sicher, dass auf Ihrem Server die folgenden Komponenten installiert 
     -   **Anwendungsmodus:** `production`
     -   **Anwendungs-URL:** Wird automatisch angezeigt.
     -   **Anwendungsstamm:** `/var/www/vhosts/ihredomain.de/ernaehrungsplaner` (passen Sie den Pfad an).
-    -   **Anwendungsstartdatei:** `server.js`
+    -   **Anwendungsstartdatei:** `server.cjs`
 
 6.  Klicken Sie auf **OK** oder **Speichern**. Plesk wird nun die `package.json` erkennen und vorschlagen, die Abhängigkeiten zu installieren. Da wir das schon manuell gemacht haben, können Sie diesen Schritt überspringen oder erneut ausführen lassen.
 
@@ -93,7 +93,7 @@ Verwenden Sie niemals eine `.env`-Datei in der Produktionsumgebung auf Plesk. Di
     -   **Prüfen Sie als Erstes die Umgebungsvariablen!** Eine fehlende `COOKIE_SECRET`- oder `APP_PASSWORD`-Variable ist die häufigste Ursache.
     -   Überprüfen Sie die Log-Dateien. Sie finden den Link zu den Logs (`stderr`) direkt auf der Node.js-Verwaltungsseite in Plesk.
     -   Stellen Sie sicher, dass alle Abhängigkeiten mit `npm install` korrekt installiert wurden.
-    -   Prüfen Sie, ob die `Anwendungsstartdatei` auf `server.js` gesetzt ist.
+    -   Prüfen Sie, ob die `Anwendungsstartdatei` auf `server.cjs` gesetzt ist.
 -   **API-Fehler:** Wenn die App läuft, aber die Plangenerierung fehlschlägt, prüfen Sie:
     -   Ob die Umgebungsvariable `API_KEY` korrekt benannt und in Plesk gesetzt ist.
     -   Ob Ihr API-Schlüssel gültig ist und die Gemini API aktiviert ist.
