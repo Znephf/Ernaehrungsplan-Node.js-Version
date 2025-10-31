@@ -1,13 +1,10 @@
-import express from 'express';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
-import cookieParser from 'cookie-parser';
-import { GoogleGenAI, Modality, Type } from '@google/genai';
+const express = require('express');
+const path = require('path');
+const dotenv = require('dotenv');
+const cookieParser = require('cookie-parser');
+const { GoogleGenAI, Modality, Type } = require('@google/genai');
 
-// --- ES Module equivalent for __dirname ---
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// In CommonJS ist __dirname eine globale Variable und benötigt keinen speziellen Import.
 
 // Lade Umgebungsvariablen aus der .env-Datei, ABER nur wenn wir NICHT in Produktion sind.
 // In der Plesk-Produktionsumgebung werden die Variablen direkt vom Server gesetzt.
