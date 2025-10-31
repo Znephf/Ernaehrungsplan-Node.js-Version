@@ -9,14 +9,12 @@ const initialPlan = {
   recipes: initialRecipes
 };
 
-export const useMealPlanGenerator = (
-    addPlanToArchive: (plan: Omit<ArchiveEntry, 'id' | 'createdAt'>) => void
-) => {
+export const useMealPlanGenerator = () => {
     const [plan, setPlan] = useState<PlanData>(initialPlan);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    const generateNewPlan = async (settings: PlanSettings) => {
+    const generateNewPlan = async (settings: PlanSettings): Promise<boolean> => {
         setIsLoading(true);
         setError(null);
 
@@ -55,15 +53,12 @@ export const useMealPlanGenerator = (
             }
             
             setPlan(newPlanData);
-
-            addPlanToArchive({
-                ...settings,
-                ...newPlanData,
-            });
+            return true;
 
         } catch (e) {
             console.error(e);
             setError(`Der Ernährungsplan konnte nicht erstellt werden: ${(e as Error).message}. Bitte versuchen Sie es später erneut.`);
+            return false;
         } finally {
             setIsLoading(false);
         }

@@ -2,44 +2,42 @@ import { useState, useEffect, useCallback } from 'react';
 import type { ArchiveEntry } from '../types';
 
 export const useArchive = () => {
-    // Initialize state from localStorage, or with an empty array if not found/invalid.
-    // This runs only once on component mount.
-    const [archive, setArchive] = useState<ArchiveEntry[]>(() => {
-        try {
-            const savedArchive = localStorage.getItem('ernaehrungsplan-archiv');
-            return savedArchive ? JSON.parse(savedArchive) : [];
-        } catch (error) {
-            console.error("Konnte Archiv nicht aus localStorage laden.", error);
-            return [];
-        }
-    });
+    const [archive, setArchive] = useState<ArchiveEntry[]>([]);
 
-    // This effect runs whenever the 'archive' state changes, saving it to localStorage.
-    // This makes the persistence logic more robust and declarative.
+    const fetchArchive = useCallback(async () => {
+        try {
+            const response = await fetch('/api/archive');
+            if (!response.ok) {
+                throw new Error('Fehler beim Laden des Archivs');
+            }
+            const data = await response.json();
+            setArchive(data);
+        } catch (error) {
+            console.error("Konnte Archiv nicht vom Server laden.", error);
+            // Optional: Set an error state to show in the UI
+        }
+    }, []);
+
+    // Lade das Archiv initial, wenn die Komponente gemountet wird
     useEffect(() => {
-        try {
-            localStorage.setItem('ernaehrungsplan-archiv', JSON.stringify(archive));
-        } catch (error) {
-            console.error("Konnte Archiv nicht in localStorage speichern.", error);
-        }
-    }, [archive]);
+        fetchArchive();
+    }, [fetchArchive]);
     
-    const addPlanToArchive = useCallback((newEntry: Omit<ArchiveEntry, 'id' | 'createdAt'>) => {
-        const entryWithMetadata: ArchiveEntry = {
-            ...newEntry,
-            id: Date.now().toString(),
-            createdAt: new Date().toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-        };
-        // Simply update the state; the useEffect will handle saving to localStorage.
-        setArchive(prevArchive => [entryWithMetadata, ...prevArchive]);
-    }, []);
-
-    const deletePlanFromArchive = useCallback((id: string) => {
+    const deletePlanFromArchive = useCallback(async (id: string) => {
         if (window.confirm("Diesen Plan wirklich aus dem Archiv löschen?")) {
-            // Simply update the state; the useEffect will handle saving to localStorage.
-            setArchive(prevArchive => prevArchive.filter(entry => entry.id !== id));
+            try {
+                const response = await fetch(`/api/archive/${id}`, { method: 'DELETE' });
+                if (!response.ok) {
+                    throw new Error('Fehler beim Löschen des Plans');
+                }
+                // Lade das Archiv neu, um die Änderungen zu übernehmen
+                fetchArchive();
+            } catch (error) {
+                 console.error("Konnte Plan nicht aus dem Archiv löschen.", error);
+                 alert("Der Plan konnte nicht gelöscht werden.");
+            }
         }
-    }, []);
+    }, [fetchArchive]);
 
     const loadPlanFromArchive = useCallback((id: string): ArchiveEntry | null => {
         const planToLoad = archive.find(entry => entry.id === id);
@@ -47,7 +45,7 @@ export const useArchive = () => {
             return planToLoad;
         }
         return null;
-    }, [archive]); // Dependency on 'archive' ensures this function has the latest data.
+    }, [archive]);
     
-    return { archive, addPlanToArchive, deletePlanFromArchive, loadPlanFromArchive };
+    return { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive };
 };

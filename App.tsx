@@ -33,8 +33,8 @@ const App: React.FC = () => {
     const [isDownloading, setIsDownloading] = useState(false);
     const [downloadStatus, setDownloadStatus] = useState('Speichern');
 
-    const { archive, addPlanToArchive, deletePlanFromArchive, loadPlanFromArchive } = useArchive();
-    const { plan, setPlan, isLoading, error, generateNewPlan } = useMealPlanGenerator(addPlanToArchive);
+    const { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive } = useArchive();
+    const { plan, setPlan, isLoading, error, generateNewPlan } = useMealPlanGenerator();
     const { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState } = useImageGenerator();
 
     useEffect(() => {
@@ -60,7 +60,11 @@ const App: React.FC = () => {
     }, [plan, resetImageState]);
 
     const handleGenerateRequest = async () => {
-        generateNewPlan(panelSettings);
+        const success = await generateNewPlan(panelSettings);
+        if (success) {
+            // Lade das Archiv neu, um den gerade erstellten Plan anzuzeigen
+            fetchArchive();
+        }
     };
 
     const handleSelectRecipe = (day: string) => {

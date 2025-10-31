@@ -7,9 +7,9 @@ Diese Anleitung beschreibt, wie Sie die KI-Ernährungsplaner-Anwendung auf einem
 Die Anwendung besteht aus zwei Hauptteilen:
 
 1.  **Frontend:** Eine in React und TypeScript geschriebene Single-Page-Application (SPA), die mit Vite gebaut wird.
-2.  **Backend:** Ein einfacher Node.js-Server mit Express, der als sicherer Proxy für die Google Gemini API dient. Er nimmt Anfragen vom Frontend entgegen, fügt den geheimen API-Schlüssel hinzu und leitet sie an die Google-API weiter.
+2.  **Backend:** Ein Node.js-Server mit Express, der als sicherer Proxy für die Google Gemini API dient und die Archiv-Daten in einer MariaDB-Datenbank verwaltet.
 
-Dieses Setup stellt sicher, dass Ihr API-Schlüssel niemals im Browser des Benutzers offengelegt wird. Ein serverseitiger Passwortschutz sichert die gesamte Anwendung ab.
+Dieses Setup stellt sicher, dass Ihr API-Schlüssel niemals im Browser offengelegt wird. Ein serverseitiger Passwortschutz sichert die gesamte Anwendung ab.
 
 ### Verwendete KI-Modelle
 
@@ -22,13 +22,24 @@ Die Anwendung verwendet die aktuell empfohlenen Modelle, um eine langfristige Ko
 
 Stellen Sie sicher, dass auf Ihrem Server die folgenden Komponenten installiert sind:
 
+-   **MariaDB oder MySQL-Server**
 -   **Node.js:** Version 18.x oder höher.
 -   **NPM (Node Package Manager):** Wird normalerweise mit Node.js installiert.
 -   **Git:** Zum Klonen des Quellcodes.
 -   Ein in Plesk eingerichteter Domain- oder Subdomain-Name.
 -   Ein gültiger **Google Gemini API Key**.
 
-## Schritt 1: Code auf den Server laden
+## Schritt 1: Datenbank einrichten
+
+1.  Loggen Sie sich in Ihre Datenbankverwaltung ein (z.B. phpMyAdmin in Plesk oder über die Kommandozeile).
+2.  Erstellen Sie eine neue Datenbank. Es wird empfohlen, den Namen `ernaehrungsplan` zu verwenden, da dieser in den Umgebungsvariablen standardmäßig vorgeschlagen wird.
+3.  Erstellen Sie einen neuen Datenbankbenutzer.
+4.  Geben Sie diesem Benutzer alle Berechtigungen (`ALL PRIVILEGES`) für die neu erstellte Datenbank.
+5.  Notieren Sie sich den Datenbanknamen, den Benutzernamen und das Passwort.
+
+Der Node.js-Server wird die benötigte Tabelle (`archived_plans`) beim ersten Start automatisch erstellen.
+
+## Schritt 2: Code auf den Server laden
 
 1.  Verbinden Sie sich per SSH mit Ihrem Server.
 2.  Navigieren Sie zum Hauptverzeichnis für Ihre Web-Anwendungen, üblicherweise `/var/www/vhosts/ihredomain.de/`.
@@ -40,7 +51,7 @@ Stellen Sie sicher, dass auf Ihrem Server die folgenden Komponenten installiert 
     # Wenn Sie den Code manuell hochladen, entpacken Sie ihn in diesem Verzeichnis.
     ```
 
-## Schritt 2: Abhängigkeiten installieren und die App bauen
+## Schritt 3: Abhängigkeiten installieren und die App bauen
 
 1.  Installieren Sie alle notwendigen Node.js-Pakete für das Backend und Frontend:
     ```bash
@@ -51,7 +62,7 @@ Stellen Sie sicher, dass auf Ihrem Server die folgenden Komponenten installiert 
     npm run build
     ```
 
-## Schritt 3: Plesk für die Node.js-Anwendung konfigurieren
+## Schritt 4: Plesk für die Node.js-Anwendung konfigurieren
 
 1.  Loggen Sie sich in Ihr Plesk-Panel ein.
 2.  Gehen Sie zu **Websites & Domains** und wählen Sie die Domain aus, auf der die App laufen soll.
@@ -68,47 +79,55 @@ Stellen Sie sicher, dass auf Ihrem Server die folgenden Komponenten installiert 
 
 6.  Klicken Sie auf **OK** oder **Speichern**. 
 
-## Schritt 4: Umgebungsvariablen in Plesk konfigurieren (WICHTIG)
+## Schritt 5: Umgebungsvariablen in Plesk konfigurieren (WICHTIG)
 
-Ihre geheimen Schlüssel müssen sicher als Umgebungsvariablen gespeichert werden. Dies ist der sicherste Weg, da sie nicht im Code gespeichert werden.
+Ihre geheimen Schlüssel und Datenbank-Zugangsdaten müssen sicher als Umgebungsvariablen gespeichert werden.
 
 1.  Gehen Sie in Plesk zur **Node.js**-Verwaltungsseite Ihrer App.
 2.  Klicken Sie auf **Umgebungsvariablen**.
-3.  Fügen Sie die folgenden drei Variablen hinzu:
+3.  Fügen Sie die folgenden Variablen hinzu:
     -   `API_KEY` = `Ihr_Google_Gemini_API_Schlüssel`
     -   `COOKIE_SECRET` = `Eine_sehr_lange_und_komplexe_zufällige_Zeichenfolge`
     -   `APP_PASSWORD` = `Ein_sicheres_Passwort_für_den_Login`
-4.  **WICHTIG:** Ersetzen Sie die Platzhalter durch Ihre echten, sicheren Werte. Der `COOKIE_SECRET` kann eine beliebige lange, zufällige Zeichenkette sein (z. B. von einem Passwort-Generator).
+    -   `DB_HOST` = `localhost` (oder die IP Ihres DB-Servers)
+    -   `DB_USER` = `Ihr_Datenbank_Benutzername`
+    -   `DB_PASSWORD` = `Ihr_Datenbank_Passwort`
+    -   `DB_NAME` = `Der_Name_Ihrer_Datenbank`
+    -   `DB_PORT` = `3306` (Optional: Nur ändern, wenn Ihr DB-Server nicht den Standard-Port verwendet)
+4.  **WICHTIG:** Ersetzen Sie die Platzhalter durch Ihre echten, sicheren Werte.
 5.  Speichern Sie die Variablen.
 
-**Hinweis: Wenn diese Variablen fehlen oder falsch sind, wird der Server absichtlich nicht starten! Dies ist die häufigste Ursache für Fehler nach dem Deployment.**
+**Hinweis: Wenn die erforderlichen Variablen fehlen oder falsch sind, wird der Server absichtlich nicht starten! Dies ist die häufigste Ursache für Fehler nach dem Deployment.**
 
-## Schritt 5: Anwendung starten
+## Schritt 6: Anwendung starten
 
 1.  Auf der Node.js-Verwaltungsseite in Plesk, klicken Sie auf **App neu starten**. Dies ist nach jeder Änderung der Umgebungsvariablen zwingend erforderlich.
 2.  Besuchen Sie Ihre Domain. Sie sollten nun von der Login-Seite begrüßt werden.
 
 ## Lokale Entwicklung (Optional)
 
-Um die Anwendung auf Ihrem lokalen Computer auszuführen (außerhalb von Plesk), erstellen Sie eine Datei namens `.env` im Hauptverzeichnis des Projekts. Fügen Sie Ihre Geheimnisse in diese Datei ein:
+Um die Anwendung lokal auszuführen, erstellen Sie eine Datei namens `.env` im Hauptverzeichnis. Fügen Sie Ihre Geheimnisse und lokalen DB-Infos in diese Datei ein:
 ```
 API_KEY=Ihr_lokaler_API_Schlüssel
 COOKIE_SECRET=Ein_lokaler_zufälliger_String
 APP_PASSWORD=Ein_lokales_Passwort
+
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=Ihr_lokales_DB_Passwort
+DB_NAME=ernaehrungsplan
+DB_PORT=3306
 ```
-Die `server.js`-Datei ist so konfiguriert, dass sie diese Datei automatisch liest, wenn sie nicht im `production`-Modus läuft. Stellen Sie sicher, dass die `.env`-Datei in Ihrer `.gitignore`-Datei aufgeführt ist, um zu verhindern, dass sie in Ihr Repository hochgeladen wird.
+Die `server.js`-Datei ist so konfiguriert, dass sie diese Datei automatisch liest. Stellen Sie sicher, dass die `.env`-Datei in Ihrer `.gitignore`-Datei aufgeführt ist.
 
 ## Fehlerbehebung
 
--   **502/503 Fehler oder keine Passwort-Abfrage:** Die Node.js-Anwendung konnte nicht starten oder stürzt ab.
-    -   **Prüfen Sie als Erstes die Umgebungsvariablen im Plesk-Panel!** Sind alle drei (`API_KEY`, `COOKIE_SECRET`, `APP_PASSWORD`) vorhanden und korrekt geschrieben?
-    -   **Haben Sie die App neu gestartet?** Klicken Sie nach jeder Änderung der Variablen im Plesk-Panel auf **"App neu starten"**.
-    -   **Überprüfen Sie die Log-Dateien.** Sie finden den Link zu den Logs (`stderr`) direkt auf der Node.js-Verwaltungsseite in Plesk. Der Server gibt dort eine klare Fehlermeldung aus, wenn Variablen fehlen.
-    -   Stellen Sie sicher, dass alle Abhängigkeiten mit `npm install` korrekt installiert wurden und der `npm run build` Befehl erfolgreich war.
-    -   Prüfen Sie, ob die `Anwendungsstartdatei` auf `server.js` gesetzt ist.
--   **API-Fehler bei Plangenerierung:** Wenn die App läuft, aber die Plangenerierung fehlschlägt, prüfen Sie:
-    -   Ob die Variable `API_KEY` in Plesk korrekt ist.
-    -   Ob Ihr API-Schlüssel gültig ist und die Gemini API aktiviert ist.
-    -   Die Server-Log-Dateien auf spezifische Fehlermeldungen der `@google/genai`-Bibliothek.
--   **Fehler bei der Bildgenerierung (Quota Exceeded):** Wenn Sie eine Fehlermeldung erhalten, die "Quota" oder "Nutzungslimit" erwähnt, bedeutet dies, dass Ihr API-Schlüssel das kostenlose Kontingent für die Bildgenerierung überschritten hat.
-    -   **Lösung:** Verknüpfen Sie Ihr Google AI Studio-Projekt mit einem Google Cloud-Projekt, für das die Abrechnung (Billing) aktiviert ist. Dies schaltet höhere Nutzungslimits frei. Weitere Informationen finden Sie unter [Gemini API Quotas](https://ai.google.dev/gemini-api/docs/rate-limits) und [Google Cloud Billing](https://cloud.google.com/billing/docs/how-to/modify-project).
+-   **502/503 Fehler oder keine Passwort-Abfrage:** Die Node.js-Anwendung konnte nicht starten.
+    -   **Prüfen Sie als Erstes die Umgebungsvariablen!** Sind alle sieben erforderlichen Variablen vorhanden und korrekt?
+    -   **Überprüfen Sie die Log-Dateien (`stderr`)** auf der Node.js-Verwaltungsseite in Plesk. Der Server gibt dort klare Fehlermeldungen aus, wenn Variablen fehlen oder die Datenbankverbindung fehlschlägt.
+    -   **Haben Sie die App nach Änderungen neu gestartet?**
+-   **API-Fehler bei Plangenerierung:**
+    -   Ist der `API_KEY` korrekt?
+    -   Ist die Gemini API für Ihren Schlüssel aktiviert?
+-   **Fehler bei der Bildgenerierung (Quota Exceeded):**
+    -   **Lösung:** Verknüpfen Sie Ihr Projekt mit einem Google Cloud-Projekt, für das die Abrechnung (Billing) aktiviert ist.

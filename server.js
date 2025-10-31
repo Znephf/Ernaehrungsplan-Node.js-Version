@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const dotenv = require('dotenv');
 const cookieParser = require('cookie-parser');
+const mysql = require('mysql2/promise');
 const { GoogleGenAI, Modality, Type } = require('@google/genai');
 
 // Lade Umgebungsvariablen aus der .env-Datei, ABER nur wenn wir NICHT in Produktion sind.
@@ -11,24 +12,56 @@ if (process.env.NODE_ENV !== 'production') {
 
 // --- Starup-Diagnose ---
 console.log('--- Starte Server und prüfe Umgebungsvariablen ---');
-console.log('Wert für COOKIE_SECRET:', process.env.COOKIE_SECRET ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
-console.log('Wert für APP_PASSWORD:', process.env.APP_PASSWORD ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
-console.log('Wert für API_KEY:', process.env.API_KEY ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
+const requiredVars = ['COOKIE_SECRET', 'APP_PASSWORD', 'API_KEY', 'DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
+requiredVars.forEach(v => {
+    console.log(`Wert für ${v}:`, process.env[v] ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
+});
+console.log(`Wert für DB_PORT:`, process.env.DB_PORT ? process.env.DB_PORT : 'Nicht gesetzt, Standard: 3306');
 console.log('--- Diagnose Ende ---');
 
 // --- Überprüfung der Umgebungsvariablen ---
-const APP_PASSWORD = process.env.APP_PASSWORD;
-const COOKIE_SECRET = process.env.COOKIE_SECRET;
-const API_KEY = process.env.API_KEY;
+const { APP_PASSWORD, COOKIE_SECRET, API_KEY, DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT } = process.env;
 
-if (!COOKIE_SECRET || !APP_PASSWORD || !API_KEY) {
-    const missing = [];
-    if (!COOKIE_SECRET) missing.push('COOKIE_SECRET');
-    if (!APP_PASSWORD) missing.push('APP_PASSWORD');
-    if (!API_KEY) missing.push('API_KEY');
-    console.error(`FATAL ERROR: Die Umgebungsvariable(n) ${missing.join(', ')} sind nicht gesetzt. Bitte fügen Sie diese in der Plesk Node.js-Verwaltung hinzu. Die Anwendung wird beendet.`);
+const missingVars = requiredVars.filter(v => !process.env[v]);
+if (missingVars.length > 0) {
+    console.error(`FATAL ERROR: Die Umgebungsvariable(n) ${missingVars.join(', ')} sind nicht gesetzt. Bitte fügen Sie diese in der Plesk Node.js-Verwaltung hinzu. Die Anwendung wird beendet.`);
     process.exit(1);
 }
+
+// --- Datenbank-Setup ---
+const pool = mysql.createPool({
+    host: DB_HOST,
+    user: DB_USER,
+    password: DB_PASSWORD,
+    database: DB_NAME,
+    port: DB_PORT || 3306,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+});
+
+async function initializeDatabase() {
+    try {
+        const connection = await pool.getConnection();
+        console.log('Erfolgreich mit der MariaDB-Datenbank verbunden.');
+
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS archived_plans (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                name VARCHAR(255) NOT NULL,
+                settings JSON NOT NULL,
+                planData JSON NOT NULL
+            );
+        `);
+        console.log('Tabelle "archived_plans" ist bereit.');
+        connection.release();
+    } catch (error) {
+        console.error('FATAL ERROR: Konnte die Datenbankverbindung nicht herstellen oder Tabelle nicht erstellen.', error);
+        process.exit(1);
+    }
+}
+
 
 // --- App-Setup ---
 const app = express();
@@ -115,6 +148,54 @@ const requireAuth = (req, res, next) => {
     }
     res.status(401).json({ error: 'Nicht authentifiziert. Bitte melden Sie sich an.' });
 };
+
+// --- Archiv-Routen ---
+app.get('/api/archive', requireAuth, async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM archived_plans ORDER BY createdAt DESC');
+        
+        const archive = rows.map(row => {
+            const settings = typeof row.settings === 'string' ? JSON.parse(row.settings) : row.settings;
+            const planData = typeof row.planData === 'string' ? JSON.parse(row.planData) : row.planData;
+            
+            // FIX: Gracefully handle entries where planData might be null or malformed.
+            // This prevents a single corrupt entry from breaking the entire archive view.
+            if (!planData || typeof planData !== 'object') {
+                console.warn(`Ungültiger oder fehlender planData-Eintrag für Archiv-ID ${row.id} wird übersprungen.`);
+                return null; // We will filter this out later
+            }
+
+            return {
+                id: row.id.toString(),
+                createdAt: new Date(row.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                name: planData.name || 'Unbenannter Plan', // Provide a fallback name
+                ...settings,
+                ...planData
+            };
+        }).filter(entry => entry !== null); // Remove any entries that failed validation
+        
+        res.json(archive);
+    } catch (error) {
+        console.error('Fehler beim Abrufen des Archivs:', error);
+        res.status(500).json({ error: 'Archiv konnte nicht geladen werden.' });
+    }
+});
+
+app.delete('/api/archive/:id', requireAuth, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [result] = await pool.query('DELETE FROM archived_plans WHERE id = ?', [id]);
+        if (result.affectedRows > 0) {
+            res.status(200).json({ message: 'Eintrag erfolgreich gelöscht.' });
+        } else {
+            res.status(404).json({ error: 'Eintrag nicht gefunden.' });
+        }
+    } catch (error) {
+        console.error(`Fehler beim Löschen von Eintrag ${id}:`, error);
+        res.status(500).json({ error: 'Eintrag konnte nicht gelöscht werden.' });
+    }
+});
+
 
 app.post('/api/generate-plan', requireAuth, async (req, res) => {
     const { settings, previousPlanRecipes } = req.body;
@@ -225,6 +306,12 @@ app.post('/api/generate-plan', requireAuth, async (req, res) => {
             ...planData,
             shoppingList: shoppingListData.shoppingList
         };
+        
+        // Den neuen Plan in der Datenbank speichern
+        await pool.query(
+            'INSERT INTO archived_plans (name, settings, planData) VALUES (?, ?, ?)',
+            [finalPlan.name, JSON.stringify(settings), JSON.stringify(finalPlan)]
+        );
 
         res.json({ 
             data: finalPlan,
@@ -281,6 +368,11 @@ app.get('*', (req, res) => {
 });
 
 // --- Server starten ---
-app.listen(port, () => {
-    console.log(`Server läuft auf Port ${port}`);
-});
+async function startServer() {
+    await initializeDatabase();
+    app.listen(port, () => {
+        console.log(`Server läuft auf Port ${port}`);
+    });
+}
+
+startServer();
