@@ -144,7 +144,7 @@ async function processGenerationJob(jobId) {
             throw new Error('Die Job-Daten sind unvollständig und enthalten keine Einstellungen (settings).');
         }
 
-        const { persons, kcal, dietaryPreference, dietType, excludedIngredients, desiredIngredients, breakfastOption, customBreakfast, isGlutenFree, isL lactoseFree } = settings;
+        const { persons, kcal, dietaryPreference, dietType, excludedIngredients, desiredIngredients, breakfastOption, customBreakfast, isGlutenFree, isLactoseFree } = settings;
 
         let planType = "Ernährungsplan";
         if (dietaryPreference === 'vegetarian') planType = "vegetarischen Ernährungsplan";
@@ -207,7 +207,7 @@ async function processGenerationJob(jobId) {
         const planSchema = {
             type: Type.OBJECT,
             properties: {
-                name: { type: Type.STRING, description: "Ein kurzer, kreativer und einprägsamer Name für diesen Ernährungsplan auf Deutsch, basierend auf den generierten Gerichten. Antworte NUR mit dem Namen, ohne Anführungszeichen oder zusätzliche Erklärungen." },
+                name: { type: Type.STRING, description: "Ein kurzer, kreativer und einprägsmamer Name für diesen Ernährungsplan auf Deutsch, basierend auf den generierten Gerichten. Antworte NUR mit dem Namen, ohne Anführungszeichen oder zusätzliche Erklärungen." },
                 weeklyPlan: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { day: { type: Type.STRING }, breakfast: { type: Type.STRING }, breakfastCalories: { type: Type.NUMBER }, dinner: { type: Type.STRING }, dinnerCalories: { type: Type.NUMBER } } } },
                 recipes: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { day: { type: Type.STRING }, title: { type: Type.STRING }, ingredients: { type: Type.ARRAY, items: { type: Type.STRING } }, instructions: { type: Type.ARRAY, items: { type: Type.STRING } }, totalCalories: { type: Type.NUMBER }, protein: { type: Type.NUMBER }, carbs: { type: Type.NUMBER }, fat: { type: Type.NUMBER } } } }
             },
