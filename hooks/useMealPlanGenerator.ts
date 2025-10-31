@@ -1,14 +1,5 @@
 import { useState } from 'react';
 import type { PlanSettings, ArchiveEntry, PlanData } from '../types';
-import { shoppingList as initialShoppingList, weeklyPlan as initialWeeklyPlan, recipes as initialRecipes } from '../data';
-
-const initialPlan = {
-  name: 'Low-Carb Woche',
-  shoppingList: initialShoppingList,
-  weeklyPlan: initialWeeklyPlan,
-  recipes: initialRecipes,
-  imageUrls: {}
-};
 
 interface GenerationResult {
     success: boolean;
@@ -17,7 +8,7 @@ interface GenerationResult {
 }
 
 export const useMealPlanGenerator = () => {
-    const [plan, setPlan] = useState<PlanData>(initialPlan);
+    const [plan, setPlan] = useState<PlanData | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [generationStatus, setGenerationStatus] = useState<string>('idle');
@@ -35,7 +26,7 @@ export const useMealPlanGenerator = () => {
                 },
                 body: JSON.stringify({ 
                     settings,
-                    previousPlanRecipes: (plan && plan.name !== initialPlan.name) ? plan.recipes : [] 
+                    previousPlanRecipes: plan ? plan.recipes : [] 
                 }),
             });
 
