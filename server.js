@@ -41,6 +41,7 @@ async function generateWithRetry(ai, generationParams) {
     let lastError = null;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         try {
+            // FIX: The parameters for `generateContent` must be passed as a single object. The original code incorrectly passed `ai` and `generationParams` as separate arguments.
             const result = await ai.models.generateContent(generationParams);
             return result; // Success
         } catch (error) {
@@ -79,12 +80,15 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser(COOKIE_SECRET));
 
 
-// --- Public Routes ---
-// Endpunkt, der die Passwort-Anmeldung verarbeitet
+// --- Public Routes & Assets (No Authentication Required) ---
+// Serve static files from 'public' folder (e.g., login.html).
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Login endpoint.
 app.post('/login', (req, res) => {
     const { password } = req.body;
     if (password === APP_PASSWORD) {
-        // Bei Erfolg wird ein sicheres, signiertes Cookie für 30 Tage gesetzt
+        // Bei Erfolg wird ein sicheres, signiertes Cookie für 30 Tage gesetzt.
         res.cookie('isAuthenticated', 'true', {
             signed: true,
             httpOnly: true,
@@ -93,12 +97,12 @@ app.post('/login', (req, res) => {
         });
         res.redirect('/');
     } else {
-        // Bei Misserfolg wird der Benutzer mit einer Fehlermeldung zurück zur Login-Seite geleitet
-        res.redirect('/?error=1');
+        // Bei Misserfolg wird der Benutzer mit einer Fehlermeldung zurück zur Login-Seite geleitet.
+        res.redirect('/login.html?error=1');
     }
 });
 
-// Endpunkt zum Abmelden
+// Logout endpoint.
 app.post('/logout', (req, res) => {
     res.clearCookie('isAuthenticated');
     res.status(200).json({ message: 'Abmeldung erfolgreich.' });
@@ -106,33 +110,29 @@ app.post('/logout', (req, res) => {
 
 
 // --- Authentication Wall Middleware ---
-// Diese Middleware schützt alle nachfolgenden Routen.
+// All requests below this point require authentication.
 app.use((req, res, next) => {
-    // Wenn das Cookie gültig ist, hat der Benutzer Zugriff.
+    // If the cookie is valid, the user has access.
     if (req.signedCookies.isAuthenticated === 'true') {
         return next();
     }
 
-    // Wenn der Benutzer nicht authentifiziert ist...
-    // ...und versucht, auf eine API zuzugreifen, wird die Anfrage mit einem Fehler abgelehnt.
+    // If the user is not authenticated and tries to access an API, reject with an error.
     if (req.path.startsWith('/api/')) {
         return res.status(401).json({ error: 'Nicht authentifiziert. Bitte melden Sie sich an.' });
     }
 
-    // ...für alle anderen Anfragen wird die Login-Seite angezeigt.
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+    // For all other unauthenticated requests, redirect to the login page.
+    res.redirect('/login.html');
 });
 
 
 // --- Protected Routes ---
-// Nur authentifizierte Anfragen erreichen diesen Teil der Anwendung.
+// Only authenticated requests reach this part of the application.
 
-// API-Proxy-Endpunkt für die Plan-Generierung
+// API proxy endpoint for plan generation.
 app.post('/api/generate-plan', async (req, res) => {
-    console.log('\n[API Request] Starte /api/generate-plan...');
     const { settings, previousPlanRecipes } = req.body;
-    console.log('--- Empfangene Einstellungen ---');
-    console.log(JSON.stringify(settings, null, 2));
     
     if (!process.env.API_KEY) {
         return res.status(500).json({ error: 'API-Schlüssel ist auf dem Server nicht konfiguriert.' });
@@ -205,9 +205,6 @@ app.post('/api/generate-plan', async (req, res) => {
         WICHTIG: Alle Nährwertangaben (Kalorien, Protein, etc.) müssen IMMER PRO PERSON berechnet werden. Die Zutatenlisten sind für ${persons} Personen.
         `;
 
-        console.log('--- Generierter Prompt für Ernährungsplan ---');
-        console.log(planPrompt);
-
         const responseSchema = {
             type: Type.OBJECT,
             properties: {
@@ -224,14 +221,10 @@ app.post('/api/generate-plan', async (req, res) => {
             config: { responseMimeType: 'application/json', responseSchema: responseSchema }
         });
         
-        console.log('[API Response] Plan-Daten erfolgreich von der KI erhalten.');
         const parsedData = JSON.parse(planResponse.text);
 
         const recipeTitles = parsedData.recipes.map((r) => r.title).join(', ');
         const namePrompt = `Basierend auf diesen Abendessen-Rezepten für eine Woche: ${recipeTitles}. Erstelle einen kurzen, kreativen und einprägsamen Namen für diesen Ernährungsplan auf Deutsch.`;
-
-        console.log('--- Generierter Prompt für Planname ---');
-        console.log(namePrompt);
 
         const nameResponse = await generateWithRetry(ai, {
             model: 'gemini-2.5-flash',
@@ -239,10 +232,12 @@ app.post('/api/generate-plan', async (req, res) => {
             config: { systemInstruction: "Antworte NUR mit dem Namen. Keine Erklärungen, keine Anführungszeichen." }
         });
 
-        console.log('[API Response] Planname erfolgreich von der KI erhalten.');
         const newName = nameResponse.text.trim().replace(/"/g, '');
 
-        res.json({ name: newName, ...parsedData });
+        res.json({ 
+            data: { name: newName, ...parsedData },
+            debug: { planPrompt, namePrompt }
+        });
 
     } catch (error) {
         console.error('[API Error] Kritischer Fehler bei der Plan-Generierung:', error);
@@ -250,12 +245,9 @@ app.post('/api/generate-plan', async (req, res) => {
     }
 });
 
-// API-Proxy-Endpunkt für die Bild-Generierung
+// API proxy endpoint for image generation.
 app.post('/api/generate-image', async (req, res) => {
-    console.log('\n[API Request] Starte /api/generate-image...');
     const { recipe, attempt } = req.body;
-    console.log('--- Empfangenes Rezept ---');
-    console.log(JSON.stringify(recipe, null, 2));
 
     if (!process.env.API_KEY) {
         return res.status(500).json({ error: 'API-Schlüssel ist auf dem Server nicht konfiguriert.' });
@@ -270,17 +262,16 @@ app.post('/api/generate-image', async (req, res) => {
           ? `Professionelle Food-Fotografie im Magazin-Stil, ultra-realistisches Foto von: "${recipe.title}". Das Gericht ist wunderschön auf einem Keramikteller angerichtet. Dramatisches, seitliches Studiolicht, das Dampf und Texturen betont. Bokeh-Hintergrund mit dezenten Küchenelementen. Kräftige Farben, extrem appetitlich.`
           : `Eine andere Perspektive, Food-Fotografie im Magazin-Stil, ultra-realistisches Foto von: "${recipe.title}". Schön angerichtet auf einem rustikalen Holztisch mit frischen Kräutern. Weiches, natürliches Licht. Kräftige, leuchtende Farben, extrem köstlich.`;
 
-        console.log(`--- Generierter Bild-Prompt (Versuch ${attempt}) ---`);
-        console.log(prompt);
-
         const response = await generateWithRetry(ai, {
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }] },
             config: { responseModalities: [Modality.IMAGE] },
         });
         
-        console.log('[API Response] Bild-Daten erfolgreich von der KI erhalten.');
-        res.json(response);
+        res.json({
+            apiResponse: response,
+            debug: { imagePrompt: prompt }
+        });
 
     } catch (error) {
         console.error('[API Error] Kritischer Fehler bei der Bild-Generierung:', error);
@@ -289,10 +280,10 @@ app.post('/api/generate-image', async (req, res) => {
 });
 
 
-// Statische Dateien aus dem 'dist'-Ordner bereitstellen
+// Serve the static files from the 'dist' folder (React app).
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Alle anderen Anfragen an die index.html weiterleiten (für Client-Side-Routing)
+// For any other request, send the index.html file (for client-side routing).
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });

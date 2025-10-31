@@ -38,7 +38,17 @@ export const useMealPlanGenerator = (
                 throw new Error(errorData.error || `Serverfehler: ${response.statusText}`);
             }
 
-            const newPlanData = await response.json();
+            const { data: newPlanData, debug: debugInfo } = await response.json();
+
+            console.groupCollapsed('[DEBUG] Ernährungsplan-Generierung');
+            console.log('--- Gesendete Einstellungen ---');
+            console.log(settings);
+            console.log('--- Prompt für den Plan ---');
+            console.log(debugInfo.planPrompt);
+            console.log('--- Prompt für den Namen ---');
+            console.log(debugInfo.namePrompt);
+            console.groupEnd();
+
 
             if (!newPlanData.recipes || !newPlanData.weeklyPlan || !newPlanData.shoppingList || newPlanData.recipes.length === 0) {
                 throw new Error("Die von der KI generierte Antwort war unvollständig.");

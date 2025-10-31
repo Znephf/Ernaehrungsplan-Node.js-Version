@@ -12,24 +12,31 @@ export const useImageGenerator = () => {
         
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                const apiResponse = await fetch('/api/generate-image', {
+                const rawApiResponse = await fetch('/api/generate-image', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ recipe, attempt })
                 });
 
-                if (!apiResponse.ok) {
-                    const errorData = await apiResponse.json();
-                    throw new Error(errorData.error || `Serverfehler: ${apiResponse.statusText}`);
+                if (!rawApiResponse.ok) {
+                    const errorData = await rawApiResponse.json();
+                    throw new Error(errorData.error || `Serverfehler: ${rawApiResponse.statusText}`);
                 }
                 
-                const response = await apiResponse.json();
+                const { apiResponse, debug } = await rawApiResponse.json();
 
-                if (response.promptFeedback?.blockReason) {
-                    throw new Error(`Anfrage blockiert (${response.promptFeedback.blockReason})`);
+                console.groupCollapsed(`[DEBUG] Bild-Generierung für: "${recipe.title}"`);
+                console.log('--- Gesendetes Rezept-Objekt ---');
+                console.log(recipe);
+                console.log(`--- Prompt (Versuch ${attempt}) ---`);
+                console.log(debug.imagePrompt);
+                console.groupEnd();
+
+                if (apiResponse.promptFeedback?.blockReason) {
+                    throw new Error(`Anfrage blockiert (${apiResponse.promptFeedback.blockReason})`);
                 }
 
-                const candidate = response?.candidates?.[0];
+                const candidate = apiResponse?.candidates?.[0];
                 if (!candidate) {
                     throw new Error("Keine Bild-Vorschläge von der API erhalten.");
                 }
