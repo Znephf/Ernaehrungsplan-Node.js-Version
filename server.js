@@ -135,8 +135,15 @@ async function processGenerationJob(jobId) {
         if (jobs.length === 0) {
             throw new Error(`Job ${jobId} nicht in der Datenbank gefunden.`);
         }
-        const { settings, previousPlanRecipes } = jobs[0].payload;
         
+        // FIX: The payload is stored as a JSON string and must be parsed before use.
+        const payload = JSON.parse(jobs[0].payload);
+        const { settings, previousPlanRecipes } = payload;
+        
+        if (!settings) {
+            throw new Error('Die Job-Daten sind unvollständig und enthalten keine Einstellungen (settings).');
+        }
+
         const { persons, kcal, dietaryPreference, dietType, excludedIngredients, desiredIngredients, breakfastOption, customBreakfast } = settings;
 
         let planType = "Ernährungsplan";
