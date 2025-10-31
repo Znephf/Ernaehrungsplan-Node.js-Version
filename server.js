@@ -37,6 +37,10 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser(COOKIE_SECRET));
 
+// --- Konstanten für KI-Modelle ---
+const TEXT_MODEL_NAME = 'gemini-2.5-flash';
+const IMAGE_MODEL_NAME = 'gemini-2.5-flash-image';
+
 // --- Hilfsfunktionen für die KI-Anfragen ---
 const MAX_RETRIES = 4;
 const INITIAL_BACKOFF_MS = 1000;
@@ -182,7 +186,7 @@ app.post('/api/generate-plan', requireAuth, async (req, res) => {
         };
 
         const planResponse = await generateWithRetry(ai, {
-            model: 'gemini-2.5-flash',
+            model: TEXT_MODEL_NAME,
             contents: [{ parts: [{ text: planPrompt }] }],
             config: { responseMimeType: 'application/json', responseSchema: planSchema }
         });
@@ -210,7 +214,7 @@ app.post('/api/generate-plan', requireAuth, async (req, res) => {
         };
 
         const shoppingListResponse = await generateWithRetry(ai, {
-            model: 'gemini-2.5-flash',
+            model: TEXT_MODEL_NAME,
             contents: [{ parts: [{ text: shoppingListPrompt }] }],
             config: { responseMimeType: 'application/json', responseSchema: shoppingListSchema }
         });
@@ -247,7 +251,7 @@ app.post('/api/generate-image', requireAuth, async (req, res) => {
           : `Eine andere Perspektive, Food-Fotografie im Magazin-Stil, ultra-realistisches Foto von: "${recipe.title}". Schön angerichtet auf einem rustikalen Holztisch mit frischen Kräutern. Weiches, natürliches Licht. Kräftige, leuchtende Farben, extrem köstlich.`;
 
         const response = await generateWithRetry(ai, {
-            model: 'gemini-2.5-flash-image',
+            model: IMAGE_MODEL_NAME,
             contents: { parts: [{ text: prompt }] },
             config: { responseModalities: [Modality.IMAGE] },
         });
@@ -259,7 +263,11 @@ app.post('/api/generate-image', requireAuth, async (req, res) => {
 
     } catch (error) {
         console.error('[API Error] Kritischer Fehler bei der Bild-Generierung:', error);
-        res.status(503).json({ error: `Fehler bei der Bildgenerierung: ${error.message}` });
+        const errorMessage = String(error.message || '');
+        if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('quota')) {
+            return res.status(429).json({ error: 'API-Nutzungslimit (Quota) überschritten. Bitte Tarif & Abrechnung in der Google Cloud Console prüfen.' });
+        }
+        res.status(503).json({ error: `Fehler bei der Bildgenerierung: ${errorMessage}` });
     }
 });
 

@@ -11,6 +11,13 @@ Die Anwendung besteht aus zwei Hauptteilen:
 
 Dieses Setup stellt sicher, dass Ihr API-Schlüssel niemals im Browser des Benutzers offengelegt wird. Ein serverseitiger Passwortschutz sichert die gesamte Anwendung ab.
 
+### Verwendete KI-Modelle
+
+-   **Textgenerierung (Pläne, Rezepte, Einkaufslisten):** `gemini-2.5-flash`
+-   **Bildgenerierung (Rezeptbilder):** `gemini-2.5-flash-image`
+
+Die Anwendung verwendet die aktuell empfohlenen Modelle, um eine langfristige Kompatibilität zu gewährleisten.
+
 ## Voraussetzungen
 
 Stellen Sie sicher, dass auf Ihrem Server die folgenden Komponenten installiert sind:
@@ -99,7 +106,9 @@ Die `server.js`-Datei ist so konfiguriert, dass sie diese Datei automatisch lies
     -   **Überprüfen Sie die Log-Dateien.** Sie finden den Link zu den Logs (`stderr`) direkt auf der Node.js-Verwaltungsseite in Plesk. Der Server gibt dort eine klare Fehlermeldung aus, wenn Variablen fehlen.
     -   Stellen Sie sicher, dass alle Abhängigkeiten mit `npm install` korrekt installiert wurden und der `npm run build` Befehl erfolgreich war.
     -   Prüfen Sie, ob die `Anwendungsstartdatei` auf `server.js` gesetzt ist.
--   **API-Fehler:** Wenn die App läuft, aber die Plangenerierung fehlschlägt, prüfen Sie:
+-   **API-Fehler bei Plangenerierung:** Wenn die App läuft, aber die Plangenerierung fehlschlägt, prüfen Sie:
     -   Ob die Variable `API_KEY` in Plesk korrekt ist.
     -   Ob Ihr API-Schlüssel gültig ist und die Gemini API aktiviert ist.
     -   Die Server-Log-Dateien auf spezifische Fehlermeldungen der `@google/genai`-Bibliothek.
+-   **Fehler bei der Bildgenerierung (Quota Exceeded):** Wenn Sie eine Fehlermeldung erhalten, die "Quota" oder "Nutzungslimit" erwähnt, bedeutet dies, dass Ihr API-Schlüssel das kostenlose Kontingent für die Bildgenerierung überschritten hat.
+    -   **Lösung:** Verknüpfen Sie Ihr Google AI Studio-Projekt mit einem Google Cloud-Projekt, für das die Abrechnung (Billing) aktiviert ist. Dies schaltet höhere Nutzungslimits frei. Weitere Informationen finden Sie unter [Gemini API Quotas](https://ai.google.dev/gemini-api/docs/rate-limits) und [Google Cloud Billing](https://cloud.google.com/billing/docs/how-to/modify-project).

@@ -63,15 +63,17 @@ export const useImageGenerator = () => {
             } catch (e) {
                 lastKnownError = e as Error;
                 console.warn(`Bildgenerierungsversuch ${attempt} für "${recipe.title}" fehlgeschlagen:`, e);
-                if (lastKnownError.message.includes('blockiert') || lastKnownError.message.includes('Sicherheit')) break; // Don't retry on safety blocks
+                const errorMsg = (lastKnownError.message || '').toLowerCase();
+                // Stop retrying on safety blocks OR quota errors to avoid unnecessary calls
+                if (errorMsg.includes('blockiert') || errorMsg.includes('sicherheit') || errorMsg.includes('quota')) {
+                    break;
+                }
             }
         }
 
-        let errorMessage = lastKnownError?.message || "Unbekannter Fehler";
-        if (errorMessage.includes('NO_IMAGE')) errorMessage = "Das Modell konnte auch nach einem weiteren Versuch kein Bild generieren.";
-        else if (errorMessage.includes('gestoppt')) errorMessage = `Generierung gestoppt: ${errorMessage.split(':').pop()?.trim()}`;
-
-        setImageErrors(prev => ({ ...prev, [recipe.day]: `Fehler: ${errorMessage}` }));
+        // The server now sends a user-friendly message, so we can use it directly.
+        const finalErrorMessage = lastKnownError?.message || "Ein unbekannter Fehler ist aufgetreten.";
+        setImageErrors(prev => ({ ...prev, [recipe.day]: `Fehler: ${finalErrorMessage}` }));
         setLoadingImages(prev => {
             const newSet = new Set(prev);
             newSet.delete(recipe.day);
