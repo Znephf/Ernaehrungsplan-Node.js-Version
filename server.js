@@ -17,7 +17,7 @@ const requiredVars = ['COOKIE_SECRET', 'APP_PASSWORD', 'API_KEY', 'DB_HOST', 'DB
 requiredVars.forEach(v => {
     console.log(`Wert für ${v}:`, process.env[v] ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
 });
-console.log(`Wert für DB_PORT:`, process.env.DB_PORT ? process.env.DB_PORT : 'Nicht gesetzt, Standard: 3306');
+console.log(`Wert für DB_PORT:`, process.env[DB_PORT] ? process.env[DB_PORT] : 'Nicht gesetzt, Standard: 3306');
 console.log('--- Diagnose Ende ---');
 
 // --- Überprüfung der Umgebungsvariablen ---
@@ -336,21 +336,34 @@ app.get('/api/archive', requireAuth, async (req, res) => {
         const [rows] = await pool.query('SELECT * FROM archived_plans ORDER BY createdAt DESC');
         
         const archive = rows.map(row => {
-            const settings = typeof row.settings === 'string' ? JSON.parse(row.settings) : row.settings;
-            const planData = typeof row.planData === 'string' ? JSON.parse(row.planData) : row.planData;
-            
-            if (!planData || typeof planData !== 'object') {
-                console.warn(`Ungültiger oder fehlender planData-Eintrag für Archiv-ID ${row.id} wird übersprungen.`);
-                return null;
-            }
+            try {
+                const settings = typeof row.settings === 'string' ? JSON.parse(row.settings) : row.settings;
+                const planData = typeof row.planData === 'string' ? JSON.parse(row.planData) : row.planData;
+                
+                // --- Datenintegritätsprüfung ---
+                // Ein gültiger Plan MUSS ein planData-Objekt mit name, weeklyPlan, recipes und shoppingList haben.
+                if (
+                    !planData || typeof planData !== 'object' ||
+                    !planData.name ||
+                    !Array.isArray(planData.weeklyPlan) || planData.weeklyPlan.length === 0 ||
+                    !Array.isArray(planData.recipes) || planData.recipes.length === 0 ||
+                    !Array.isArray(planData.shoppingList)
+                ) {
+                    console.warn(`[Archiv] Plan mit ID ${row.id} wird übersprungen, da die Plandaten unvollständig oder korrupt sind.`);
+                    return null; // Dieser Eintrag wird später herausgefiltert.
+                }
 
-            return {
-                id: row.id.toString(),
-                createdAt: new Date(row.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                name: planData.name || 'Unbenannter Plan',
-                ...settings,
-                ...planData
-            };
+                return {
+                    id: row.id.toString(),
+                    createdAt: new Date(row.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                    name: planData.name, // Wir haben bereits validiert, dass der Name existiert.
+                    ...settings,
+                    ...planData
+                };
+            } catch(e) {
+                console.error(`[Archiv] Fehler beim Verarbeiten von Plan mit ID ${row.id}:`, e);
+                return null; // Überspringe diesen Eintrag bei einem JSON-Parse-Fehler oder einem anderen unerwarteten Fehler.
+            }
         }).filter(entry => entry !== null);
         
         res.json(archive);
