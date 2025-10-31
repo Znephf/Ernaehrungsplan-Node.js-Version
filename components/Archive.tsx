@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { ArchiveEntry, DietType } from '../types';
+import type { ArchiveEntry, DietType, Diet } from '../types';
 import { TrashIcon } from './IconComponents';
 
 interface ArchiveComponentProps {
@@ -7,6 +7,12 @@ interface ArchiveComponentProps {
   onLoadPlan: (id: string) => void;
   onDeletePlan: (id: string) => void;
 }
+
+const dietPreferenceLabels: Record<Diet, string> = {
+    omnivore: 'Alles',
+    vegetarian: 'Vegetarisch',
+    vegan: 'Vegan'
+};
 
 const dietTypeLabels: Record<DietType, string> = {
     balanced: 'Ausgewogen',
@@ -19,18 +25,25 @@ const dietTypeLabels: Record<DietType, string> = {
 
 const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan, onDeletePlan }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDiet, setSelectedDiet] = useState<DietType | 'all'>('all');
+  const [selectedPreference, setSelectedPreference] = useState<Diet | 'all'>('all');
+
 
   const filteredArchive = useMemo(() => {
-    if (!searchTerm.trim()) {
-      return archive;
-    }
-    const lowercasedTerm = searchTerm.toLowerCase();
-    return archive.filter(entry => 
-      entry.recipes.some(recipe => 
-        recipe.title.toLowerCase().includes(lowercasedTerm)
-      )
-    );
-  }, [archive, searchTerm]);
+    const lowercasedTerm = searchTerm.toLowerCase().trim();
+    return archive.filter(entry => {
+      const matchesSearch = !lowercasedTerm ||
+        (entry.name && entry.name.toLowerCase().includes(lowercasedTerm)) ||
+        entry.recipes.some(recipe =>
+          recipe.title.toLowerCase().includes(lowercasedTerm)
+        );
+
+      const matchesDiet = selectedDiet === 'all' || entry.dietType === selectedDiet;
+      const matchesPreference = selectedPreference === 'all' || entry.dietaryPreference === selectedPreference;
+      
+      return matchesSearch && matchesDiet && matchesPreference;
+    });
+  }, [archive, searchTerm, selectedDiet, selectedPreference]);
 
 
   if (archive.length === 0) {
@@ -42,18 +55,58 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
     );
   }
 
+  const FilterButton: React.FC<{
+    value: DietType | Diet | 'all';
+    label: string;
+    currentValue: DietType | Diet | 'all';
+    onClick: (value: any) => void;
+  }> = ({ value, label, currentValue, onClick }) => {
+    const isActive = currentValue === value;
+    return (
+      <button
+        onClick={() => onClick(value)}
+        className={`px-3 py-1 text-sm rounded-full transition-colors font-medium whitespace-nowrap ${
+          isActive
+            ? 'bg-emerald-600 text-white shadow-sm'
+            : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+        }`}
+      >
+        {label}
+      </button>
+    );
+  };
+
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <h2 className="text-2xl font-bold text-slate-700">Archivierte Ernährungspläne</h2>
-        <div className="w-full md:w-auto md:max-w-xs">
-          <input
-            type="text"
-            placeholder="Suche nach Gerichten..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 bg-white text-slate-900 rounded-md border-slate-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
-          />
+      <div className="space-y-6 bg-white/50 p-6 rounded-lg shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <h2 className="text-2xl font-bold text-slate-700">Archivierte Ernährungspläne</h2>
+          <div className="w-full md:w-auto md:max-w-xs">
+            <input
+              type="text"
+              placeholder="Suche in Name & Gerichten..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-2 bg-white text-slate-900 rounded-md border-slate-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Ernährungsweise:</span>
+                <FilterButton value="all" label="Alle" currentValue={selectedPreference} onClick={setSelectedPreference} />
+                {Object.entries(dietPreferenceLabels).map(([key, label]) => (
+                    <FilterButton key={key} value={key as Diet} label={label} currentValue={selectedPreference} onClick={setSelectedPreference} />
+                ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Diät-Typ:</span>
+                <FilterButton value="all" label="Alle" currentValue={selectedDiet} onClick={setSelectedDiet} />
+                {Object.entries(dietTypeLabels).map(([key, label]) => (
+                    <FilterButton key={key} value={key as DietType} label={label} currentValue={selectedDiet} onClick={setSelectedDiet} />
+                ))}
+            </div>
         </div>
       </div>
       
@@ -120,7 +173,7 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
       ) : (
         <div className="text-center py-16 bg-white rounded-lg shadow-md col-span-1 md:col-span-2 lg:col-span-3">
           <h2 className="text-xl font-bold text-slate-600 mb-2">Keine Treffer</h2>
-          <p className="text-slate-500">Für den Suchbegriff "{searchTerm}" wurden keine Pläne gefunden.</p>
+          <p className="text-slate-500">Für die aktuellen Filter wurden keine Pläne gefunden.</p>
         </div>
       )}
     </div>
