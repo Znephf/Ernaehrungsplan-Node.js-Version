@@ -136,8 +136,8 @@ async function processGenerationJob(jobId) {
             throw new Error(`Job ${jobId} nicht in der Datenbank gefunden.`);
         }
         
-        // FIX: The payload is stored as a JSON string and must be parsed before use.
-        const payload = JSON.parse(jobs[0].payload);
+        const rawPayload = jobs[0].payload;
+        const payload = typeof rawPayload === 'string' ? JSON.parse(rawPayload) : rawPayload;
         const { settings, previousPlanRecipes } = payload;
         
         if (!settings) {
