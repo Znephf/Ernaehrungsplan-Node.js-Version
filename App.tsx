@@ -32,10 +32,12 @@ const App: React.FC = () => {
     const [panelSettings, setPanelSettings] = useState<PlanSettings>(defaultSettings);
     const [isDownloading, setIsDownloading] = useState(false);
     const [downloadStatus, setDownloadStatus] = useState('Speichern');
+    const [currentPlanId, setCurrentPlanId] = useState<string | null>(null);
+
 
     const { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive } = useArchive();
     const { plan, setPlan, isLoading, error, generateNewPlan } = useMealPlanGenerator();
-    const { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState } = useImageGenerator();
+    const { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState, setImageUrlsFromArchive } = useImageGenerator();
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -55,13 +57,12 @@ const App: React.FC = () => {
         checkAuth();
     }, []);
 
-    useEffect(() => {
-        resetImageState();
-    }, [plan, resetImageState]);
-
     const handleGenerateRequest = async () => {
-        const success = await generateNewPlan(panelSettings);
-        if (success) {
+        const result = await generateNewPlan(panelSettings);
+        if (result.success && result.newPlanId) {
+            setCurrentPlanId(result.newPlanId);
+            // Ein neuer Plan hat per Definition keine Bilder, also wird der Image-State zurückgesetzt
+            resetImageState();
             // Lade das Archiv neu, um den gerade erstellten Plan anzuzeigen
             fetchArchive();
         }
@@ -76,9 +77,11 @@ const App: React.FC = () => {
         const planToLoad = loadPlanFromArchive(id);
         if (planToLoad) {
             setPlan(planToLoad);
+            setCurrentPlanId(id);
+            setImageUrlsFromArchive(planToLoad.imageUrls || {});
             setCurrentView('plan');
         }
-    }, [loadPlanFromArchive, setPlan]);
+    }, [loadPlanFromArchive, setPlan, setImageUrlsFromArchive]);
     
     useEffect(() => {
         if (currentView === 'recipes' && selectedRecipeDay) {
@@ -144,6 +147,7 @@ const App: React.FC = () => {
             case 'recipes':
                 return <RecipesComponent 
                             recipes={plan.recipes} 
+                            planId={currentPlanId}
                             imageUrls={imageUrls}
                             loadingImages={loadingImages}
                             imageErrors={imageErrors}

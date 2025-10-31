@@ -6,15 +6,22 @@ const initialPlan = {
   name: 'Low-Carb Woche',
   shoppingList: initialShoppingList,
   weeklyPlan: initialWeeklyPlan,
-  recipes: initialRecipes
+  recipes: initialRecipes,
+  imageUrls: {}
 };
+
+interface GenerationResult {
+    success: boolean;
+    newPlan: PlanData | null;
+    newPlanId: string | null;
+}
 
 export const useMealPlanGenerator = () => {
     const [plan, setPlan] = useState<PlanData>(initialPlan);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    const generateNewPlan = async (settings: PlanSettings): Promise<boolean> => {
+    const generateNewPlan = async (settings: PlanSettings): Promise<GenerationResult> => {
         setIsLoading(true);
         setError(null);
 
@@ -36,7 +43,7 @@ export const useMealPlanGenerator = () => {
                 throw new Error(errorData.error || `Serverfehler: ${response.statusText}`);
             }
 
-            const { data: newPlanData, debug: debugInfo } = await response.json();
+            const { data: newPlanData, id: newPlanId, debug: debugInfo } = await response.json();
 
             console.groupCollapsed('[DEBUG] Ernährungsplan-Generierung (2-stufig)');
             console.log('--- Gesendete Einstellungen ---');
@@ -53,12 +60,12 @@ export const useMealPlanGenerator = () => {
             }
             
             setPlan(newPlanData);
-            return true;
+            return { success: true, newPlan: newPlanData, newPlanId };
 
         } catch (e) {
             console.error(e);
             setError(`Der Ernährungsplan konnte nicht erstellt werden: ${(e as Error).message}. Bitte versuchen Sie es später erneut.`);
-            return false;
+            return { success: false, newPlan: null, newPlanId: null };
         } finally {
             setIsLoading(false);
         }
@@ -69,7 +76,8 @@ export const useMealPlanGenerator = () => {
             name: archiveEntry.name,
             shoppingList: archiveEntry.shoppingList,
             weeklyPlan: archiveEntry.weeklyPlan,
-            recipes: archiveEntry.recipes
+            recipes: archiveEntry.recipes,
+            imageUrls: archiveEntry.imageUrls || {}
         });
     };
 

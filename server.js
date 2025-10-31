@@ -196,6 +196,34 @@ app.delete('/api/archive/:id', requireAuth, async (req, res) => {
     }
 });
 
+app.put('/api/archive/image', requireAuth, async (req, res) => {
+    const { planId, day, imageUrl } = req.body;
+    if (!planId || !day || !imageUrl) {
+        return res.status(400).json({ error: 'Fehlende Daten zum Speichern des Bildes.' });
+    }
+
+    try {
+        const [rows] = await pool.query('SELECT planData FROM archived_plans WHERE id = ?', [planId]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Plan nicht gefunden.' });
+        }
+
+        const planData = typeof rows[0].planData === 'string' ? JSON.parse(rows[0].planData) : rows[0].planData;
+
+        if (!planData.imageUrls) {
+            planData.imageUrls = {};
+        }
+        planData.imageUrls[day] = imageUrl;
+
+        await pool.query('UPDATE archived_plans SET planData = ? WHERE id = ?', [JSON.stringify(planData), planId]);
+
+        res.status(200).json({ message: 'Bild erfolgreich gespeichert.' });
+    } catch (error) {
+        console.error(`Fehler beim Speichern des Bildes für Plan ${planId}:`, error);
+        res.status(500).json({ error: 'Bild konnte nicht in der Datenbank gespeichert werden.' });
+    }
+});
+
 
 app.post('/api/generate-plan', requireAuth, async (req, res) => {
     const { settings, previousPlanRecipes } = req.body;
@@ -304,17 +332,19 @@ app.post('/api/generate-plan', requireAuth, async (req, res) => {
         
         const finalPlan = {
             ...planData,
-            shoppingList: shoppingListData.shoppingList
+            shoppingList: shoppingListData.shoppingList,
+            imageUrls: {} // Initialize with empty images object
         };
         
         // Den neuen Plan in der Datenbank speichern
-        await pool.query(
+        const [result] = await pool.query(
             'INSERT INTO archived_plans (name, settings, planData) VALUES (?, ?, ?)',
             [finalPlan.name, JSON.stringify(settings), JSON.stringify(finalPlan)]
         );
 
         res.json({ 
             data: finalPlan,
+            id: result.insertId.toString(),
             debug: { planPrompt, shoppingListPrompt }
         });
 

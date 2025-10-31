@@ -49,6 +49,7 @@ export interface PlanData {
     shoppingList: ShoppingList;
     weeklyPlan: WeeklyPlan;
     recipes: Recipes;
+    imageUrls?: { [key: string]: string };
 }
 
 export interface ArchiveEntry extends PlanSettings, PlanData {

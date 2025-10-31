@@ -83,13 +83,26 @@ export const useImageGenerator = () => {
         return null;
     }, []);
 
-    const generateImage = useCallback(async (recipe: Recipe) => {
-        if (loadingImages.has(recipe.day)) return;
+    const generateImage = useCallback(async (recipe: Recipe, planId: string | null) => {
+        if (loadingImages.has(recipe.day) || !planId) return;
 
         setLoadingImages(prev => new Set(prev).add(recipe.day));
         setImageErrors(prev => ({ ...prev, [recipe.day]: null }));
 
-        await executeImageGeneration(recipe);
+        const newImageUrl = await executeImageGeneration(recipe);
+
+        if (newImageUrl) {
+            try {
+                await fetch('/api/archive/image', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ planId, day: recipe.day, imageUrl: newImageUrl })
+                });
+            } catch (e) {
+                console.error("Konnte Bild-URL nicht im Backend speichern:", e);
+                // Optional: UI-Feedback geben, dass Speichern fehlgeschlagen ist.
+            }
+        }
     }, [loadingImages, executeImageGeneration]);
 
     const generateMissingImages = useCallback(async (recipes: Recipe[], onProgress?: (status: string) => void): Promise<{[key: string]: string}> => {
@@ -100,6 +113,8 @@ export const useImageGenerator = () => {
             return finalUrls;
         }
 
+        // Bilder werden hier nicht persistent gespeichert, da kein Plan-Kontext vorhanden ist.
+        // Das persistente Speichern erfolgt nur über die einzelne `generateImage`-Funktion.
         for (let i = 0; i < recipesToGenerate.length; i++) {
             const recipe = recipesToGenerate[i];
             if (onProgress) {
@@ -131,5 +146,12 @@ export const useImageGenerator = () => {
         setImageErrors({});
     }, []);
 
-    return { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState };
+    const setImageUrlsFromArchive = useCallback((urls: { [key: string]: string }) => {
+        setImageUrls(urls);
+        setLoadingImages(new Set());
+        setImageErrors({});
+    }, []);
+
+
+    return { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState, setImageUrlsFromArchive };
 };

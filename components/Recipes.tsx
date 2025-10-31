@@ -9,15 +9,16 @@ import GeneratedRecipeImage from './GeneratedRecipeImage';
 
 interface RecipesComponentProps {
   recipes: Recipes;
+  planId: string | null;
   imageUrls: { [key: string]: string };
   loadingImages: Set<string>;
   imageErrors: { [key: string]: string | null };
-  generateImage: (recipe: Recipe) => Promise<void>;
+  generateImage: (recipe: Recipe, planId: string | null) => Promise<void>;
   // FIX: The return type of `generateMissingImages` is updated to reflect that it returns a promise resolving to a dictionary of image URLs, aligning it with the `useImageGenerator` hook's implementation.
   generateMissingImages: (recipes: Recipe[], onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
 }
 
-const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages }) => {
+const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages }) => {
   const [isCreatingPdf, setIsCreatingPdf] = useState(false);
   const [pdfStatus, setPdfStatus] = useState('');
   const [isPdfGenerationQueued, setIsPdfGenerationQueued] = useState(false);
@@ -120,7 +121,7 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, imageUrls,
                 imageUrl={imageUrls[recipe.day] || null}
                 isLoading={loadingImages.has(recipe.day)}
                 error={imageErrors[recipe.day] || null}
-                onGenerate={() => generateImage(recipe)}
+                onGenerate={() => generateImage(recipe, planId)}
               />
             </div>
             <div className="p-6">
