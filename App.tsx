@@ -4,7 +4,6 @@ import WeeklyPlanComponent from './components/WeeklyPlan';
 import RecipesComponent from './components/Recipes';
 import ArchiveComponent from './components/Archive';
 import SettingsPanel from './components/SettingsPanel';
-import LoginComponent from './components/Login';
 import LoadingOverlay from './components/LoadingOverlay';
 import type { View, PlanSettings, ArchiveEntry } from './types';
 import { useArchive } from './hooks/useArchive';
@@ -28,7 +27,6 @@ const defaultSettings: PlanSettings = {
 };
 
 const App: React.FC = () => {
-    const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
     const [currentView, setCurrentView] = useState<View>('plan');
     const [selectedRecipeDay, setSelectedRecipeDay] = useState<string | null>(null);
     const [isSettingsVisible, setIsSettingsVisible] = useState(true);
@@ -42,24 +40,6 @@ const App: React.FC = () => {
     const { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState, setImageUrlsFromArchive } = useImageGenerator(fetchArchive);
 
     const currentPlanId = plan ? plan.id : null;
-
-    useEffect(() => {
-        const checkAuth = async () => {
-            try {
-                const response = await fetch('/api/check-auth');
-                if (response.ok) {
-                    const data = await response.json();
-                    setIsAuthenticated(data.isAuthenticated);
-                } else {
-                    setIsAuthenticated(false);
-                }
-            } catch (err) {
-                console.error("Auth check failed", err);
-                setIsAuthenticated(false);
-            }
-        };
-        checkAuth();
-    }, []);
 
     const handleLoadPlan = useCallback((id: string) => {
         const planToLoad = loadPlanFromArchive(id);
@@ -139,25 +119,15 @@ const App: React.FC = () => {
 
     const handleLogout = async () => {
         try {
+            // The server will handle the redirect. The browser will follow it.
             await fetch('/logout', { method: 'POST' });
-            setIsAuthenticated(false);
+            // To be safe, we can force a reload to clear the app state.
+            window.location.reload();
         } catch (error) {
             console.error('Fehler beim Abmelden:', error);
-            alert('Abmeldung fehlgeschlagen.');
+            alert('Abmeldung fehlgeschlagen. Bitte versuchen Sie, die Seite neu zu laden.');
         }
     };
-
-    if (isAuthenticated === null) {
-        return (
-            <div className="flex items-center justify-center h-screen bg-slate-100">
-                <div className="text-xl font-semibold text-slate-600">Lade...</div>
-            </div>
-        );
-    }
-
-    if (!isAuthenticated) {
-        return <LoginComponent onLoginSuccess={() => setIsAuthenticated(true)} />;
-    }
 
     const renderView = () => {
         switch (currentView) {

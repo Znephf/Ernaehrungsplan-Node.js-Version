@@ -144,7 +144,7 @@ async function processGenerationJob(jobId) {
             throw new Error('Die Job-Daten sind unvollständig und enthalten keine Einstellungen (settings).');
         }
 
-        const { persons, kcal, dietaryPreference, dietType, excludedIngredients, desiredIngredients, breakfastOption, customBreakfast, isGlutenFree, isLactoseFree } = settings;
+        const { persons, kcal, dietaryPreference, dietType, excludedIngredients, desiredIngredients, breakfastOption, customBreakfast, isGlutenFree, isL lactoseFree } = settings;
 
         let planType = "Ernährungsplan";
         if (dietaryPreference === 'vegetarian') planType = "vegetarischen Ernährungsplan";
@@ -332,9 +332,13 @@ async function processGenerationJob(jobId) {
 
 
 // ======================================================
-// --- ÖFFENTLICHE API-ROUTEN ---
+// --- AUTHENTICATION & ROUTING ---
 // ======================================================
 
+// Serve static files from the 'public' directory (e.g., login.html)
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Login handler for form submissions from login.html
 app.post('/login', (req, res) => {
     const { password } = req.body;
     if (password === APP_PASSWORD) {
@@ -345,38 +349,33 @@ app.post('/login', (req, res) => {
             maxAge: 30 * 24 * 60 * 60 * 1000, // 30 Tage
             secure: process.env.NODE_ENV === 'production',
         });
-        res.status(200).json({ message: 'Anmeldung erfolgreich.' });
+        res.redirect('/');
     } else {
-        res.status(401).json({ error: 'Das eingegebene Passwort ist falsch.' });
+        res.redirect('/login.html?error=1');
     }
 });
 
-app.post('/logout', (req, res) => {
-    res.clearCookie('isAuthenticated');
-    res.status(200).json({ message: 'Abmeldung erfolgreich.' });
-});
-
-app.get('/api/check-auth', (req, res) => {
+// Auth wall: All requests below this point require authentication.
+app.use((req, res, next) => {
     if (req.signedCookies.isAuthenticated === 'true') {
-        res.json({ isAuthenticated: true });
-    } else {
-        res.json({ isAuthenticated: false });
+        return next();
     }
+    // If not authenticated, redirect to the static login page.
+    res.redirect('/login.html');
 });
+
 
 // ======================================================
 // --- GESCHÜTZTE API-ROUTEN ---
 // ======================================================
 
-const requireAuth = (req, res, next) => {
-    if (req.signedCookies.isAuthenticated === 'true') {
-        return next();
-    }
-    res.status(401).json({ error: 'Nicht authentifiziert. Bitte melden Sie sich an.' });
-};
+app.post('/logout', (req, res) => {
+    res.clearCookie('isAuthenticated');
+    res.redirect('/login.html');
+});
 
 // --- Archiv-Routen ---
-app.get('/api/archive', requireAuth, async (req, res) => {
+app.get('/api/archive', async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM archived_plans ORDER BY createdAt DESC');
         
@@ -418,7 +417,7 @@ app.get('/api/archive', requireAuth, async (req, res) => {
     }
 });
 
-app.delete('/api/archive/:id', requireAuth, async (req, res) => {
+app.delete('/api/archive/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const [result] = await pool.query('DELETE FROM archived_plans WHERE id = ?', [id]);
@@ -433,7 +432,7 @@ app.delete('/api/archive/:id', requireAuth, async (req, res) => {
     }
 });
 
-app.put('/api/archive/image', requireAuth, async (req, res) => {
+app.put('/api/archive/image', async (req, res) => {
     const { planId, day, imageUrl } = req.body;
     if (!planId || !day || !imageUrl) {
         return res.status(400).json({ error: 'Fehlende Daten zum Speichern des Bildes.' });
@@ -462,7 +461,7 @@ app.put('/api/archive/image', requireAuth, async (req, res) => {
 });
 
 
-app.post('/api/generate-plan-job', requireAuth, async (req, res) => {
+app.post('/api/generate-plan-job', async (req, res) => {
     const payload = req.body;
      if (!payload.settings) {
         return res.status(400).json({ error: 'Einstellungen fehlen in der Anfrage.' });
@@ -480,7 +479,7 @@ app.post('/api/generate-plan-job', requireAuth, async (req, res) => {
     }
 });
 
-app.get('/api/job-status/:jobId', requireAuth, async (req, res) => {
+app.get('/api/job-status/:jobId', async (req, res) => {
     const { jobId } = req.params;
     try {
         const [jobRows] = await pool.query('SELECT status, planId, errorMessage FROM generation_jobs WHERE jobId = ?', [jobId]);
@@ -518,7 +517,7 @@ app.get('/api/job-status/:jobId', requireAuth, async (req, res) => {
 });
 
 
-app.post('/api/generate-image', requireAuth, async (req, res) => {
+app.post('/api/generate-image', async (req, res) => {
     const { recipe, attempt } = req.body;
 
     if (!recipe) {
