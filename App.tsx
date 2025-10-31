@@ -8,7 +8,7 @@ import type { View, PlanSettings, PlanData } from './types';
 import { useArchive } from './hooks/useArchive';
 import { useMealPlanGenerator } from './hooks/useMealPlanGenerator';
 import { useImageGenerator } from './hooks/useImageGenerator';
-import { ChevronUpIcon, ChevronDownIcon, DownloadIcon } from './components/IconComponents';
+import { ChevronUpIcon, ChevronDownIcon, DownloadIcon, LogoutIcon } from './components/IconComponents';
 import { generateAndDownloadHtml } from './services/htmlExporter';
 
 
@@ -91,6 +91,20 @@ const App: React.FC = () => {
         }
     };
 
+    const handleLogout = async () => {
+        try {
+            const response = await fetch('/logout', { method: 'POST' });
+            if (response.ok) {
+                window.location.reload(); // Seite neu laden, um den Auth-Check auszulösen
+            } else {
+                throw new Error('Logout fehlgeschlagen');
+            }
+        } catch (error) {
+            console.error('Fehler beim Abmelden:', error);
+            alert('Abmeldung fehlgeschlagen.');
+        }
+    };
+
 
     const renderView = () => {
         switch (currentView) {
@@ -150,6 +164,14 @@ const App: React.FC = () => {
                         >
                             <DownloadIcon />
                             <span className="hidden sm:inline">{isDownloading ? downloadStatus : 'Speichern'}</span>
+                        </button>
+                         <button
+                            onClick={handleLogout}
+                            className="flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-red-100 hover:text-red-600 rounded-md transition-colors"
+                            title="Abmelden"
+                        >
+                            <LogoutIcon />
+                            <span className="hidden sm:inline">Abmelden</span>
                         </button>
                     </div>
                 </div>

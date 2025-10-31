@@ -25,6 +25,45 @@ console.log('--- Diagnose Ende ---');
 const app = express();
 const port = process.env.PORT || 3001; // Port für Plesk/Phusion Passenger
 
+// --- API Retry Logic Helper ---
+const MAX_RETRIES = 4; // Total attempts = 1 initial + 3 retries
+const INITIAL_BACKOFF_MS = 1000;
+
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Wraps a Gemini API call with a retry mechanism for transient errors.
+ * @param {GoogleGenAI} ai - The GoogleGenAI client instance.
+ * @param {object} generationParams - The parameters for the generateContent call.
+ * @returns {Promise<any>}
+ */
+async function generateWithRetry(ai, generationParams) {
+    let lastError = null;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        try {
+            const result = await ai.models.generateContent(generationParams);
+            return result; // Success
+        } catch (error) {
+            lastError = error;
+            const errorMessage = (error.message || '').toLowerCase();
+            
+            if (errorMessage.includes('503') || errorMessage.includes('unavailable') || errorMessage.includes('overloaded') || errorMessage.includes('rate limit')) {
+                if (attempt < MAX_RETRIES - 1) {
+                    const backoffTime = INITIAL_BACKOFF_MS * Math.pow(2, attempt) + Math.random() * 1000;
+                    console.log(`[API Retry] Versuch ${attempt + 1}/${MAX_RETRIES} fehlgeschlagen: KI-Modell ist überlastet. Nächster Versuch in ${Math.round(backoffTime / 1000)}s...`);
+                    await delay(backoffTime);
+                }
+            } else {
+                console.error('[API Error] Nicht behebbarer Fehler:', error.message);
+                throw error;
+            }
+        }
+    }
+    console.error(`[API Error] Alle ${MAX_RETRIES} Versuche, die KI zu erreichen, sind fehlgeschlagen.`);
+    throw new Error(`Das KI-Modell ist derzeit überlastet. Bitte versuchen Sie es in ein paar Minuten erneut.`);
+}
+
+
 // --- Security Configuration ---
 const APP_PASSWORD = process.env.APP_PASSWORD;
 const COOKIE_SECRET = process.env.COOKIE_SECRET;
@@ -59,6 +98,12 @@ app.post('/login', (req, res) => {
     }
 });
 
+// Endpunkt zum Abmelden
+app.post('/logout', (req, res) => {
+    res.clearCookie('isAuthenticated');
+    res.status(200).json({ message: 'Abmeldung erfolgreich.' });
+});
+
 
 // --- Authentication Wall Middleware ---
 // Diese Middleware schützt alle nachfolgenden Routen.
@@ -84,7 +129,10 @@ app.use((req, res, next) => {
 
 // API-Proxy-Endpunkt für die Plan-Generierung
 app.post('/api/generate-plan', async (req, res) => {
+    console.log('\n[API Request] Starte /api/generate-plan...');
     const { settings, previousPlanRecipes } = req.body;
+    console.log('--- Empfangene Einstellungen ---');
+    console.log(JSON.stringify(settings, null, 2));
     
     if (!process.env.API_KEY) {
         return res.status(500).json({ error: 'API-Schlüssel ist auf dem Server nicht konfiguriert.' });
@@ -157,6 +205,9 @@ app.post('/api/generate-plan', async (req, res) => {
         WICHTIG: Alle Nährwertangaben (Kalorien, Protein, etc.) müssen IMMER PRO PERSON berechnet werden. Die Zutatenlisten sind für ${persons} Personen.
         `;
 
+        console.log('--- Generierter Prompt für Ernährungsplan ---');
+        console.log(planPrompt);
+
         const responseSchema = {
             type: Type.OBJECT,
             properties: {
@@ -167,36 +218,44 @@ app.post('/api/generate-plan', async (req, res) => {
             required: ["shoppingList", "weeklyPlan", "recipes"]
         };
 
-        const planResponse = await ai.models.generateContent({
+        const planResponse = await generateWithRetry(ai, {
             model: 'gemini-2.5-flash',
             contents: [{ parts: [{ text: planPrompt }] }],
             config: { responseMimeType: 'application/json', responseSchema: responseSchema }
         });
         
+        console.log('[API Response] Plan-Daten erfolgreich von der KI erhalten.');
         const parsedData = JSON.parse(planResponse.text);
 
         const recipeTitles = parsedData.recipes.map((r) => r.title).join(', ');
         const namePrompt = `Basierend auf diesen Abendessen-Rezepten für eine Woche: ${recipeTitles}. Erstelle einen kurzen, kreativen und einprägsamen Namen für diesen Ernährungsplan auf Deutsch.`;
 
-        const nameResponse = await ai.models.generateContent({
+        console.log('--- Generierter Prompt für Planname ---');
+        console.log(namePrompt);
+
+        const nameResponse = await generateWithRetry(ai, {
             model: 'gemini-2.5-flash',
             contents: [{ parts: [{ text: namePrompt }] }],
             config: { systemInstruction: "Antworte NUR mit dem Namen. Keine Erklärungen, keine Anführungszeichen." }
         });
 
+        console.log('[API Response] Planname erfolgreich von der KI erhalten.');
         const newName = nameResponse.text.trim().replace(/"/g, '');
 
         res.json({ name: newName, ...parsedData });
 
     } catch (error) {
-        console.error('Fehler bei der API-Anfrage:', error);
-        res.status(500).json({ error: `Fehler bei der Kommunikation mit der KI: ${error.message}` });
+        console.error('[API Error] Kritischer Fehler bei der Plan-Generierung:', error);
+        res.status(503).json({ error: `Fehler bei der Kommunikation mit der KI: ${error.message}` });
     }
 });
 
 // API-Proxy-Endpunkt für die Bild-Generierung
 app.post('/api/generate-image', async (req, res) => {
+    console.log('\n[API Request] Starte /api/generate-image...');
     const { recipe, attempt } = req.body;
+    console.log('--- Empfangenes Rezept ---');
+    console.log(JSON.stringify(recipe, null, 2));
 
     if (!process.env.API_KEY) {
         return res.status(500).json({ error: 'API-Schlüssel ist auf dem Server nicht konfiguriert.' });
@@ -211,17 +270,21 @@ app.post('/api/generate-image', async (req, res) => {
           ? `Professionelle Food-Fotografie im Magazin-Stil, ultra-realistisches Foto von: "${recipe.title}". Das Gericht ist wunderschön auf einem Keramikteller angerichtet. Dramatisches, seitliches Studiolicht, das Dampf und Texturen betont. Bokeh-Hintergrund mit dezenten Küchenelementen. Kräftige Farben, extrem appetitlich.`
           : `Eine andere Perspektive, Food-Fotografie im Magazin-Stil, ultra-realistisches Foto von: "${recipe.title}". Schön angerichtet auf einem rustikalen Holztisch mit frischen Kräutern. Weiches, natürliches Licht. Kräftige, leuchtende Farben, extrem köstlich.`;
 
-        const response = await ai.models.generateContent({
+        console.log(`--- Generierter Bild-Prompt (Versuch ${attempt}) ---`);
+        console.log(prompt);
+
+        const response = await generateWithRetry(ai, {
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }] },
             config: { responseModalities: [Modality.IMAGE] },
         });
         
+        console.log('[API Response] Bild-Daten erfolgreich von der KI erhalten.');
         res.json(response);
 
     } catch (error) {
-        console.error('Fehler bei der Bildgenerierung:', error);
-        res.status(500).json({ error: `Fehler bei der Bildgenerierung: ${error.message}` });
+        console.error('[API Error] Kritischer Fehler bei der Bild-Generierung:', error);
+        res.status(503).json({ error: `Fehler bei der Bildgenerierung: ${error.message}` });
     }
 });
 
