@@ -61,43 +61,45 @@ Stellen Sie sicher, dass auf Ihrem Server die folgenden Komponenten installiert 
 
 6.  Klicken Sie auf **OK** oder **Speichern**. 
 
-## Schritt 4: Konfigurationsdatei `.env` erstellen (Sicherheit)
+## Schritt 4: Umgebungsvariablen in Plesk konfigurieren (WICHTIG)
 
-Da die Bereitstellung von Umgebungsvariablen über das Plesk-Panel unzuverlässig sein kann, verwenden wir eine `.env`-Datei direkt auf dem Server. Dies ist eine sichere und gängige Methode.
+Ihre geheimen Schlüssel müssen sicher als Umgebungsvariablen gespeichert werden. Dies ist der sicherste Weg, da sie nicht im Code gespeichert werden.
 
-1.  **Erstellen Sie die Datei:** Verbinden Sie sich per SSH mit Ihrem Server, navigieren Sie in Ihr Anwendungsverzeichnis (`/var/www/vhosts/ihredomain.de/ernaehrungsplaner`) und erstellen Sie die Datei:
-    ```bash
-    touch .env
-    ```
-2.  **Fügen Sie Ihre Geheimnisse hinzu:** Öffnen Sie die Datei mit einem Editor (z.B. `nano .env`) und fügen Sie Ihre drei Geheimnisse in diesem Format ein:
-    ```
-    API_KEY=Ihr_Google_Gemini_API_Schlüssel
-    COOKIE_SECRET=Eine_sehr_lange_und_komplexe_zufällige_Zeichenfolge
-    APP_PASSWORD=Ein_sicheres_Passwort_für_den_Login
-    ```
-    Ersetzen Sie die Platzhalter durch Ihre echten Werte. Speichern und schließen Sie die Datei.
+1.  Gehen Sie in Plesk zur **Node.js**-Verwaltungsseite Ihrer App.
+2.  Klicken Sie auf **Umgebungsvariablen**.
+3.  Fügen Sie die folgenden drei Variablen hinzu:
+    -   `API_KEY` = `Ihr_Google_Gemini_API_Schlüssel`
+    -   `COOKIE_SECRET` = `Eine_sehr_lange_und_komplexe_zufällige_Zeichenfolge`
+    -   `APP_PASSWORD` = `Ein_sicheres_Passwort_für_den_Login`
+4.  **WICHTIG:** Ersetzen Sie die Platzhalter durch Ihre echten, sicheren Werte. Der `COOKIE_SECRET` kann eine beliebige lange, zufällige Zeichenkette sein (z. B. von einem Passwort-Generator).
+5.  Speichern Sie die Variablen.
 
-3.  **SICHERN SIE DIE DATEI (WICHTIGSTER SCHRITT):** Ändern Sie die Dateiberechtigungen, damit nur Ihr Benutzer die Datei lesen und schreiben kann. Dies verhindert, dass andere Benutzer auf dem Server Ihre Geheimnisse einsehen können.
-    ```bash
-    chmod 600 .env
-    ```
-4.  **Zu `.gitignore` hinzufügen:** Stellen Sie sicher, dass die Datei `.gitignore` in Ihrem Projekt eine Zeile mit `.env` enthält. Dadurch wird verhindert, dass Ihre Geheimnisse jemals versehentlich in Ihr Git-Repository hochgeladen werden.
-
-**WICHTIG: Wenn die `.env`-Datei fehlt oder die Variablen darin falsch sind, wird der Server absichtlich nicht starten! Dies ist die häufigste Ursache für Fehler nach dem Deployment.**
+**Hinweis: Wenn diese Variablen fehlen oder falsch sind, wird der Server absichtlich nicht starten! Dies ist die häufigste Ursache für Fehler nach dem Deployment.**
 
 ## Schritt 5: Anwendung starten
 
-1.  Auf der Node.js-Verwaltungsseite in Plesk, klicken Sie auf **App neu starten**.
+1.  Auf der Node.js-Verwaltungsseite in Plesk, klicken Sie auf **App neu starten**. Dies ist nach jeder Änderung der Umgebungsvariablen zwingend erforderlich.
 2.  Besuchen Sie Ihre Domain. Sie sollten nun von der Login-Seite begrüßt werden.
+
+## Lokale Entwicklung (Optional)
+
+Um die Anwendung auf Ihrem lokalen Computer auszuführen (außerhalb von Plesk), erstellen Sie eine Datei namens `.env` im Hauptverzeichnis des Projekts. Fügen Sie Ihre Geheimnisse in diese Datei ein:
+```
+API_KEY=Ihr_lokaler_API_Schlüssel
+COOKIE_SECRET=Ein_lokaler_zufälliger_String
+APP_PASSWORD=Ein_lokales_Passwort
+```
+Die `server.js`-Datei ist so konfiguriert, dass sie diese Datei automatisch liest, wenn sie nicht im `production`-Modus läuft. Stellen Sie sicher, dass die `.env`-Datei in Ihrer `.gitignore`-Datei aufgeführt ist, um zu verhindern, dass sie in Ihr Repository hochgeladen wird.
 
 ## Fehlerbehebung
 
 -   **502/503 Fehler oder keine Passwort-Abfrage:** Die Node.js-Anwendung konnte nicht starten oder stürzt ab.
-    -   **Prüfen Sie als Erstes die `.env`-Datei!** Ist sie vorhanden, korrekt formatiert und sind alle drei Variablen gesetzt?
-    -   Überprüfen Sie die Log-Dateien. Sie finden den Link zu den Logs (`stderr`) direkt auf der Node.js-Verwaltungsseite in Plesk. Der Server gibt dort eine klare Fehlermeldung aus, wenn Variablen fehlen.
-    -   Stellen Sie sicher, dass alle Abhängigkeiten mit `npm install` korrekt installiert wurden.
+    -   **Prüfen Sie als Erstes die Umgebungsvariablen im Plesk-Panel!** Sind alle drei (`API_KEY`, `COOKIE_SECRET`, `APP_PASSWORD`) vorhanden und korrekt geschrieben?
+    -   **Haben Sie die App neu gestartet?** Klicken Sie nach jeder Änderung der Variablen im Plesk-Panel auf **"App neu starten"**.
+    -   **Überprüfen Sie die Log-Dateien.** Sie finden den Link zu den Logs (`stderr`) direkt auf der Node.js-Verwaltungsseite in Plesk. Der Server gibt dort eine klare Fehlermeldung aus, wenn Variablen fehlen.
+    -   Stellen Sie sicher, dass alle Abhängigkeiten mit `npm install` korrekt installiert wurden und der `npm run build` Befehl erfolgreich war.
     -   Prüfen Sie, ob die `Anwendungsstartdatei` auf `server.js` gesetzt ist.
 -   **API-Fehler:** Wenn die App läuft, aber die Plangenerierung fehlschlägt, prüfen Sie:
-    -   Ob die Variable `API_KEY` in Ihrer `.env`-Datei korrekt ist.
+    -   Ob die Variable `API_KEY` in Plesk korrekt ist.
     -   Ob Ihr API-Schlüssel gültig ist und die Gemini API aktiviert ist.
     -   Die Server-Log-Dateien auf spezifische Fehlermeldungen der `@google/genai`-Bibliothek.
