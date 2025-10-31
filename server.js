@@ -61,8 +61,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser(COOKIE_SECRET));
 
-// --- Public Routes & Assets (No Authentication Required) ---
-// Serve static files from 'public' folder (login.html).
+// --- Public Routes (No Authentication Required) ---
+// Serve static files from 'public' folder (contains login.html).
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Login endpoint.
@@ -73,7 +73,7 @@ app.post('/login', (req, res) => {
             signed: true,
             httpOnly: true,
             path: '/',
-            maxAge: 30 * 24 * 60 * 60 * 1000
+            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
         });
         res.redirect('/');
     } else {
@@ -87,26 +87,27 @@ app.post('/logout', (req, res) => {
     res.status(200).json({ message: 'Abmeldung erfolgreich.' });
 });
 
-// Serve static assets from the React app build folder (JS, CSS, images).
-// Do NOT serve index.html from here automatically for the root path.
-app.use(express.static(path.join(__dirname, 'dist'), { index: false }));
-
 // --- Authentication Wall Middleware ---
 // All requests below this point require authentication.
 app.use((req, res, next) => {
     if (req.signedCookies.isAuthenticated === 'true') {
-        return next();
+        return next(); // User is authenticated, proceed.
     }
+    // If user is not authenticated:
     if (req.path.startsWith('/api/')) {
+        // For API calls, send a 401 Unauthorized error.
         return res.status(401).json({ error: 'Nicht authentifiziert. Bitte melden Sie sich an.' });
     }
-    // For any other unauthenticated requests (like '/'), redirect to the login page.
+    // For any other page requests, redirect to the login page.
     res.redirect('/login.html');
 });
 
 
 // --- Protected Routes ---
-// Only authenticated requests reach this part of the application.
+// Only authenticated requests can reach this part of the application.
+
+// Serve the static assets of the React app (JS, CSS, images).
+app.use(express.static(path.join(__dirname, 'dist')));
 
 app.post('/api/generate-plan', async (req, res) => {
     const { settings, previousPlanRecipes } = req.body;
@@ -145,7 +146,7 @@ app.post('/api/generate-plan', async (req, res) => {
         
         const dietTypePrompts = {
             balanced: 'Der Plan soll eine ausgewogene Mischung aus Makronährstoffen (Kohlenhydrate, Proteine, Fette) enthalten.',
-            'low-carb': 'Der Plan soll streng Low-Carb sein. Vermeide kohlenhydratreiche Lebensmittel wie Brot, Nudeln, Reis, Kartolleln und Zucker. Konzentriere dich auf Gemüse, gesunde Fette und Proteine.',
+            'low-carb': 'Der Plan soll streng Low-Carb sein. Vermeide kohlenhydratreiche Lebensmittel wie Brot, Nudeln, Reis, Kartoffeln und Zucker. Konzentriere dich auf Gemüse, gesunde Fette und Proteine.',
             keto: 'Der Plan soll streng ketogen sein, also sehr kohlenhydratarm (unter 30g pro Tag), moderat im Protein und sehr fettreich.',
             'high-protein': 'Der Plan soll besonders proteinreich sein. Jede Mahlzeit, insbesondere das Abendessen, sollte eine signifikante Proteinquelle enthalten.',
             mediterranean: 'Der Plan soll der mediterranen Küche folgen. Viel frisches Gemüse, Hülsenfrüchte, Olivenöl, Nüsse, Samen.'
@@ -168,7 +169,7 @@ app.post('/api/generate-plan', async (req, res) => {
         Das Abendessen soll jeden Tag ein anderes warmes Gericht sein.
         Generiere eine detaillierte und vollständige Einkaufsliste für ALLE Zutaten der Woche für ${persons} Personen. Gruppiere die Einkaufsliste nach sinnvollen Kategorien.
         Erstelle detaillierte Rezepte für jedes Abendessen.
-        WICHTIG: Alle Nährwertangaben (Kalorien, Protein, etc.) müssen IMMER PRO PERSON berechnet werden. Die Zutatenlisten sind für ${persons} Personen.
+        WICHTIG: Alle Nährwertangaben müssen IMMER PRO PERSON berechnet werden. Die Zutatenlisten sind für ${persons} Personen. Die Angabe von Kalorien ist zwingend erforderlich. Die Angabe von Protein, Kohlenhydraten und Fett für die Rezepte ist optional, aber sehr erwünscht.
         `;
 
         const responseSchema = {
@@ -235,7 +236,8 @@ app.post('/api/generate-image', async (req, res) => {
 });
 
 
-// For any other authenticated request, send the index.html file (for client-side routing).
+// For any other authenticated GET request, send the main index.html file.
+// This handles the initial page load and allows for client-side routing if added later.
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
