@@ -9,22 +9,22 @@ import { GoogleGenAI, Modality, Type } from '@google/genai';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Lade Umgebungsvariablen aus der .env Datei.
+// Diese Methode wird jetzt sowohl für die lokale Entwicklung als auch für die Produktion verwendet,
+// da die Injektion durch Plesk/Phusion Passenger unzuverlässig zu sein scheint.
+// Stellen Sie sicher, dass eine .env-Datei in der Produktion vorhanden und gesichert ist.
+dotenv.config();
+
+
 // --- Diagnostischer Code-Block ---
 // Dieser Block wird sofort beim Start ausgeführt, um zu prüfen, welche Umgebungsvariablen
-// der Node.js-Prozess tatsächlich von Plesk erhält.
+// der Node.js-Prozess nach dem Laden der .env Datei kennt.
 console.log('--- Starte Server und prüfe Umgebungsvariablen ---');
 console.log('Wert für COOKIE_SECRET:', process.env.COOKIE_SECRET ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
 console.log('Wert für APP_PASSWORD:', process.env.APP_PASSWORD ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
 console.log('Wert für API_KEY:', process.env.API_KEY ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
 console.log('--- Diagnose Ende ---');
 
-
-// Umgebungsvariablen laden (für lokale Entwicklung)
-// In der Plesk-Produktionsumgebung werden die Variablen direkt vom Server gesetzt.
-// dotenv wird hier nur für die lokale Entwicklung ohne Plesk benötigt.
-if (process.env.NODE_ENV !== 'production') {
-  dotenv.config();
-}
 
 const app = express();
 const port = process.env.PORT || 3001; // Port für Plesk/Phusion Passenger
@@ -34,7 +34,7 @@ const APP_PASSWORD = process.env.APP_PASSWORD;
 const COOKIE_SECRET = process.env.COOKIE_SECRET;
 
 if (!COOKIE_SECRET || !APP_PASSWORD) {
-    console.error('FATAL ERROR: Die Umgebungsvariablen COOKIE_SECRET und/oder APP_PASSWORD sind nicht gesetzt. Bitte fügen Sie diese in der Plesk Node.js-Verwaltung hinzu. Die Anwendung wird beendet.');
+    console.error('FATAL ERROR: Die Umgebungsvariablen COOKIE_SECRET und/oder APP_PASSWORD sind nicht gesetzt. Bitte erstellen Sie eine .env Datei im Hauptverzeichnis der Anwendung. Die Anwendung wird beendet.');
     process.exit(1);
 }
 
