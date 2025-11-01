@@ -71,9 +71,9 @@ async function processGenerationJob(jobId) {
         let specialDietInstructions = isGlutenFree && isLactoseFree ? 'Alle Gerichte müssen strikt glutenfrei UND laktosefrei sein.' : isGlutenFree ? 'Alle Gerichte müssen strikt glutenfrei sein.' : isLactoseFree ? 'Alle Gerichte müssen strikt laktosefrei sein.' : '';
         
         const complexityPrompts = {
-            simple: 'Der Plan soll einfache Gerichte enthalten, die schnell (unter 30 Minuten) und unkompliziert zuzubereiten sind.',
-            advanced: 'Die Gerichte dürfen fortgeschritten sein und komplexere Zubereitungsschritte oder speziellere Zutaten enthalten.',
-            fancy: 'Erstelle pfiffige, kreative und besondere Gerichte, die auch optisch beeindrucken und nicht alltäglich sind.',
+            simple: 'Fokus auf einfache Alltagsgerichte. Die Zubereitung muss schnell (maximal 30 Minuten) und mit wenigen, gängigen Zutaten möglich sein. Ideal für Kochanfänger und die schnelle Feierabendküche.',
+            advanced: 'Fokus auf interessante und abwechslungsreiche Rezepte für Hobbyköche. Die Zubereitung darf mehrere Schritte umfassen und bis zu 60 Minuten dauern. Die Gerichte können auch weniger alltägliche Zutaten enthalten, die aber gut erhältlich sind.',
+            fancy: 'Absoluter Fokus auf Kreativität und das Besondere. Erstelle anspruchsvolle Gerichte auf Restaurant-Niveau. Der Zeitaufwand und die Komplexität spielen keine Rolle. Nutze ungewöhnliche Zutatenkombinationen, fortgeschrittene Kochtechniken (z.B. Schäume, Reduktionen, Saucen ansetzen) und beschreibe eine elegante Anrichtung. Diese Gerichte sind für besondere Anlässe gedacht und erfordern Kocherfahrung.',
         };
         const complexityInstruction = complexityPrompts[dishComplexity] || complexityPrompts.simple;
 
