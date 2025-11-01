@@ -57,4 +57,5 @@ export interface PlanData {
 export interface ArchiveEntry extends PlanSettings, PlanData {
   id: string;
   createdAt: string;
+  shareId?: string | null;
 }

@@ -60,10 +60,24 @@ async function initializeDatabase() {
                 createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 name VARCHAR(255) NOT NULL,
                 settings JSON NOT NULL,
-                planData JSON NOT NULL
+                planData JSON NOT NULL,
+                shareId VARCHAR(255) NULL UNIQUE
             );
         `);
         console.log('Tabelle "archived_plans" ist bereit.');
+
+         // Add migration logic for existing tables
+        try {
+            await connection.query('SELECT shareId FROM archived_plans LIMIT 1');
+        } catch (error) {
+            if (error.code === 'ER_BAD_FIELD_ERROR') {
+                console.log('Spalte "shareId" nicht gefunden, füge sie hinzu...');
+                await connection.query('ALTER TABLE archived_plans ADD COLUMN shareId VARCHAR(255) NULL UNIQUE AFTER planData');
+                console.log('Spalte "shareId" erfolgreich zu "archived_plans" hinzugefügt.');
+            } else {
+                throw error; // Re-throw other critical errors
+            }
+        }
 
         await connection.query(`
             CREATE TABLE IF NOT EXISTS generation_jobs (
@@ -82,7 +96,7 @@ async function initializeDatabase() {
 
         connection.release();
     } catch (error) {
-        console.error('FATAL ERROR: Konnte die Datenbankverbindung nicht herstellen oder Tabelle nicht erstellen.', error);
+        console.error('FATAL ERROR: Konnte die Datenbankverbindung nicht herstellen oder Tabelle nicht erstellen/aktualisieren.', error);
         process.exit(1);
     }
 }
@@ -417,6 +431,7 @@ app.get('/api/archive', async (req, res) => {
                 return {
                     id: row.id.toString(),
                     createdAt: new Date(row.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                    shareId: row.shareId || null,
                     name: planData.name, // Wir haben bereits validiert, dass der Name existiert.
                     ...settings,
                     ...planData
@@ -515,6 +530,7 @@ app.get('/api/job-status/:jobId', async (req, res) => {
                 const newPlanEntry = {
                     id: row.id.toString(),
                     createdAt: new Date(row.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                    shareId: row.shareId || null,
                     name: planData.name || 'Unbenannter Plan',
                     ...settings,
                     ...planData
@@ -677,18 +693,21 @@ function generateShareableHtml(plan, imageUrls) {
 
 app.post('/api/share-plan', async (req, res) => {
     const { plan, imageUrls } = req.body;
-    if (!plan || !imageUrls || !plan.name || !plan.weeklyPlan || !plan.recipes || !plan.shoppingList) {
+    if (!plan || !plan.id || !imageUrls || !plan.name || !plan.weeklyPlan || !plan.recipes || !plan.shoppingList) {
         return res.status(400).json({ error: 'Unvollständige Plandaten für die Freigabe erhalten.' });
     }
     try {
+        const shareId = crypto.randomBytes(12).toString('hex');
         const htmlContent = generateShareableHtml(plan, imageUrls);
-        const fileName = `${crypto.randomBytes(12).toString('hex')}.html`;
+        const fileName = `${shareId}.html`;
         const filePath = path.join(publicSharesDir, fileName);
 
         fs.writeFileSync(filePath, htmlContent, 'utf-8');
 
+        await pool.query('UPDATE archived_plans SET shareId = ? WHERE id = ?', [shareId, plan.id]);
+
         const shareUrl = `/shares/${fileName}`;
-        res.json({ shareUrl });
+        res.json({ shareUrl, shareId });
 
     } catch (error) {
         console.error('Fehler beim Erstellen des Links zum Teilen:', error);

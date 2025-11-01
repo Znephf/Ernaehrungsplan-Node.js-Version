@@ -47,5 +47,13 @@ export const useArchive = () => {
         return null;
     }, [archive]);
     
-    return { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive };
+    const updatePlanInArchive = useCallback((updatedPlan: ArchiveEntry) => {
+        setArchive(prevArchive =>
+            prevArchive.map(entry =>
+                entry.id === updatedPlan.id ? updatedPlan : entry
+            )
+        );
+    }, []);
+
+    return { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive, updatePlanInArchive };
 };

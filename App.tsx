@@ -73,7 +73,7 @@ const App: React.FC = () => {
     const [shareUrl, setShareUrl] = useState<string | null>(null);
 
 
-    const { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive } = useArchive();
+    const { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive, updatePlanInArchive } = useArchive();
     const { plan, setPlan, isLoading, error, generateNewPlan, generationStatus } = useMealPlanGenerator();
     const { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState, setImageUrlsFromArchive } = useImageGenerator(fetchArchive);
 
@@ -172,6 +172,14 @@ const App: React.FC = () => {
 
     const handleShare = async () => {
         if (!plan || isSharing) return;
+
+        // If a share link already exists, show it immediately.
+        if (plan.shareId) {
+            const fullUrl = `${window.location.origin}/shares/${plan.shareId}.html`;
+            setShareUrl(fullUrl);
+            return;
+        }
+
         setIsSharing(true);
         setShareStatus('Prüfe Bilder...');
     
@@ -209,13 +217,11 @@ const App: React.FC = () => {
                  if (response.status === 413) {
                     throw new Error("Die Datenmenge des Plans (insbesondere die Bilder) ist zu groß für die aktuellen Server-Einstellungen. Bitte kontaktieren Sie den Administrator, um das Upload-Limit zu erhöhen (siehe README).");
                 }
-                // Try to get a meaningful error message from the server response
                 let errorData;
                 const contentType = response.headers.get("content-type");
                 if (contentType && contentType.indexOf("application/json") !== -1) {
                     errorData = await response.json();
                 } else {
-                    // If the response is not JSON (e.g., HTML error page from Nginx), show a generic error.
                     errorData = { error: `Serverfehler: ${response.status} ${response.statusText}` };
                 }
                 throw new Error(errorData.error || 'Unbekannter Serverfehler beim Erstellen des Links.');
@@ -224,6 +230,11 @@ const App: React.FC = () => {
             const data = await response.json();
             const fullUrl = `${window.location.origin}${data.shareUrl}`;
             setShareUrl(fullUrl);
+
+            // Update local state with the new shareId to prevent re-sharing
+            const updatedPlan = { ...plan, shareId: data.shareId };
+            setPlan(updatedPlan);
+            updatePlanInArchive(updatedPlan);
     
         } catch (err) {
             console.error("Fehler beim Teilen:", err);
