@@ -697,7 +697,6 @@ app.post('/api/share-plan', async (req, res) => {
         return res.status(400).json({ error: 'Unvollständige Plandaten für die Freigabe erhalten.' });
     }
     try {
-        // 1. Check if a shareId already exists for this plan
         const [rows] = await pool.query('SELECT shareId FROM archived_plans WHERE id = ?', [plan.id]);
 
         if (rows.length === 0) {
@@ -706,7 +705,6 @@ app.post('/api/share-plan', async (req, res) => {
 
         let shareId = rows[0].shareId;
 
-        // 2. If no shareId exists, generate a new one, create the file, and save it.
         if (!shareId) {
             shareId = crypto.randomBytes(12).toString('hex');
             const htmlContent = generateShareableHtml(plan, imageUrls);
@@ -715,11 +713,20 @@ app.post('/api/share-plan', async (req, res) => {
 
             fs.writeFileSync(filePath, htmlContent, 'utf-8');
 
-            await pool.query('UPDATE archived_plans SET shareId = ? WHERE id = ?', [shareId, plan.id]);
+            const [updateResult] = await pool.query(
+                'UPDATE archived_plans SET shareId = ? WHERE id = ?',
+                [shareId, plan.id]
+            );
+
+            if (updateResult.affectedRows === 0) {
+                // This is a critical failure. The ID sent from the client didn't match any record.
+                // This prevents silent failures and the creation of multiple share links.
+                throw new Error(`Konnte den Plan mit ID ${plan.id} nicht in der Datenbank finden, um die Share-ID zu speichern.`);
+            }
+            
             console.log(`Neuer Share-Link für Plan ID ${plan.id} erstellt: ${shareId}`);
         } else {
             console.log(`Bestehender Share-Link für Plan ID ${plan.id} gefunden: ${shareId}`);
-            // Robustness check: Re-create the file if it's missing for some reason.
             const fileName = `${shareId}.html`;
             const filePath = path.join(publicSharesDir, fileName);
             if (!fs.existsSync(filePath)) {
