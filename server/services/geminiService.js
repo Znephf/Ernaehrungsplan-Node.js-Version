@@ -37,6 +37,7 @@ async function generateWithRetry(ai, generationParams) {
 }
 
 const validatePlanData = (data) => {
+    if (!data || typeof data !== 'object') throw new Error("Validierung fehlgeschlagen: Plandaten sind kein Objekt.");
     if (!data.name || typeof data.name !== 'string' || data.name.trim() === '') throw new Error("Validierung fehlgeschlagen: Planname fehlt.");
     if (!Array.isArray(data.weeklyPlan) || data.weeklyPlan.length === 0) throw new Error(`Validierung fehlgeschlagen: Wochenplan ist leer.`);
     for (const dayPlan of data.weeklyPlan) {
@@ -134,7 +135,18 @@ async function processGenerationJob(jobId) {
         await connection.query("UPDATE generation_jobs SET status = 'generating_plan' WHERE jobId = ?", [jobId]);
         
         const planResponse = await generateWithRetry(ai, { model: TEXT_MODEL_NAME, contents: [{ parts: [{ text: planPrompt }] }], config: { responseMimeType: 'application/json', responseSchema: planSchema, temperature: parseFloat((Math.random() * 0.3 + 0.7).toFixed(2)) } });
-        const planData = JSON.parse(planResponse.text);
+        
+        let planData;
+        try {
+            if (!planResponse.text || planResponse.text.trim() === '') {
+                throw new Error("Leere Antwort vom Planungs-Modell erhalten.");
+            }
+            planData = JSON.parse(planResponse.text);
+        } catch (e) {
+            console.error("Fehler beim Parsen der Plan-Antwort:", e);
+            console.error("Roh-Antwort vom Modell:", planResponse.text);
+            throw new Error(`Das KI-Modell hat eine ungültige Antwort gesendet. (${e.message})`);
+        }
         validatePlanData(planData);
         
         await connection.query("UPDATE generation_jobs SET status = 'generating_shopping_list' WHERE jobId = ?", [jobId]);
@@ -143,7 +155,24 @@ async function processGenerationJob(jobId) {
         const shoppingListSchema = { type: Type.OBJECT, properties: { shoppingList: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, items: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ["category", "items"] } } }, required: ["shoppingList"] };
         const shoppingListResponse = await generateWithRetry(ai, { model: TEXT_MODEL_NAME, contents: [{ parts: [{ text: shoppingListPrompt }] }], config: { responseMimeType: 'application/json', responseSchema: shoppingListSchema } });
         
-        const finalPlan = { ...planData, shoppingList: JSON.parse(shoppingListResponse.text).shoppingList, imageUrls: {} };
+        let shoppingListData;
+        try {
+            if (!shoppingListResponse.text || shoppingListResponse.text.trim() === '') {
+                throw new Error("Leere Antwort vom Einkaufslisten-Modell erhalten.");
+            }
+            shoppingListData = JSON.parse(shoppingListResponse.text);
+        } catch (e) {
+            console.error("Fehler beim Parsen der Einkaufslisten-Antwort:", e);
+            console.error("Roh-Antwort vom Modell:", shoppingListResponse.text);
+            throw new Error(`Das KI-Modell hat eine ungültige Einkaufsliste gesendet. (${e.message})`);
+        }
+
+        if (!shoppingListData || !Array.isArray(shoppingListData.shoppingList)) {
+            console.error("Ungültiges Format der Einkaufsliste:", shoppingListData);
+            throw new Error('Die generierte Einkaufsliste hat ein ungültiges Format.');
+        }
+
+        const finalPlan = { ...planData, shoppingList: shoppingListData.shoppingList, imageUrls: {} };
         
         const [result] = await connection.query('INSERT INTO archived_plans (name, settings, planData) VALUES (?, ?, ?)', [finalPlan.name, JSON.stringify(settings), JSON.stringify(finalPlan)]);
         

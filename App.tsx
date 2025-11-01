@@ -42,7 +42,15 @@ const App: React.FC = () => {
     const [shareUrl, setShareUrl] = useState<string | null>(null);
 
     const { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive, updatePlanInArchive } = useArchive();
-    const { plan, setPlan, isLoading, error, generateNewPlan, generationStatus } = useMealPlanGenerator();
+    const { 
+        plan, 
+        setPlan, 
+        isLoading, 
+        error, 
+        generateNewPlan, 
+        generationStatus,
+        cancelGeneration 
+    } = useMealPlanGenerator();
     const { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState, setImageUrlsFromArchive } = useImageGenerator(fetchArchive);
     
     useEffect(() => {
@@ -51,13 +59,11 @@ const App: React.FC = () => {
             try {
                 await apiService.checkAuth();
                 setIsAuthenticated(true);
-                // WICHTIG: Lade das Archiv erst nach erfolgreicher Authentifizierung
                 await fetchArchive();
             } catch (error) {
                 console.error("Nicht authentifiziert oder Initialisierungsfehler.");
                 setIsAuthenticated(false);
             } finally {
-                // Blende den Ladebildschirm aus, NACHDEM alles geladen ist
                 setIsAuthLoading(false);
             }
         };
@@ -66,7 +72,7 @@ const App: React.FC = () => {
     
     const handleLoginSuccess = useCallback(() => {
         setIsAuthenticated(true);
-        fetchArchive(); // Lade das Archiv direkt nach dem erfolgreichen Login
+        fetchArchive();
     }, [fetchArchive]);
 
     const handleLoadPlan = useCallback((id: string) => {
@@ -80,22 +86,22 @@ const App: React.FC = () => {
     }, [loadPlanFromArchive, setPlan, setImageUrlsFromArchive]);
 
     const handleGenerateRequest = async () => {
-        const result = await generateNewPlan(panelSettings);
-        if (result.success) {
-            if (result.newPlan) {
-                setPlan(result.newPlan); 
-                setImageUrlsFromArchive(result.newPlan.imageUrls || {});
+        generateNewPlan(panelSettings, (newPlan) => {
+            if (newPlan) {
+                setPlan(newPlan);
+                setImageUrlsFromArchive(newPlan.imageUrls || {});
                 setCurrentView('plan');
                 window.scrollTo(0, 0);
-                fetchArchive();
-            } else if (result.newPlanId) {
-                console.warn("Fallback-Logik wird verwendet, um den Plan zu laden.");
-                resetImageState(); 
-                await fetchArchive(); 
-                handleLoadPlan(result.newPlanId);
+                fetchArchive(); 
+            } else {
+                 console.warn("Ein neuer Plan wurde generiert, aber die Daten konnten nicht direkt geladen werden. Ein erneutes Laden aus dem Archiv ist erforderlich.");
+                 fetchArchive().then(() => {
+                    // Hier könnte man versuchen, den neuesten Plan zu laden
+                 });
             }
-        }
+        });
     };
+    
 
     const handleSelectRecipe = (day: string) => {
         setSelectedRecipeDay(day);
@@ -159,7 +165,6 @@ const App: React.FC = () => {
                 return;
             }
             
-            // Link nicht gefunden, also neuen erstellen
             try {
                 setShareStatus('Prüfe Bilder...');
                 const finalImageUrls = await generateMissingImages(plan.recipes, plan.id, setShareStatus);
@@ -214,7 +219,7 @@ const App: React.FC = () => {
 
     return (
         <div className="bg-slate-100 min-h-screen font-sans">
-            {isLoading && <LoadingOverlay status={generationStatus} />}
+            {isLoading && <LoadingOverlay status={generationStatus} onCancel={cancelGeneration} />}
             {shareUrl && <ShareModal url={shareUrl} onClose={() => setShareUrl(null)} />}
             
             <Header

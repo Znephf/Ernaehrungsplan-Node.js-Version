@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface LoadingOverlayProps {
   status: string;
+  onCancel: () => void;
 }
 
 const statusMessages: { [key: string]: { title: string; subtitle: string } } = {
@@ -23,9 +24,17 @@ const statusMessages: { [key: string]: { title: string; subtitle: string } } = {
   }
 };
 
-
-const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ status }) => {
+const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ status, onCancel }) => {
   const message = statusMessages[status] || statusMessages.default;
+  const [showCancelButton, setShowCancelButton] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowCancelButton(true);
+    }, 5000); // Zeige den Button nach 5 Sekunden
+
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div 
@@ -39,7 +48,27 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ status }) => {
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
       </svg>
       <h2 id="loading-heading" className="text-xl font-bold mb-2">{message.title}</h2>
-      <p className="text-slate-300">{message.subtitle}</p>
+      <p className="text-slate-300 mb-6">{message.subtitle}</p>
+
+      {showCancelButton && (
+        <button
+          onClick={onCancel}
+          className="px-4 py-2 bg-slate-600 text-white font-semibold rounded-lg shadow-md hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-opacity opacity-0 animate-fade-in"
+          style={{ animationFillMode: 'forwards', animationDelay: '0.5s' }}
+        >
+          Abbrechen
+        </button>
+      )}
+
+      <style>{`
+        @keyframes fadeIn {
+          to { opacity: 1; }
+        }
+        .animate-fade-in {
+          animation-name: fadeIn;
+          animation-duration: 0.5s;
+        }
+      `}</style>
     </div>
   );
 };
