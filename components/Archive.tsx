@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { ArchiveEntry, DietType, Diet } from '../types';
+import type { ArchiveEntry, DietType, Diet, DishComplexity } from '../types';
 import { TrashIcon } from './IconComponents';
 
 interface ArchiveComponentProps {
@@ -22,14 +22,34 @@ const dietTypeLabels: Record<DietType, string> = {
     mediterranean: 'Mediterran'
 };
 
+const dishComplexityLabels: Record<DishComplexity, string> = {
+    simple: 'Einfach',
+    advanced: 'Fortgeschritten',
+    fancy: 'Pfiffig'
+};
+
 
 const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan, onDeletePlan }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDiet, setSelectedDiet] = useState<DietType | 'all'>('all');
-  const [selectedPreference, setSelectedPreference] = useState<Diet | 'all'>('all');
+  const [selectedPreferences, setSelectedPreferences] = useState<Set<Diet>>(new Set());
+  const [selectedDietTypes, setSelectedDietTypes] = useState<Set<DietType>>(new Set());
+  const [selectedComplexities, setSelectedComplexities] = useState<Set<DishComplexity>>(new Set());
   const [filterGlutenFree, setFilterGlutenFree] = useState(false);
   const [filterLactoseFree, setFilterLactoseFree] = useState(false);
 
+  const handleFilterToggle = <T extends string>(
+    value: T,
+    currentFilters: Set<T>,
+    setFilters: React.Dispatch<React.SetStateAction<Set<T>>>
+  ) => {
+    const newFilters = new Set(currentFilters);
+    if (newFilters.has(value)) {
+      newFilters.delete(value);
+    } else {
+      newFilters.add(value);
+    }
+    setFilters(newFilters);
+  };
 
   const filteredArchive = useMemo(() => {
     const lowercasedTerm = searchTerm.toLowerCase().trim();
@@ -39,15 +59,16 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
         (entry.recipes || []).some(recipe =>
           recipe.title.toLowerCase().includes(lowercasedTerm)
         );
-
-      const matchesDiet = selectedDiet === 'all' || entry.dietType === selectedDiet;
-      const matchesPreference = selectedPreference === 'all' || entry.dietaryPreference === selectedPreference;
+      
+      const matchesPreference = selectedPreferences.size === 0 || selectedPreferences.has(entry.dietaryPreference);
+      const matchesDietType = selectedDietTypes.size === 0 || selectedDietTypes.has(entry.dietType);
+      const matchesComplexity = selectedComplexities.size === 0 || selectedComplexities.has(entry.dishComplexity);
       const matchesGlutenFree = !filterGlutenFree || entry.isGlutenFree;
       const matchesLactoseFree = !filterLactoseFree || entry.isLactoseFree;
 
-      return matchesSearch && matchesDiet && matchesPreference && matchesGlutenFree && matchesLactoseFree;
+      return matchesSearch && matchesPreference && matchesDietType && matchesComplexity && matchesGlutenFree && matchesLactoseFree;
     });
-  }, [archive, searchTerm, selectedDiet, selectedPreference, filterGlutenFree, filterLactoseFree]);
+  }, [archive, searchTerm, selectedPreferences, selectedDietTypes, selectedComplexities, filterGlutenFree, filterLactoseFree]);
 
 
   if (archive.length === 0) {
@@ -59,18 +80,16 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
     );
   }
 
-  const FilterButton: React.FC<{
-    value: DietType | Diet | 'all';
+  const FilterToggleButton: React.FC<{
     label: string;
-    currentValue: DietType | Diet | 'all';
-    onClick: (value: any) => void;
-  }> = ({ value, label, currentValue, onClick }) => {
-    const isActive = currentValue === value;
+    isSelected: boolean;
+    onClick: () => void;
+  }> = ({ label, isSelected, onClick }) => {
     return (
       <button
-        onClick={() => onClick(value)}
+        onClick={onClick}
         className={`px-3 py-1 text-sm rounded-full transition-colors font-medium whitespace-nowrap ${
-          isActive
+          isSelected
             ? 'bg-emerald-600 text-white shadow-sm'
             : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
         }`}
@@ -99,16 +118,35 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
         <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Ernährungsweise:</span>
-                <FilterButton value="all" label="Alle" currentValue={selectedPreference} onClick={setSelectedPreference} />
                 {Object.entries(dietPreferenceLabels).map(([key, label]) => (
-                    <FilterButton key={key} value={key as Diet} label={label} currentValue={selectedPreference} onClick={setSelectedPreference} />
+                    <FilterToggleButton 
+                        key={key} 
+                        label={label} 
+                        isSelected={selectedPreferences.has(key as Diet)}
+                        onClick={() => handleFilterToggle(key as Diet, selectedPreferences, setSelectedPreferences)} 
+                    />
                 ))}
             </div>
             <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Diät-Typ:</span>
-                <FilterButton value="all" label="Alle" currentValue={selectedDiet} onClick={setSelectedDiet} />
                 {Object.entries(dietTypeLabels).map(([key, label]) => (
-                    <FilterButton key={key} value={key as DietType} label={label} currentValue={selectedDiet} onClick={setSelectedDiet} />
+                     <FilterToggleButton 
+                        key={key} 
+                        label={label} 
+                        isSelected={selectedDietTypes.has(key as DietType)}
+                        onClick={() => handleFilterToggle(key as DietType, selectedDietTypes, setSelectedDietTypes)} 
+                    />
+                ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Koch-Niveau:</span>
+                {Object.entries(dishComplexityLabels).map(([key, label]) => (
+                     <FilterToggleButton 
+                        key={key} 
+                        label={label} 
+                        isSelected={selectedComplexities.has(key as DishComplexity)}
+                        onClick={() => handleFilterToggle(key as DishComplexity, selectedComplexities, setSelectedComplexities)} 
+                    />
                 ))}
             </div>
              <div className="flex flex-wrap items-center gap-2 pt-2">
@@ -160,6 +198,9 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
                   <div className="mt-3 space-y-1 text-sm text-slate-600">
                       <p>
                           <span className="font-semibold">Diät-Typ:</span> {dietTypeLabels[entry.dietType] || 'Standard'}
+                      </p>
+                       <p>
+                          <span className="font-semibold">Niveau:</span> {dishComplexityLabels[entry.dishComplexity] || 'Einfach'}
                       </p>
                       <p>
                           <span className="font-semibold">Frühstück:</span> <span className="capitalize">{entry.breakfastOption === 'custom' ? 'Eigene Angabe' : entry.breakfastOption}</span>
