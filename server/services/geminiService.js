@@ -1,4 +1,5 @@
 
+
 const { GoogleGenAI, Modality, Type } = require('@google/genai');
 const { pool } = require('./database');
 const { API_KEY } = process.env;
@@ -62,13 +63,20 @@ async function processGenerationJob(jobId) {
         const { settings, previousPlanRecipes } = JSON.parse(jobs[0].payload);
         if (!settings) throw new Error('Job-Daten sind unvollständig.');
 
-        const { persons, kcal, dietaryPreference, dietType, excludedIngredients, desiredIngredients, breakfastOption, customBreakfast, isGlutenFree, isLactoseFree } = settings;
+        const { persons, kcal, dietaryPreference, dietType, excludedIngredients, desiredIngredients, breakfastOption, customBreakfast, isGlutenFree, isLactoseFree, dishComplexity } = settings;
 
         let planType = dietaryPreference === 'vegetarian' ? "vegetarischen Ernährungsplan" : dietaryPreference === 'vegan' ? "veganen Ernährungsplan" : "Ernährungsplan";
         const exclusionText = excludedIngredients.trim() ? `Folgende Zutaten explizit vermeiden: ${excludedIngredients}.` : '';
         const desiredIngredientsText = desiredIngredients.trim() ? `Folgende Zutaten bevorzugen: ${desiredIngredients}.` : '';
         let specialDietInstructions = isGlutenFree && isLactoseFree ? 'Alle Gerichte müssen strikt glutenfrei UND laktosefrei sein.' : isGlutenFree ? 'Alle Gerichte müssen strikt glutenfrei sein.' : isLactoseFree ? 'Alle Gerichte müssen strikt laktosefrei sein.' : '';
         
+        const complexityPrompts = {
+            simple: 'Der Plan soll einfache Gerichte enthalten, die schnell (unter 30 Minuten) und unkompliziert zuzubereiten sind.',
+            advanced: 'Die Gerichte dürfen fortgeschritten sein und komplexere Zubereitungsschritte oder speziellere Zutaten enthalten.',
+            fancy: 'Erstelle pfiffige, kreative und besondere Gerichte, die auch optisch beeindrucken und nicht alltäglich sind.',
+        };
+        const complexityInstruction = complexityPrompts[dishComplexity] || complexityPrompts.simple;
+
         let breakfastInstruction = '';
         switch (breakfastOption) {
             case 'quark': breakfastInstruction = dietaryPreference === 'vegan' ? "Frühstück ist jeden Tag nur vegane Quark-Alternative. Keine weiteren Zutaten." : "Frühstück ist jeden Tag nur 'CremeQuark von Edeka'. Keine weiteren Zutaten."; break;
@@ -81,7 +89,7 @@ async function processGenerationJob(jobId) {
         };
         const varietyInstruction = (previousPlanRecipes && previousPlanRecipes.length > 0) ? ` WICHTIG: Erstelle völlig andere Gerichte als diese: ${previousPlanRecipes.map(r => r.title).join(', ')}.` : '';
 
-        const planPrompt = `Erstelle einen ${planType} für eine Woche (Mo-So) für ${persons} Personen. Tägliches Kalorienziel pro Person: ${kcal} kcal (max. 100 kcal Abweichung). ${dietTypePrompts[dietType]} ${specialDietInstructions} ${desiredIngredientsText} ${exclusionText} Der Plan soll einfach sein.${varietyInstruction} ${breakfastInstruction} Abendessen ist jeden Tag ein anderes warmes Gericht. Erstelle detaillierte Rezepte. WICHTIG: Alle Nährwertangaben (Kalorien, Makros) sind PRO PERSON. Zutatenlisten in Rezepten sind für ${persons} Personen. 'breakfastCalories' und 'dinnerCalories' als Zahlen sind zwingend.`;
+        const planPrompt = `Erstelle einen ${planType} für eine Woche (Mo-So) für ${persons} Personen. Tägliches Kalorienziel pro Person: ${kcal} kcal (max. 100 kcal Abweichung). ${dietTypePrompts[dietType]} ${specialDietInstructions} ${desiredIngredientsText} ${exclusionText} ${complexityInstruction}${varietyInstruction} ${breakfastInstruction} Abendessen ist jeden Tag ein anderes warmes Gericht. Erstelle detaillierte Rezepte. WICHTIG: Alle Nährwertangaben (Kalorien, Makros) sind PRO PERSON. Zutatenlisten in Rezepten sind für ${persons} Personen. 'breakfastCalories' und 'dinnerCalories' als Zahlen sind zwingend.`;
         
         const planSchema = { type: Type.OBJECT, properties: { name: { type: Type.STRING }, weeklyPlan: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { day: { type: Type.STRING }, breakfast: { type: Type.STRING }, breakfastCalories: { type: Type.NUMBER }, dinner: { type: Type.STRING }, dinnerCalories: { type: Type.NUMBER } } } }, recipes: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { day: { type: Type.STRING }, title: { type: Type.STRING }, ingredients: { type: Type.ARRAY, items: { type: Type.STRING } }, instructions: { type: Type.ARRAY, items: { type: Type.STRING } }, totalCalories: { type: Type.NUMBER }, protein: { type: Type.NUMBER }, carbs: { type: Type.NUMBER }, fat: { type: Type.NUMBER } } } } }, required: ["name", "weeklyPlan", "recipes"] };
         

@@ -20,6 +20,7 @@ const defaultSettings: PlanSettings = {
     kcal: 2000,
     dietaryPreference: 'omnivore',
     dietType: 'balanced',
+    dishComplexity: 'simple',
     excludedIngredients: '',
     desiredIngredients: '',
     isGlutenFree: false,

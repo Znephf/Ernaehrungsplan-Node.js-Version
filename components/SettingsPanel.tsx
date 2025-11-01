@@ -60,6 +60,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
           </select>
         </div>
         <div>
+          <label htmlFor="dishComplexity" className="block text-sm font-medium text-slate-700">Koch-Niveau</label>
+          <select name="dishComplexity" id="dishComplexity" value={settings.dishComplexity} onChange={handleChange} className={inputStyles}>
+            <option value="simple">Einfache Gerichte</option>
+            <option value="advanced">Fortgeschrittene Gerichte</option>
+            <option value="fancy">Pfiffige Gerichte</option>
+          </select>
+        </div>
+      </div>
+      
+      {/* Column 3 */}
+      <div className="space-y-4">
+        <div>
           <label htmlFor="dietType" className="block text-sm font-medium text-slate-700">Diät-Typ</label>
           <select name="dietType" id="dietType" value={settings.dietType} onChange={handleChange} className={`${inputStyles} capitalize`}>
             <option value="balanced">Ausgewogen</option>
@@ -69,10 +81,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
             <option value="mediterranean">Mediterran</option>
           </select>
         </div>
-      </div>
-      
-      {/* Column 3 */}
-      <div className="space-y-4">
           <div>
           <label htmlFor="breakfastOption" className="block text-sm font-medium text-slate-700">Frühstücks-Option</label>
           <select name="breakfastOption" id="breakfastOption" value={settings.breakfastOption} onChange={handleChange} className={`${inputStyles} capitalize`}>
