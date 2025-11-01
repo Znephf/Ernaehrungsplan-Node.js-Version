@@ -49,13 +49,13 @@ app.use(cookieParser(process.env.COOKIE_SECRET));
 const authRoutes = require('./routes/auth');
 const archiveRoutes = require('./routes/archive');
 const generationRoutes = require('./routes/generation');
-const shareRoutes = require('./routes/share');
+const jobRoutes = require('./routes/jobs');
 const { requireAuth } = require('./routes/auth'); // Import middleware
 
 app.use('/', authRoutes.unprotected);
 app.use('/api', requireAuth, archiveRoutes);
 app.use('/api', requireAuth, generationRoutes);
-app.use('/api', requireAuth, shareRoutes);
+app.use('/api/jobs', requireAuth, jobRoutes);
 
 
 // ======================================================

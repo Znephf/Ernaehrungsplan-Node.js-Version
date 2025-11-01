@@ -1,12 +1,8 @@
 
 const express = require('express');
 const router = express.Router();
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
 const { pool } = require('../services/database');
-
-const publicImagesDir = path.join(__dirname, '..', '..', 'public', 'images', 'recipes');
+const { saveImageAndUpdatePlan } = require('../services/jobService');
 
 // Alle Pläne aus dem Archiv abrufen
 router.get('/archive', async (req, res) => {
@@ -68,35 +64,14 @@ router.put('/archive/image', async (req, res) => {
     }
 
     try {
-        // Base64-Daten in eine Datei umwandeln
         const base64Data = imageUrl.split(';base64,').pop();
-        const imageBuffer = Buffer.from(base64Data, 'base64');
-        const fileName = `${crypto.randomBytes(16).toString('hex')}.jpg`;
-        const filePath = path.join(publicImagesDir, fileName);
-        
-        fs.writeFileSync(filePath, imageBuffer);
-        const fileUrl = `/images/recipes/${fileName}`;
-
-        // Datenbankeintrag aktualisieren
-        const [rows] = await pool.query('SELECT planData FROM archived_plans WHERE id = ?', [planId]);
-        if (rows.length === 0) {
-            // Wenn der Plan nicht gefunden wird, löschen wir das eben erstellte Bild wieder.
-            fs.unlinkSync(filePath);
-            return res.status(404).json({ error: 'Plan nicht gefunden.' });
-        }
-
-        const planData = typeof rows[0].planData === 'string' ? JSON.parse(rows[0].planData) : rows[0].planData;
-
-        if (!planData.imageUrls) {
-            planData.imageUrls = {};
-        }
-        planData.imageUrls[day] = fileUrl;
-
-        await pool.query('UPDATE archived_plans SET planData = ? WHERE id = ?', [JSON.stringify(planData), planId]);
-
+        const fileUrl = await saveImageAndUpdatePlan(planId, day, base64Data);
         res.status(200).json({ message: 'Bild erfolgreich gespeichert.', imageUrl: fileUrl });
     } catch (error) {
         console.error(`Fehler beim Speichern des Bildes für Plan ${planId}:`, error);
+        if (error.message.includes('Plan nicht gefunden')) {
+             return res.status(404).json({ error: error.message });
+        }
         res.status(500).json({ error: 'Bild konnte nicht verarbeitet oder in der DB gespeichert werden.' });
     }
 });

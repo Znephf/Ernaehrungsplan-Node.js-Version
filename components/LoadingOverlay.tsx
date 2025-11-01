@@ -25,8 +25,14 @@ const statusMessages: { [key: string]: { title: string; subtitle: string } } = {
 };
 
 const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ status, onCancel }) => {
-  const message = statusMessages[status] || statusMessages.default;
   const [showCancelButton, setShowCancelButton] = useState(false);
+
+  // Mache das Overlay flexibler: Wenn der Status kein bekannter Key ist,
+  // behandle ihn als dynamischen Titel.
+  const message = statusMessages[status] 
+    ? statusMessages[status] 
+    : { title: status, subtitle: 'Dies kann einen Moment dauern. Bitte laden Sie die Seite nicht neu.' };
+
 
   useEffect(() => {
     const timer = setTimeout(() => {

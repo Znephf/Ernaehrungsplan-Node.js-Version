@@ -107,28 +107,26 @@ export const generateImage = async (recipe: Recipe, attempt: number): Promise<{ 
     return response.json();
 };
 
-// --- Share Service ---
+// --- Job Service (for Sharing etc.) ---
 
-export const checkShareLink = async (planId: string): Promise<{ shareUrl: string }> => {
-    const response = await fetch(`/api/share-plan/${planId}`);
+export const startShareJob = async (planId: string): Promise<{ jobId: string }> => {
+    const response = await fetch('/api/jobs/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId })
+    });
     if (!response.ok) {
-        if (response.status === 404) {
-            throw new Error('Not Found');
-        }
-        throw new Error('Failed to check share link');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to start share job');
     }
     return response.json();
 };
 
-export const createShareLink = async (plan: ArchiveEntry, imageUrls: { [key: string]: string }): Promise<{ shareUrl: string; shareId: string }> => {
-    const response = await fetch('/api/share-plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, imageUrls })
-    });
-     if (!response.ok) {
+export const getShareJobStatus = async (jobId: string): Promise<{ status: string; progressText?: string; resultJson?: { shareUrl: string }; errorMessage?: string }> => {
+    const response = await fetch(`/api/jobs/${jobId}`);
+    if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create share link');
+        throw new Error(errorData.error || 'Failed to get share job status');
     }
     return response.json();
 };

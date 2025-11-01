@@ -10,6 +10,7 @@ import type { View, PlanSettings, ArchiveEntry } from './types';
 import { useArchive } from './hooks/useArchive';
 import { useMealPlanGenerator } from './hooks/useMealPlanGenerator';
 import { useImageGenerator } from './hooks/useImageGenerator';
+import { useShareProcessor } from './hooks/useShareProcessor';
 import { generateAndDownloadHtml } from './services/htmlExporter';
 import * as apiService from './services/apiService';
 
@@ -37,20 +38,34 @@ const App: React.FC = () => {
     
     const [isDownloading, setIsDownloading] = useState(false);
     const [downloadStatus, setDownloadStatus] = useState('Speichern');
-    const [isSharing, setIsSharing] = useState(false);
-    const [shareStatus, setShareStatus] = useState('Teilen');
-    const [shareUrl, setShareUrl] = useState<string | null>(null);
 
     const { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive, updatePlanInArchive } = useArchive();
     const { 
         plan, 
         setPlan, 
-        isLoading, 
-        error, 
+        isLoading: isGeneratingPlan, 
+        error: planError, 
         generateNewPlan, 
         generationStatus,
         cancelGeneration 
     } = useMealPlanGenerator();
+
+    const handleShareComplete = useCallback(async () => {
+        // Nach Abschluss des Share-Prozesses das Archiv neu laden,
+        // um den aktualisierten Plan mit shareId und neuen Bild-URLs zu erhalten.
+        await fetchArchive();
+    }, [fetchArchive]);
+    
+    const { 
+        isProcessing: isSharing, 
+        status: shareStatus, 
+        shareUrl, 
+        setShareUrl,
+        error: shareError,
+        startSharingProcess, 
+        cancelProcessing: cancelSharing 
+    } = useShareProcessor(handleShareComplete);
+
     const { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState, setImageUrlsFromArchive } = useImageGenerator(fetchArchive);
     
     useEffect(() => {
@@ -145,47 +160,9 @@ const App: React.FC = () => {
         }
     };
 
-    const handleShare = async () => {
-        if (!plan || isSharing) return;
-        setIsSharing(true);
-    
-        try {
-            setShareStatus('Prüfe Link...');
-            const existingLink = await apiService.checkShareLink(plan.id);
-            const fullUrl = `${window.location.origin}${existingLink.shareUrl}`;
-            setShareUrl(fullUrl);
-            return;
-    
-        } catch (error) {
-            if ((error as Error).message !== 'Not Found') {
-                console.error("Fehler beim Prüfen des Share-Links:", error);
-                alert(`Der Plan konnte nicht geteilt werden: ${(error as Error).message}`);
-                setIsSharing(false);
-                setShareStatus('Teilen');
-                return;
-            }
-            
-            try {
-                setShareStatus('Prüfe Bilder...');
-                const finalImageUrls = await generateMissingImages(plan.recipes, plan.id, setShareStatus);
-                
-                setShareStatus('Link erstellen...');
-                const data = await apiService.createShareLink(plan, finalImageUrls);
-                const fullUrl = `${window.location.origin}${data.shareUrl}`;
-                setShareUrl(fullUrl);
-    
-                if (plan.shareId !== data.shareId) {
-                    const updatedPlan = { ...plan, shareId: data.shareId };
-                    setPlan(updatedPlan);
-                    updatePlanInArchive(updatedPlan);
-                }
-            } catch (creationError) {
-                 console.error("Fehler beim Teilen:", creationError);
-                 alert(`Der Plan konnte nicht geteilt werden: ${(creationError as Error).message}`);
-            }
-        } finally {
-            setIsSharing(false);
-            setShareStatus('Teilen');
+    const handleShare = () => {
+        if (plan && !isSharing) {
+            startSharingProcess(plan);
         }
     };
 
@@ -217,9 +194,12 @@ const App: React.FC = () => {
         return <LoginComponent onLoginSuccess={handleLoginSuccess} />;
     }
 
+    const appError = planError || shareError;
+
     return (
         <div className="bg-slate-100 min-h-screen font-sans">
-            {isLoading && <LoadingOverlay status={generationStatus} onCancel={cancelGeneration} />}
+            {isGeneratingPlan && <LoadingOverlay status={generationStatus} onCancel={cancelGeneration} />}
+            {isSharing && !shareUrl && <LoadingOverlay status={shareStatus} onCancel={cancelSharing} />}
             {shareUrl && <ShareModal url={shareUrl} onClose={() => setShareUrl(null)} />}
             
             <Header
@@ -257,7 +237,7 @@ const App: React.FC = () => {
                                         settings={panelSettings}
                                         onSettingsChange={setPanelSettings}
                                         onGeneratePlan={handleGenerateRequest} 
-                                        isLoading={isLoading} 
+                                        isLoading={isGeneratingPlan} 
                                     />
                                 </div>
                             </div>
@@ -265,10 +245,10 @@ const App: React.FC = () => {
                     </div>
                 )}
 
-                {error && (
+                {appError && (
                     <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-6" role="alert">
                         <strong className="font-bold">Fehler!</strong>
-                        <span className="block sm:inline ml-2">{error}</span>
+                        <span className="block sm:inline ml-2">{appError}</span>
                     </div>
                 )}
                 
