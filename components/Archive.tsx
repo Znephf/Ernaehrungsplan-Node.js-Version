@@ -1,11 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { ArchiveEntry, DietType, Diet, DishComplexity } from '../types';
-import { TrashIcon } from './IconComponents';
+import { HideIcon } from './IconComponents';
 
 interface ArchiveComponentProps {
   archive: ArchiveEntry[];
   onLoadPlan: (id: number) => void;
-  onDeletePlan: (id: number) => void;
 }
 
 const dietPreferenceLabels: Record<Diet, string> = {
@@ -29,13 +28,44 @@ const dishComplexityLabels: Record<DishComplexity, string> = {
 };
 
 
-const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan, onDeletePlan }) => {
+const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPreferences, setSelectedPreferences] = useState<Set<Diet>>(new Set());
   const [selectedDietTypes, setSelectedDietTypes] = useState<Set<DietType>>(new Set());
   const [selectedComplexities, setSelectedComplexities] = useState<Set<DishComplexity>>(new Set());
   const [filterGlutenFree, setFilterGlutenFree] = useState(false);
   const [filterLactoseFree, setFilterLactoseFree] = useState(false);
+  const [hiddenIds, setHiddenIds] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    const cookieValue = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('hidden_plans='))
+      ?.split('=')[1];
+    if (cookieValue && cookieValue !== '') {
+      const ids = cookieValue.split(',').map(Number).filter(id => !isNaN(id));
+      setHiddenIds(new Set(ids));
+    }
+  }, []);
+
+  const handleHidePlan = (id: number) => {
+    const newHiddenIds = new Set(hiddenIds);
+    newHiddenIds.add(id);
+    setHiddenIds(newHiddenIds);
+
+    const newCookieValue = Array.from(newHiddenIds).join(',');
+    const expires = new Date();
+    expires.setFullYear(expires.getFullYear() + 1); // Cookie für 1 Jahr
+    document.cookie = `hidden_plans=${newCookieValue};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+  };
+  
+  const handleShowAll = () => {
+    if (window.confirm("Möchten Sie wirklich alle ausgeblendeten Pläne wieder anzeigen?")) {
+      setHiddenIds(new Set());
+      document.cookie = 'hidden_plans=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax';
+    }
+  };
+
 
   const handleFilterToggle = <T extends string>(
     value: T,
@@ -54,6 +84,9 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
   const filteredArchive = useMemo(() => {
     const lowercasedTerm = searchTerm.toLowerCase().trim();
     return archive.filter(entry => {
+      if (hiddenIds.has(entry.id)) {
+        return false;
+      }
       const matchesSearch = !lowercasedTerm ||
         (entry.name && entry.name.toLowerCase().includes(lowercasedTerm)) ||
         (entry.recipes || []).some(recipe =>
@@ -68,7 +101,7 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
 
       return matchesSearch && matchesPreference && matchesDietType && matchesComplexity && matchesGlutenFree && matchesLactoseFree;
     });
-  }, [archive, searchTerm, selectedPreferences, selectedDietTypes, selectedComplexities, filterGlutenFree, filterLactoseFree]);
+  }, [archive, searchTerm, selectedPreferences, selectedDietTypes, selectedComplexities, filterGlutenFree, filterLactoseFree, hiddenIds]);
 
 
   if (archive.length === 0) {
@@ -104,14 +137,25 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
       <div className="space-y-6 bg-white/50 p-6 rounded-lg shadow-sm">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <h2 className="text-2xl font-bold text-slate-700">Archivierte Ernährungspläne</h2>
-          <div className="w-full md:w-auto md:max-w-xs">
-            <input
-              type="text"
-              placeholder="Suche in Name & Gerichten..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 bg-white text-slate-900 rounded-md border-slate-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
-            />
+          <div className="flex items-center gap-2">
+            {hiddenIds.size > 0 && (
+                <button
+                    onClick={handleShowAll}
+                    className="px-3 py-2 text-sm rounded-md transition-colors font-medium whitespace-nowrap bg-slate-200 text-slate-700 hover:bg-slate-300"
+                    title={`${hiddenIds.size} ausgeblendete(n) Plan/Pläne wieder anzeigen`}
+                >
+                    Alle anzeigen
+                </button>
+            )}
+            <div className="w-full md:w-auto md:max-w-xs">
+                <input
+                  type="text"
+                  placeholder="Suche in Name & Gerichten..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-4 py-2 bg-white text-slate-900 rounded-md border-slate-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+                />
+            </div>
           </div>
         </div>
 
@@ -224,11 +268,11 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
               </div>
               <div className="flex items-center justify-end gap-2 mt-6">
                 <button
-                  onClick={() => onDeletePlan(entry.id)}
-                  aria-label={`Plan vom ${entry.createdAt} löschen`}
-                  className="p-2 text-slate-500 hover:bg-red-100 hover:text-red-600 rounded-full transition-colors"
+                  onClick={() => handleHidePlan(entry.id)}
+                  aria-label={`Plan vom ${entry.createdAt} ausblenden`}
+                  className="p-2 text-slate-500 hover:bg-amber-100 hover:text-amber-600 rounded-full transition-colors"
                 >
-                  <TrashIcon />
+                  <HideIcon />
                 </button>
                 <button
                   onClick={() => onLoadPlan(entry.id)}

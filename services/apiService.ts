@@ -42,14 +42,6 @@ export const getArchive = async (): Promise<ArchiveEntry[]> => {
     return response.json();
 };
 
-export const deletePlan = async (id: number): Promise<{ message: string }> => {
-    const response = await fetch(`/api/archive/${id}`, { method: 'DELETE' });
-    if (!response.ok) {
-        throw new Error('Failed to delete plan');
-    }
-    return response.json();
-};
-
 // Sends base64, expects back the new file URL
 export const saveImageUrl = async (planId: number, day: string, imageUrl: string): Promise<{ message: string, imageUrl: string }> => {
     const response = await fetch('/api/archive/image', {

@@ -39,22 +39,6 @@ router.get('/archive', async (req, res) => {
     }
 });
 
-// Einen Plan aus dem Archiv löschen
-router.delete('/archive/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        const [result] = await pool.query('DELETE FROM archived_plans WHERE id = ?', [id]);
-        if (result.affectedRows > 0) {
-            res.status(200).json({ message: 'Eintrag erfolgreich gelöscht.' });
-        } else {
-            res.status(404).json({ error: 'Eintrag nicht gefunden.' });
-        }
-    } catch (error) {
-        console.error(`Fehler beim Löschen von Eintrag ${id}:`, error);
-        res.status(500).json({ error: 'Eintrag konnte nicht gelöscht werden.' });
-    }
-});
-
 // Bild-URL für ein Rezept in einem bestehenden Plan speichern/aktualisieren
 router.put('/archive/image', async (req, res) => {
     const { planId, day, imageUrl } = req.body;

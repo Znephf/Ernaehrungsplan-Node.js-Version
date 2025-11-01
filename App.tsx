@@ -36,7 +36,7 @@ const App: React.FC = () => {
     const [panelSettings, setPanelSettings] = useState<PlanSettings>(defaultSettings);
     
 
-    const { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive, updatePlanInArchive } = useArchive();
+    const { archive, loadPlanFromArchive, fetchArchive, updatePlanInArchive } = useArchive();
     const { 
         plan, 
         setPlan, 
@@ -238,7 +238,6 @@ const App: React.FC = () => {
                     imageErrors={imageErrors}
                     onSelectRecipe={handleSelectRecipe}
                     onLoadPlan={handleLoadPlan}
-                    onDeletePlan={deletePlanFromArchive}
                     onGenerateImage={generateImage}
                     onGenerateMissingImages={generateMissingImages}
                 />

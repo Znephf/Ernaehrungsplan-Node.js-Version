@@ -14,17 +14,6 @@ export const useArchive = () => {
         }
     }, []);
     
-    const deletePlanFromArchive = useCallback(async (id: number) => {
-        if (window.confirm("Diesen Plan wirklich aus dem Archiv löschen?")) {
-            try {
-                await apiService.deletePlan(id);
-                fetchArchive();
-            } catch (error) {
-                 console.error("Konnte Plan nicht aus dem Archiv löschen.", error);
-                 alert("Der Plan konnte nicht gelöscht werden.");
-            }
-        }
-    }, [fetchArchive]);
 
     const loadPlanFromArchive = useCallback((id: number): ArchiveEntry | null => {
         return archive.find(entry => entry.id === id) || null;
@@ -38,5 +27,5 @@ export const useArchive = () => {
         );
     }, []);
 
-    return { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive, updatePlanInArchive };
+    return { archive, loadPlanFromArchive, fetchArchive, updatePlanInArchive };
 };
