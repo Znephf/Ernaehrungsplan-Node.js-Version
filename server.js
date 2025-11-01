@@ -697,16 +697,39 @@ app.post('/api/share-plan', async (req, res) => {
         return res.status(400).json({ error: 'Unvollständige Plandaten für die Freigabe erhalten.' });
     }
     try {
-        const shareId = crypto.randomBytes(12).toString('hex');
-        const htmlContent = generateShareableHtml(plan, imageUrls);
-        const fileName = `${shareId}.html`;
-        const filePath = path.join(publicSharesDir, fileName);
+        // 1. Check if a shareId already exists for this plan
+        const [rows] = await pool.query('SELECT shareId FROM archived_plans WHERE id = ?', [plan.id]);
 
-        fs.writeFileSync(filePath, htmlContent, 'utf-8');
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Der zu teilende Plan wurde im Archiv nicht gefunden.' });
+        }
 
-        await pool.query('UPDATE archived_plans SET shareId = ? WHERE id = ?', [shareId, plan.id]);
+        let shareId = rows[0].shareId;
 
-        const shareUrl = `/shares/${fileName}`;
+        // 2. If no shareId exists, generate a new one, create the file, and save it.
+        if (!shareId) {
+            shareId = crypto.randomBytes(12).toString('hex');
+            const htmlContent = generateShareableHtml(plan, imageUrls);
+            const fileName = `${shareId}.html`;
+            const filePath = path.join(publicSharesDir, fileName);
+
+            fs.writeFileSync(filePath, htmlContent, 'utf-8');
+
+            await pool.query('UPDATE archived_plans SET shareId = ? WHERE id = ?', [shareId, plan.id]);
+            console.log(`Neuer Share-Link für Plan ID ${plan.id} erstellt: ${shareId}`);
+        } else {
+            console.log(`Bestehender Share-Link für Plan ID ${plan.id} gefunden: ${shareId}`);
+            // Robustness check: Re-create the file if it's missing for some reason.
+            const fileName = `${shareId}.html`;
+            const filePath = path.join(publicSharesDir, fileName);
+            if (!fs.existsSync(filePath)) {
+                console.warn(`Share-Datei für ${shareId} nicht gefunden. Erstelle sie neu.`);
+                const htmlContent = generateShareableHtml(plan, imageUrls);
+                fs.writeFileSync(filePath, htmlContent, 'utf-8');
+            }
+        }
+        
+        const shareUrl = `/shares/${shareId}.html`;
         res.json({ shareUrl, shareId });
 
     } catch (error) {
