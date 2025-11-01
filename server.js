@@ -91,8 +91,9 @@ async function initializeDatabase() {
 // --- App-Setup ---
 const app = express();
 const port = process.env.PORT || 3001;
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+// Erhöhe das Limit, um "413 Content Too Large"-Fehler beim Teilen von Plänen mit vielen Bildern zu vermeiden.
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser(COOKIE_SECRET));
 
 // --- Konstanten für KI-Modelle ---

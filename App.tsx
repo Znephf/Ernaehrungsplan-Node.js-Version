@@ -28,6 +28,34 @@ const defaultSettings: PlanSettings = {
     customBreakfast: ''
 };
 
+// Helper function to compress images before uploading them for sharing.
+// This is crucial to prevent "413 Content Too Large" errors.
+async function compressImageForSharing(base64Url: string, maxWidth = 800, quality = 0.8): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ratio = img.width / img.height;
+            const width = Math.min(img.width, maxWidth);
+            const height = width / ratio;
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return reject(new Error('Konnte Canvas-Kontext nicht abrufen'));
+            
+            // Fill background with white for JPG to avoid black backgrounds from transparency
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, width, height);
+            
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = (err) => reject(err);
+        img.src = base64Url;
+    });
+}
+
+
 const App: React.FC = () => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -145,30 +173,62 @@ const App: React.FC = () => {
         if (!plan || isSharing) return;
         setIsSharing(true);
         setShareStatus('Prüfe Bilder...');
-
+    
         const finalImageUrls = await generateMissingImages(plan.recipes, plan.id, setShareStatus);
         
+        setShareStatus('Komprimiere Bilder...');
+        
+        const compressedImageUrls: { [key: string]: string } = {};
+        const imageCompressionPromises = Object.keys(finalImageUrls).map(async day => {
+            const url = finalImageUrls[day];
+            if (url && url.startsWith('data:image/')) {
+                try {
+                    compressedImageUrls[day] = await compressImageForSharing(url);
+                } catch (e) {
+                    console.error(`Konnte Bild für ${day} nicht komprimieren, verwende Original:`, e);
+                    compressedImageUrls[day] = url; // Fallback auf Original, falls Komprimierung fehlschlägt
+                }
+            } else {
+                compressedImageUrls[day] = url; // Behalte URLs, die keine Base64-Daten sind, bei (falls vorhanden)
+            }
+        });
+        
+        await Promise.all(imageCompressionPromises);
+    
         setShareStatus('Link erstellen...');
-
+    
         try {
             const response = await fetch('/api/share-plan', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan, imageUrls: finalImageUrls })
+                body: JSON.stringify({ plan, imageUrls: compressedImageUrls }) // Sende die komprimierten Bilder
             });
-
+    
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Serverfehler beim Erstellen des Links.');
+                // Try to get a meaningful error message from the server response
+                let errorData;
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    errorData = await response.json();
+                } else {
+                    // If the response is not JSON (e.g., HTML error page from Nginx), show a generic error.
+                    errorData = { error: `Serverfehler: ${response.status} ${response.statusText}` };
+                }
+                throw new Error(errorData.error || 'Unbekannter Serverfehler beim Erstellen des Links.');
             }
-
+    
             const data = await response.json();
             const fullUrl = `${window.location.origin}${data.shareUrl}`;
             setShareUrl(fullUrl);
-
+    
         } catch (err) {
             console.error("Fehler beim Teilen:", err);
-            alert(`Der Plan konnte nicht geteilt werden: ${(err as Error).message}`);
+            // Check for the specific JSON parsing error and provide a user-friendly message
+            if (err instanceof SyntaxError) {
+                 alert("Der Plan konnte nicht geteilt werden: Der Server hat eine unerwartete Antwort gesendet. Dies kann passieren, wenn die Datenmenge zu groß ist.");
+            } else {
+                 alert(`Der Plan konnte nicht geteilt werden: ${(err as Error).message}`);
+            }
         } finally {
             setIsSharing(false);
             setShareStatus('Teilen');
