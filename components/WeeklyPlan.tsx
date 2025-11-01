@@ -23,7 +23,7 @@ const WeeklyPlanComponent: React.FC<WeeklyPlanComponentProps> = ({ weeklyPlan, p
             )}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {weeklyPlan.map((plan) => {
+            {(weeklyPlan || []).map((plan) => {
                 const totalCalories = (plan.breakfastCalories || 0) + (plan.dinnerCalories || 0);
                 return (
                     <div key={plan.day} className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col transition-transform transform hover:scale-105">

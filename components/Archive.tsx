@@ -36,7 +36,7 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
     return archive.filter(entry => {
       const matchesSearch = !lowercasedTerm ||
         (entry.name && entry.name.toLowerCase().includes(lowercasedTerm)) ||
-        entry.recipes.some(recipe =>
+        (entry.recipes || []).some(recipe =>
           recipe.title.toLowerCase().includes(lowercasedTerm)
         );
 

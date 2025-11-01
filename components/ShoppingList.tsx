@@ -140,7 +140,7 @@ const ShoppingListComponent: React.FC<ShoppingListComponentProps> = ({ shoppingL
       </div>
 
       <div ref={printableRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-1">
-        {shoppingList.map(({ category, items }) => (
+        {(shoppingList || []).map(({ category, items }) => (
           <div key={category} className="bg-white rounded-lg shadow-lg p-6 break-inside-avoid">
             <h3 className="text-xl font-semibold text-emerald-700 border-b-2 border-emerald-200 pb-2 mb-4">{category}</h3>
             <ul className="space-y-2">

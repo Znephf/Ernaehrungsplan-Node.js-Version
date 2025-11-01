@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -26,7 +24,7 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, im
     setIsCreatingPdf(true);
     setPdfStatus('Prüfe Bilder...');
     
-    await generateMissingImages(recipes, planId, setPdfStatus);
+    await generateMissingImages(recipes || [], planId, setPdfStatus);
     
     setIsPdfGenerationQueued(true);
   };
@@ -156,7 +154,7 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, im
       </div>
 
       <div className="space-y-12">
-        {recipes.map((recipe) => (
+        {(recipes || []).map((recipe) => (
           <div key={recipe.day} id={`recipe-${recipe.day}`} className="bg-white rounded-lg shadow-lg hover:shadow-xl overflow-hidden recipe-card-for-pdf">
             <div>
               <GeneratedRecipeImage 
@@ -207,7 +205,7 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, im
                 <div className="md:col-span-2">
                   <h4 className="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Zutaten:</h4>
                   <ul className="space-y-2 list-disc list-inside text-slate-600">
-                    {recipe.ingredients.map((ingredient, index) => (
+                    {(recipe.ingredients || []).map((ingredient, index) => (
                       <li key={index}>{ingredient}</li>
                     ))}
                   </ul>
@@ -215,7 +213,7 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, im
                 <div className="md:col-span-3 md:border-l md:border-slate-200 md:pl-8">
                   <h4 className="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Anleitung:</h4>
                   <ol className="space-y-3 list-decimal list-inside text-slate-600">
-                    {recipe.instructions.map((step, index) => (
+                    {(recipe.instructions || []).map((step, index) => (
                       <li key={index}>{step}</li>
                     ))}
                   </ol>

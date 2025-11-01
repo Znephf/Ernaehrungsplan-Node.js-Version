@@ -40,7 +40,7 @@ const validatePlanData = (data) => {
     if (!Array.isArray(data.weeklyPlan) || data.weeklyPlan.length === 0) throw new Error(`Validierung fehlgeschlagen: Wochenplan ist leer.`);
     for (const dayPlan of data.weeklyPlan) {
         if (typeof dayPlan.day !== 'string' || typeof dayPlan.breakfast !== 'string' || typeof dayPlan.breakfastCalories !== 'number' || typeof dayPlan.dinner !== 'string' || typeof dayPlan.dinnerCalories !== 'number') {
-            throw new Error(`Validierung fehlgeschlagen: Ein Tagesplan-Objekt ist unvollständig.`);
+            throw new Error(`Validierung fehlgeschlagen: Ein Tagesplan-Objekt ist unvollständig!`);
         }
     }
     if (!Array.isArray(data.recipes) || data.recipes.length === 0) throw new Error("Validierung fehlgeschlagen: Rezepte sind leer.");
@@ -72,7 +72,7 @@ async function processGenerationJob(jobId) {
         let breakfastInstruction = '';
         switch (breakfastOption) {
             case 'quark': breakfastInstruction = dietaryPreference === 'vegan' ? "Frühstück ist jeden Tag nur vegane Quark-Alternative. Keine weiteren Zutaten." : "Frühstück ist jeden Tag nur 'CremeQuark von Edeka'. Keine weiteren Zutaten."; break;
-            case 'muesli': breakfastInstruction = 'Frühstück basiert täglich auf Müsli, variiere die Toppings.'; break;
+            case 'muesli': breakfastInstruction = dietaryPreference === 'vegan' ? "Frühstück basiert täglich auf veganem Müsli (z.B. mit Pflanzenmilch/Sojajoghurt, Früchten, Nüssen). Es darf kein Honig enthalten sein." : "Frühstück basiert täglich auf Müsli, variiere die Toppings."; break;
             case 'custom': breakfastInstruction = customBreakfast.trim() ? `Frühstück ist täglich: "${customBreakfast}".` : 'Das Frühstück ist jeden Tag gleich und einfach.'; break;
         }
         

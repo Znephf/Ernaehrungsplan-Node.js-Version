@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
@@ -41,6 +40,12 @@ router.get('/job-status/:jobId', async (req, res) => {
                 const row = planRows[0];
                 const settings = typeof row.settings === 'string' ? JSON.parse(row.settings) : row.settings;
                 const planData = typeof row.planData === 'string' ? JSON.parse(row.planData) : row.planData;
+
+                // WICHTIG: Validierung hinzugefügt, um sicherzustellen, dass keine korrupten Daten gesendet werden
+                if (!planData || typeof planData !== 'object' || !planData.name || !Array.isArray(planData.weeklyPlan) || !Array.isArray(planData.recipes) || !Array.isArray(planData.shoppingList)) {
+                    console.error(`[Job-Status] Plan mit ID ${planId} hat korrupte Daten und wird nicht gesendet.`);
+                    return res.json({ status: 'error', error: 'Der generierte Plan hat ein ungültiges Format und kann nicht geladen werden.' });
+                }
 
                 const newPlanEntry = {
                     id: row.id.toString(),
