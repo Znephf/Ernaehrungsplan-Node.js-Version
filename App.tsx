@@ -173,12 +173,9 @@ const App: React.FC = () => {
     const handleShare = async () => {
         if (!plan || isSharing) return;
 
-        // If a share link already exists, show it immediately.
-        if (plan.shareId) {
-            const fullUrl = `${window.location.origin}/shares/${plan.shareId}.html`;
-            setShareUrl(fullUrl);
-            return;
-        }
+        // The client-side check is removed. The server will now be the single source of truth.
+        // It will check if a link exists and return it, or create a new one.
+        // This makes the logic more robust against client-side state issues.
 
         setIsSharing(true);
         setShareStatus('Prüfe Bilder...');
@@ -195,10 +192,10 @@ const App: React.FC = () => {
                     compressedImageUrls[day] = await compressImageForSharing(url);
                 } catch (e) {
                     console.error(`Konnte Bild für ${day} nicht komprimieren, verwende Original:`, e);
-                    compressedImageUrls[day] = url; // Fallback auf Original, falls Komprimierung fehlschlägt
+                    compressedImageUrls[day] = url; // Fallback to original if compression fails
                 }
             } else {
-                compressedImageUrls[day] = url; // Behalte URLs, die keine Base64-Daten sind, bei (falls vorhanden)
+                compressedImageUrls[day] = url; // Keep non-base64 URLs (if any)
             }
         });
         
@@ -210,7 +207,7 @@ const App: React.FC = () => {
             const response = await fetch('/api/share-plan', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan, imageUrls: compressedImageUrls }) // Sende die komprimierten Bilder
+                body: JSON.stringify({ plan, imageUrls: compressedImageUrls }) // Send compressed images
             });
     
             if (!response.ok) {
@@ -232,9 +229,11 @@ const App: React.FC = () => {
             setShareUrl(fullUrl);
 
             // Update local state with the new shareId to prevent re-sharing
-            const updatedPlan = { ...plan, shareId: data.shareId };
-            setPlan(updatedPlan);
-            updatePlanInArchive(updatedPlan);
+            if (plan.shareId !== data.shareId) {
+                const updatedPlan = { ...plan, shareId: data.shareId };
+                setPlan(updatedPlan);
+                updatePlanInArchive(updatedPlan);
+            }
     
         } catch (err) {
             console.error("Fehler beim Teilen:", err);
