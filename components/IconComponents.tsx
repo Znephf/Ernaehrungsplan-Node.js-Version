@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 
 const IconProps = {
@@ -61,6 +59,37 @@ export const LogoutIcon: React.FC = () => (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
     </svg>
 );
+
+export const ShareIcon: React.FC = () => (
+    <svg {...IconProps} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.195.025.39.042.582.042h4.4c.192 0 .387-.017.582-.042m0 2.186a2.25 2.25 0 110-2.186m0 2.186c-.195-.025-.39-.042-.582-.042h-4.4c-.192 0-.387.017-.582-.042m0-2.186l-2.083-1.157a2.25 2.25 0 010-3.829l2.083-1.157m0 7.172l2.083 1.157a2.25 2.25 0 000-3.829l-2.083-1.157" />
+    </svg>
+);
+
+export const CloseIcon: React.FC = () => (
+    <svg {...IconProps} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+);
+
+export const CopyIcon: React.FC = () => (
+    <svg {...IconProps} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 8.25V6a2.25 2.25 0 00-2.25-2.25H6A2.25 2.25 0 003.75 6v8.25A2.25 2.25 0 006 16.5h2.25m8.25-8.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-7.5A2.25 2.25 0 018.25 18v-1.5m8.25-8.25h-6.75" />
+    </svg>
+);
+
+export const WhatsAppIcon: React.FC<{className?: string}> = ({className = "h-8 w-8"}) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.01,2.01C6.49,2.01,2.01,6.49,2.01,12.01c0,1.74,0.45,3.39,1.26,4.86l-1.2,4.25l4.35-1.18 c1.43,0.74,3.03,1.16,4.7,1.16h0c5.52,0,9.99-4.47,9.99-9.99C22,6.49,17.53,2.01,12.01,2.01z M17,14.63 c-0.21-0.1-1.26-0.62-1.46-0.69s-0.34-0.1-0.49,0.1s-0.55,0.69-0.68,0.84c-0.13,0.15-0.25,0.17-0.47,0.07 c-0.21-0.1-0.9-0.33-1.72-1.06c-0.64-0.57-1.07-1.28-1.2-1.5c-0.12-0.22,0,0,0.11-0.24c0.09-0.11,0.21-0.28,0.31-0.42 c0.1-0.14,0.13-0.23,0.2-0.38s0.03-0.28-0.01-0.38c-0.05-0.1-0.49-1.18-0.67-1.62c-0.18-0.42-0.36-0.36-0.49-0.37 c-0.12-0.01-0.25-0.01-0.38-0.01s-0.34,0.05-0.52,0.24s-0.7,0.68-0.7,1.68s0.72,1.95,0.82,2.09c0.1,0.15,1.41,2.15,3.42,3.01 c0.48,0.2,0.86,0.32,1.15,0.41c0.47,0.14,0.89,0.12,1.22,0.07c0.37-0.05,1.26-0.51,1.44-1c0.18-0.49,0.18-0.9,0.13-1 C17.34,14.74,17.21,14.73,17,14.63z" fill="#25D366"/></svg>
+);
+
+export const TelegramIcon: React.FC<{className?: string}> = ({className = "h-8 w-8"}) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12,2.01C6.49,2.01,2.01,6.49,2.01,12.01s4.48,9.99,9.99,9.99s9.99-4.48,9.99-9.99S17.53,2.01,12,2.01z M16.86,8.55l-1.5,7.03c-0.14,0.64-0.51,0.79-1.03,0.5l-2.4-1.77l-1.16,1.12c-0.13,0.13-0.24,0.24-0.47,0.24l0.17-2.46l4.52-4.08 c0.19-0.17-0.04-0.26-0.3-0.1l-5.59,3.5l-2.32-0.72c-0.64-0.2-0.66-0.62,0.12-0.9l9.23-3.61 C16.5,8.02,17.02,8.19,16.86,8.55z" fill="#0088cc"/></svg>
+);
+
+export const EmailIcon: React.FC<{className?: string}> = ({className = "h-8 w-8"}) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12,2.01C6.49,2.01,2.01,6.49,2.01,12.01s4.48,9.99,9.99,9.99s9.99-4.48,9.99-9.99S17.53,2.01,12,2.01z M12,14.39 l-6.4-4.06c-0.05-0.03-0.11-0.05-0.17-0.05H5.05c-0.16,0-0.29,0.13-0.29,0.29v5.6c0,0.16,0.13,0.29,0.29,0.29h13.9 c0.16,0,0.29-0.13,0.29-0.29v-5.6c0-0.16-0.13-0.29-0.29-0.29h-0.38c-0.06,0-0.12,0.02-0.17,0.05L12,14.39z M18.95,9.75 c0-0.09-0.04-0.17-0.11-0.22l-6.4-4.06c-0.28-0.17-0.64-0.17-0.92,0l-6.4,4.06C5.04,9.58,5,9.66,5,9.75v0.11l6.71,4.25 c0.18,0.11,0.4,0.11,0.58,0l6.71-4.25V9.75z" fill="#7D7D7D"/></svg>
+);
+
 
 const MacroIconProps = {
   className: "h-6 w-6 text-emerald-600",

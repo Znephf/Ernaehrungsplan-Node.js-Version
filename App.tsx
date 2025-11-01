@@ -6,11 +6,12 @@ import ArchiveComponent from './components/Archive';
 import SettingsPanel from './components/SettingsPanel';
 import LoadingOverlay from './components/LoadingOverlay';
 import LoginComponent from './components/Login';
+import ShareModal from './components/ShareModal';
 import type { View, PlanSettings, ArchiveEntry } from './types';
 import { useArchive } from './hooks/useArchive';
 import { useMealPlanGenerator } from './hooks/useMealPlanGenerator';
 import { useImageGenerator } from './hooks/useImageGenerator';
-import { ChevronUpIcon, ChevronDownIcon, DownloadIcon, LogoutIcon } from './components/IconComponents';
+import { ChevronUpIcon, ChevronDownIcon, DownloadIcon, LogoutIcon, ShareIcon } from './components/IconComponents';
 import { generateAndDownloadHtml } from './services/htmlExporter';
 
 
@@ -34,8 +35,13 @@ const App: React.FC = () => {
     const [selectedRecipeDay, setSelectedRecipeDay] = useState<string | null>(null);
     const [isSettingsVisible, setIsSettingsVisible] = useState(true);
     const [panelSettings, setPanelSettings] = useState<PlanSettings>(defaultSettings);
+    
     const [isDownloading, setIsDownloading] = useState(false);
     const [downloadStatus, setDownloadStatus] = useState('Speichern');
+
+    const [isSharing, setIsSharing] = useState(false);
+    const [shareStatus, setShareStatus] = useState('Teilen');
+    const [shareUrl, setShareUrl] = useState<string | null>(null);
 
 
     const { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive } = useArchive();
@@ -120,7 +126,6 @@ const App: React.FC = () => {
         setIsDownloading(true);
         setDownloadStatus('Prüfe Bilder...');
         
-        // FIX: Pass the plan ID to save generated images to the archive.
         const finalImageUrls = await generateMissingImages(plan.recipes, plan.id, setDownloadStatus);
         
         setDownloadStatus('Erstelle Datei...');
@@ -133,6 +138,40 @@ const App: React.FC = () => {
         } finally {
             setIsDownloading(false);
             setDownloadStatus('Speichern');
+        }
+    };
+
+    const handleShare = async () => {
+        if (!plan || isSharing) return;
+        setIsSharing(true);
+        setShareStatus('Prüfe Bilder...');
+
+        const finalImageUrls = await generateMissingImages(plan.recipes, plan.id, setShareStatus);
+        
+        setShareStatus('Link erstellen...');
+
+        try {
+            const response = await fetch('/api/share-plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plan, imageUrls: finalImageUrls })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Serverfehler beim Erstellen des Links.');
+            }
+
+            const data = await response.json();
+            const fullUrl = `${window.location.origin}${data.shareUrl}`;
+            setShareUrl(fullUrl);
+
+        } catch (err) {
+            console.error("Fehler beim Teilen:", err);
+            alert(`Der Plan konnte nicht geteilt werden: ${(err as Error).message}`);
+        } finally {
+            setIsSharing(false);
+            setShareStatus('Teilen');
         }
     };
 
@@ -211,6 +250,7 @@ const App: React.FC = () => {
     return (
         <div className="bg-slate-100 min-h-screen font-sans">
             {isLoading && <LoadingOverlay status={generationStatus} />}
+            {shareUrl && <ShareModal url={shareUrl} onClose={() => setShareUrl(null)} />}
             <header className="bg-white shadow-md sticky top-0 z-10">
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
                     <h1 className="text-2xl font-bold text-slate-800">
@@ -225,9 +265,18 @@ const App: React.FC = () => {
                         </nav>
                         <div className="hidden sm:block h-8 border-l border-slate-300 mx-2"></div>
                          <button
+                            onClick={handleShare}
+                            disabled={isSharing || !plan}
+                            className="flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed rounded-md transition-colors w-28 text-center"
+                            title="Aktuellen Plan als öffentlichen Link teilen"
+                        >
+                            <ShareIcon />
+                            <span className="hidden sm:inline">{isSharing ? shareStatus : 'Teilen'}</span>
+                        </button>
+                         <button
                             onClick={handleDownload}
                             disabled={isDownloading || !plan}
-                            className="flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed rounded-md transition-colors w-40 text-center"
+                            className="flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed rounded-md transition-colors w-28 text-center"
                             title="Aktuellen Plan als interaktive HTML-Datei speichern"
                         >
                             <DownloadIcon />
