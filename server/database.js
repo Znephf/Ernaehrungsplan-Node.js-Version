@@ -75,7 +75,7 @@ async function initializeDatabase() {
 
         connection.release();
     } catch (error) {
-        console.error('FATAL ERROR: Konnte die Datenbankverbindung nicht herstellen oder Tabelle nicht erstellen/aktualisieren.', error);
+        console.error('FATAL ERROR: Konnte die Datenbankverbindung nicht herstellen oder Tabelle nicht erstellen/aktualisieren!', error);
         process.exit(1);
     }
 }
