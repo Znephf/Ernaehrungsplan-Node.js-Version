@@ -90,6 +90,7 @@ Ihre geheimen Schlüssel und Datenbank-Zugangsdaten müssen sicher als Umgebungs
 2.  Klicken Sie auf **Umgebungsvariablen**.
 3.  Fügen Sie die folgenden Variablen hinzu:
     -   `API_KEY` = `Ihr_Google_Gemini_API_Schlüssel`
+    -   `API_KEY_FALLBACK` = `Ihr_ZWEITER_Google_Gemini_API_Schlüssel` (Optional: Wird verwendet, wenn der erste Schlüssel sein Kontingent erreicht hat oder einen Fehler zurückgibt.)
     -   `COOKIE_SECRET` = `Eine_sehr_lange_und_komplexe_zufällige_Zeichenfolge`
     -   `APP_PASSWORD` = `Ein_sicheres_Passwort_für_den_Login`
     -   `DB_HOST` = `localhost` (oder die IP Ihres DB-Servers)
@@ -139,4 +140,42 @@ Denken Sie daran, regelmäßige Backups zu erstellen. Sichern Sie dabei:
     -   Ist der `API_KEY` korrekt?
     -   Ist die Gemini API für Ihren Schlüssel aktiviert?
 -   **Fehler bei der Bildgenerierung (Quota Exceeded):**
-    -   **Lösung:** Verknüpfen Sie Ihr Projekt mit einem Google Cloud-Projekt, für das die Abrechnung (Billing) aktiviert ist.
+    -   **Lösung:** Verknüpfen Sie Ihr Projekt mit einem Google Cloud-Projekt, für das die Abrechnung (Billing) aktiviert ist.--- START OF FILE package.json ---
+
+
+{
+  "name": "ki-ernaehrungsplaner",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "start": "node server/index.js",
+    "preview": "vite preview",
+    "migrate:images": "node scripts/migrate_images.js",
+    "migrate:complexity": "node scripts/migrate_complexity.js"
+  },
+  "dependencies": {
+    "@google/genai": "latest",
+    "cookie-parser": "^1.4.6",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.1",
+    "mysql2": "^3.10.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.7",
+    "@types/express": "^4.17.21",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4"
+  }
+}

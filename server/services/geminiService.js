@@ -1,39 +1,70 @@
-
-
 const { GoogleGenAI, Modality, Type } = require('@google/genai');
 const { pool } = require('./database');
-const { API_KEY } = process.env;
+const { API_KEY, API_KEY_FALLBACK } = process.env;
 
 const TEXT_MODEL_NAME = 'gemini-2.5-flash';
 const IMAGE_MODEL_NAME = 'gemini-2.5-flash-image';
 
-const MAX_RETRIES = 4;
+const MAX_RETRIES_PER_KEY = 3; // Max retries for a single API key
 const INITIAL_BACKOFF_MS = 1000;
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function generateWithRetry(ai, generationParams) {
+const apiKeys = [
+    { name: 'API_KEY', value: API_KEY },
+    { name: 'API_KEY_FALLBACK', value: API_KEY_FALLBACK }
+].filter(k => k.value);
+
+if (apiKeys.length === 0) {
+    console.error('[API Error] Critical: No API_KEY or API_KEY_FALLBACK environment variables are set.');
+}
+
+/**
+ * Attempts to generate content using a primary API key, with a fallback key if the primary fails.
+ * Includes retry logic with exponential backoff for retriable errors (e.g., rate limits, server overload).
+ * @param {object} generationParams - The parameters for the generateContent call.
+ * @returns {Promise<object>} The result from the Gemini API.
+ */
+async function generateWithFallbackAndRetry(generationParams) {
     let lastError = null;
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        try {
-            const result = await ai.models.generateContent(generationParams);
-            return result;
-        } catch (error) {
-            lastError = error;
-            const errorMessage = (error.message || '').toLowerCase();
-            if (errorMessage.includes('503') || errorMessage.includes('unavailable') || errorMessage.includes('overloaded') || errorMessage.includes('rate limit')) {
-                if (attempt < MAX_RETRIES - 1) {
-                    const backoffTime = INITIAL_BACKOFF_MS * Math.pow(2, attempt) + Math.random() * 1000;
-                    console.log(`[API Retry] Versuch ${attempt + 1}/${MAX_RETRIES} fehlgeschlagen. Nächster Versuch in ${Math.round(backoffTime / 1000)}s...`);
-                    await delay(backoffTime);
+    if (apiKeys.length === 0) {
+        throw new Error("Kein Google Gemini API-Schlüssel konfiguriert.");
+    }
+
+    for (const keyInfo of apiKeys) {
+        const ai = new GoogleGenAI({ apiKey: keyInfo.value });
+        console.log(`[API] Führe Anfrage mit Schlüssel '${keyInfo.name}' aus (endet auf ...${keyInfo.value.slice(-4)}).`);
+        
+        for (let attempt = 0; attempt < MAX_RETRIES_PER_KEY; attempt++) {
+            try {
+                const result = await ai.models.generateContent(generationParams);
+                console.log(`[API] Anfrage mit Schlüssel '${keyInfo.name}' war erfolgreich.`);
+                return result; // Success, return immediately.
+            } catch (error) {
+                lastError = error;
+                const errorMessage = (error.message || '').toLowerCase();
+                const isRetriableError = errorMessage.includes('503') || errorMessage.includes('unavailable') || errorMessage.includes('overloaded') || errorMessage.includes('rate limit') || errorMessage.includes('429');
+                
+                if (isRetriableError) {
+                    if (attempt < MAX_RETRIES_PER_KEY - 1) {
+                        const backoffTime = INITIAL_BACKOFF_MS * Math.pow(2, attempt) + Math.random() * 1000;
+                        console.warn(`[API Retry] Versuch ${attempt + 1}/${MAX_RETRIES_PER_KEY} mit '${keyInfo.name}' fehlgeschlagen (Server überlastet). Nächster Versuch in ${Math.round(backoffTime / 1000)}s...`);
+                        await delay(backoffTime);
+                    }
+                } else {
+                    console.error(`[API] Kritischer Fehler mit Schlüssel '${keyInfo.name}': ${errorMessage}. Wechsle zum nächsten Schlüssel, falls vorhanden.`);
+                    break; // Break from the inner retry loop to try the next key.
                 }
-            } else {
-                console.error('[API Error] Nicht behebbarer Fehler:', error.message);
-                throw error;
             }
         }
+        
+        if (apiKeys.length > 1 && keyInfo.name !== apiKeys[apiKeys.length - 1].name) {
+             console.warn(`[API Fallback] Alle Versuche für Schlüssel '${keyInfo.name}' sind fehlgeschlagen. Wechsle zum Fallback-Schlüssel.`);
+        }
     }
-    console.error(`[API Error] Alle ${MAX_RETRIES} Versuche sind fehlgeschlagen.`);
-    throw new Error(`Das KI-Modell ist derzeit überlastet. Bitte versuchen Sie es in ein paar Minuten erneut.`);
+
+    console.error(`[API FATAL] Alle konfigurierten API-Schlüssel (${apiKeys.map(k => k.name).join(', ')}) sind fehlgeschlagen.`);
+    // Re-throw the last captured error to be handled by the caller.
+    throw lastError || new Error("Alle API-Schlüssel sind fehlgeschlagen. Das KI-Modell ist derzeit nicht erreichbar.");
 }
 
 const validatePlanData = (data) => {
@@ -54,7 +85,6 @@ const validatePlanData = (data) => {
 };
 
 async function processGenerationJob(jobId) {
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
     let connection;
     try {
         connection = await pool.getConnection();
@@ -134,7 +164,7 @@ async function processGenerationJob(jobId) {
         
         await connection.query("UPDATE generation_jobs SET status = 'generating_plan' WHERE jobId = ?", [jobId]);
         
-        const planResponse = await generateWithRetry(ai, { model: TEXT_MODEL_NAME, contents: [{ parts: [{ text: planPrompt }] }], config: { responseMimeType: 'application/json', responseSchema: planSchema, temperature: parseFloat((Math.random() * 0.3 + 0.7).toFixed(2)) } });
+        const planResponse = await generateWithFallbackAndRetry({ model: TEXT_MODEL_NAME, contents: [{ parts: [{ text: planPrompt }] }], config: { responseMimeType: 'application/json', responseSchema: planSchema, temperature: parseFloat((Math.random() * 0.3 + 0.7).toFixed(2)) } });
         
         let planData;
         try {
@@ -153,7 +183,7 @@ async function processGenerationJob(jobId) {
 
         const shoppingListPrompt = `Basierend auf diesen Rezepten für ${persons} Personen, erstelle eine vollständige, zusammengefasste Einkaufsliste. Gruppiere nach Supermarkt-Kategorien: ${JSON.stringify({ weeklyPlan: planData.weeklyPlan, recipes: planData.recipes })}`;
         const shoppingListSchema = { type: Type.OBJECT, properties: { shoppingList: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, items: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ["category", "items"] } } }, required: ["shoppingList"] };
-        const shoppingListResponse = await generateWithRetry(ai, { model: TEXT_MODEL_NAME, contents: [{ parts: [{ text: shoppingListPrompt }] }], config: { responseMimeType: 'application/json', responseSchema: shoppingListSchema } });
+        const shoppingListResponse = await generateWithFallbackAndRetry({ model: TEXT_MODEL_NAME, contents: [{ parts: [{ text: shoppingListPrompt }] }], config: { responseMimeType: 'application/json', responseSchema: shoppingListSchema } });
         
         let shoppingListData;
         try {
@@ -190,12 +220,11 @@ async function processGenerationJob(jobId) {
 }
 
 async function generateImageForRecipe(recipe, attempt) {
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
     const prompt = attempt <= 2
         ? `Professionelle Food-Fotografie, ultra-realistisches Foto von: "${recipe.title}". Angerichtet auf Keramikteller, dramatisches Seitenlicht, Dampf, Bokeh-Hintergrund, appetitlich.`
         : `Andere Perspektive, Food-Fotografie, ultra-realistisches Foto von: "${recipe.title}". Angerichtet auf rustikalem Holztisch, natürliches Licht, kräftige Farben, köstlich.`;
 
-    const response = await generateWithRetry(ai, {
+    const response = await generateWithFallbackAndRetry({
         model: IMAGE_MODEL_NAME,
         contents: { parts: [{ text: prompt }] },
         config: { responseModalities: [Modality.IMAGE] },
