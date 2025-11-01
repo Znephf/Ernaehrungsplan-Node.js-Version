@@ -11,7 +11,6 @@ import { useArchive } from './hooks/useArchive';
 import { useMealPlanGenerator } from './hooks/useMealPlanGenerator';
 import { useImageGenerator } from './hooks/useImageGenerator';
 import { useShareProcessor } from './hooks/useShareProcessor';
-import { generateAndDownloadHtml } from './services/htmlExporter';
 import * as apiService from './services/apiService';
 
 const defaultSettings: PlanSettings = {
@@ -36,8 +35,6 @@ const App: React.FC = () => {
     const [isSettingsVisible, setIsSettingsVisible] = useState(true);
     const [panelSettings, setPanelSettings] = useState<PlanSettings>(defaultSettings);
     
-    const [isDownloading, setIsDownloading] = useState(false);
-    const [downloadStatus, setDownloadStatus] = useState('Speichern');
 
     const { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive, updatePlanInArchive } = useArchive();
     const { 
@@ -143,23 +140,6 @@ const App: React.FC = () => {
         }
     }, [currentView, selectedRecipeDay]);
 
-    const handleDownload = async () => {
-        if (!plan || isDownloading) return;
-        setIsDownloading(true);
-        setDownloadStatus('Prüfe Bilder...');
-        const finalImageUrls = await generateMissingImages(plan.recipes, plan.id, setDownloadStatus);
-        setDownloadStatus('Erstelle Datei...');
-        try {
-            await generateAndDownloadHtml(plan, finalImageUrls);
-        } catch (err) {
-            console.error("Fehler beim Herunterladen:", err);
-            alert("Der Plan konnte nicht heruntergeladen werden.");
-        } finally {
-            setIsDownloading(false);
-            setDownloadStatus('Speichern');
-        }
-    };
-
     const handleShare = () => {
         if (plan && !isSharing) {
             startSharingProcess(plan);
@@ -209,9 +189,6 @@ const App: React.FC = () => {
                 isSharing={isSharing}
                 shareStatus={shareStatus}
                 onShare={handleShare}
-                isDownloading={isDownloading}
-                downloadStatus={downloadStatus}
-                onDownload={handleDownload}
                 onLogout={handleLogout}
             />
 

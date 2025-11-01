@@ -1,6 +1,6 @@
 import React from 'react';
 import type { View } from '../types';
-import { DownloadIcon, LogoutIcon, ShareIcon } from './IconComponents';
+import { LogoutIcon, ShareIcon } from './IconComponents';
  
 interface HeaderProps {
     currentView: View;
@@ -9,9 +9,6 @@ interface HeaderProps {
     isSharing: boolean;
     shareStatus: string;
     onShare: () => void;
-    isDownloading: boolean;
-    downloadStatus: string;
-    onDownload: () => void;
     onLogout: () => void;
 }
 
@@ -36,9 +33,6 @@ const Header: React.FC<HeaderProps> = ({
     isSharing,
     shareStatus,
     onShare,
-    isDownloading,
-    downloadStatus,
-    onDownload,
     onLogout
 }) => {
     return (
@@ -62,16 +56,7 @@ const Header: React.FC<HeaderProps> = ({
                         title="Aktuellen Plan als öffentlichen Link teilen"
                     >
                         <ShareIcon />
-                        <span className="hidden sm:inline">{isSharing ? 'Teile...' : 'Teilen'}</span>
-                    </button>
-                     <button
-                        onClick={onDownload}
-                        disabled={isDownloading || !planExists}
-                        className="flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed rounded-md transition-colors w-28 text-center"
-                        title="Aktuellen Plan als interaktive HTML-Datei speichern"
-                    >
-                        <DownloadIcon />
-                        <span className="hidden sm:inline">{isDownloading ? 'Speichere...' : 'Speichern'}</span>
+                        <span>{isSharing ? 'Teile...' : 'Teilen'}</span>
                     </button>
                      <button
                         onClick={onLogout}

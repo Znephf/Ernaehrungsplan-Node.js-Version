@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import * as apiService from '../services/apiService';
 
 interface LoginComponentProps {
@@ -10,6 +11,24 @@ const LoginComponent: React.FC<LoginComponentProps> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    try {
+      // Dies verhindert die doppelte Injektion des Skripts bei schnellen Neu-Renderings
+      if (!document.querySelector('script[src*="adsbygoogle.js"]')) {
+        const script = document.createElement('script');
+        script.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8080690667651280";
+        script.async = true;
+        script.crossOrigin = "anonymous";
+        document.body.appendChild(script);
+      }
+      // Pusht die Anzeige, um sie zu laden
+      // FIX: Cast window to 'any' to access 'adsbygoogle', which is dynamically added by the AdSense script and not known to TypeScript.
+      ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+    } catch (e) {
+        console.error("AdSense Error:", e);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,8 +46,8 @@ const LoginComponent: React.FC<LoginComponentProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="bg-slate-100 flex items-center justify-center h-screen">
-      <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-8 m-4">
+    <div className="bg-slate-100 flex flex-col items-center justify-center min-h-screen p-4">
+      <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-8">
         <h1 className="text-2xl font-bold text-center text-slate-800 mb-6">KI Ernährungsplaner</h1>
         <p className="text-center text-slate-500 mb-6">Bitte melden Sie sich an, um fortzufahren.</p>
         <form onSubmit={handleSubmit}>
@@ -63,6 +82,14 @@ const LoginComponent: React.FC<LoginComponentProps> = ({ onLoginSuccess }) => {
             </button>
           </div>
         </form>
+      </div>
+      <div className="w-full max-w-md mt-8">
+        <ins className="adsbygoogle"
+             style={{ display: 'block', textAlign: 'center' }}
+             data-ad-client="ca-pub-8080690667651280"
+             data-ad-slot="7239597318"
+             data-ad-format="auto"
+             data-full-width-responsive="true"></ins>
       </div>
     </div>
   );
