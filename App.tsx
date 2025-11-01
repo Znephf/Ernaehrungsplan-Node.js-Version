@@ -1,5 +1,3 @@
-
-
 import React, { useState, useCallback, useEffect } from 'react';
 import Header from './components/Header';
 import MainContent from './components/MainContent';
@@ -104,6 +102,13 @@ const App: React.FC = () => {
         setCurrentView('recipes');
     };
     
+    const handleSetView = useCallback((view: View) => {
+        if (view === 'archive') {
+            fetchArchive();
+        }
+        setCurrentView(view);
+    }, [fetchArchive]);
+
     useEffect(() => {
         if (currentView === 'recipes' && selectedRecipeDay) {
             const timer = setTimeout(() => {
@@ -214,7 +219,7 @@ const App: React.FC = () => {
             
             <Header
                 currentView={currentView}
-                onSetView={setCurrentView}
+                onSetView={handleSetView}
                 planExists={!!plan}
                 isSharing={isSharing}
                 shareStatus={shareStatus}
