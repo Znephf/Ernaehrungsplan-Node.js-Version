@@ -89,9 +89,47 @@ async function processGenerationJob(jobId) {
         };
         const varietyInstruction = (previousPlanRecipes && previousPlanRecipes.length > 0) ? ` WICHTIG: Erstelle völlig andere Gerichte als diese: ${previousPlanRecipes.map(r => r.title).join(', ')}.` : '';
 
-        const planPrompt = `Erstelle einen ${planType} für eine Woche (Mo-So) für ${persons} Personen. Tägliches Kalorienziel pro Person: ${kcal} kcal (max. 100 kcal Abweichung). ${dietTypePrompts[dietType]} ${specialDietInstructions} ${desiredIngredientsText} ${exclusionText} ${complexityInstruction}${varietyInstruction} ${breakfastInstruction} Abendessen ist jeden Tag ein anderes warmes Gericht. Erstelle detaillierte Rezepte. WICHTIG: Alle Nährwertangaben (Kalorien, Makros) sind PRO PERSON. Zutatenlisten in Rezepten sind für ${persons} Personen. 'breakfastCalories' und 'dinnerCalories' als Zahlen sind zwingend.`;
+        const planPrompt = `Erstelle einen ${planType} für eine Woche (Mo-So) für ${persons} Personen. Tägliches Kalorienziel pro Person: ${kcal} kcal (max. 100 kcal Abweichung). ${dietTypePrompts[dietType]} ${specialDietInstructions} ${desiredIngredientsText} ${exclusionText} ${complexityInstruction}${varietyInstruction} ${breakfastInstruction} Abendessen ist jeden Tag ein anderes warmes Gericht. Erstelle detaillierte Rezepte. Gib dem Plan einen kreativen Namen, der die Gerichte der Woche widerspiegelt (z.B. "Mediterrane Genusswoche mit Halloumi & Shakshuka"). Vermeide generische Titel wie "Wochenplan". WICHTIG: Alle Nährwertangaben (Kalorien, Makros) sind PRO PERSON. Zutatenlisten in Rezepten sind für ${persons} Personen. 'breakfastCalories' und 'dinnerCalories' als Zahlen sind zwingend.`;
         
-        const planSchema = { type: Type.OBJECT, properties: { name: { type: Type.STRING }, weeklyPlan: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { day: { type: Type.STRING }, breakfast: { type: Type.STRING }, breakfastCalories: { type: Type.NUMBER }, dinner: { type: Type.STRING }, dinnerCalories: { type: Type.NUMBER } } } }, recipes: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { day: { type: Type.STRING }, title: { type: Type.STRING }, ingredients: { type: Type.ARRAY, items: { type: Type.STRING } }, instructions: { type: Type.ARRAY, items: { type: Type.STRING } }, totalCalories: { type: Type.NUMBER }, protein: { type: Type.NUMBER }, carbs: { type: Type.NUMBER }, fat: { type: Type.NUMBER } } } } }, required: ["name", "weeklyPlan", "recipes"] };
+        const planSchema = { 
+            type: Type.OBJECT, 
+            properties: { 
+                name: { 
+                    type: Type.STRING,
+                    description: "Ein kreativer, ansprechender Name für den Ernährungsplan, der sich auf die Gerichte der Woche bezieht, z.B. 'Mediterrane Genusswoche mit Halloumi & Shakshuka' oder 'Asiatische Tofu-Reise'. Vermeide unbedingt generische Titel wie 'Wochenplan für 2 Personen'."
+                }, 
+                weeklyPlan: { 
+                    type: Type.ARRAY, 
+                    items: { 
+                        type: Type.OBJECT, 
+                        properties: { 
+                            day: { type: Type.STRING }, 
+                            breakfast: { type: Type.STRING }, 
+                            breakfastCalories: { type: Type.NUMBER }, 
+                            dinner: { type: Type.STRING }, 
+                            dinnerCalories: { type: Type.NUMBER } 
+                        } 
+                    } 
+                }, 
+                recipes: { 
+                    type: Type.ARRAY, 
+                    items: { 
+                        type: Type.OBJECT, 
+                        properties: { 
+                            day: { type: Type.STRING }, 
+                            title: { type: Type.STRING }, 
+                            ingredients: { type: Type.ARRAY, items: { type: Type.STRING } }, 
+                            instructions: { type: Type.ARRAY, items: { type: Type.STRING } }, 
+                            totalCalories: { type: Type.NUMBER }, 
+                            protein: { type: Type.NUMBER }, 
+                            carbs: { type: Type.NUMBER }, 
+                            fat: { type: Type.NUMBER } 
+                        } 
+                    } 
+                } 
+            }, 
+            required: ["name", "weeklyPlan", "recipes"] 
+        };
         
         await connection.query("UPDATE generation_jobs SET status = 'generating_plan' WHERE jobId = ?", [jobId]);
         
