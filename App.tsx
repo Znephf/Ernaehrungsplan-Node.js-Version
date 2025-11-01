@@ -14,23 +14,24 @@ import { useImageGenerator } from './hooks/useImageGenerator';
 import { ChevronUpIcon, ChevronDownIcon, DownloadIcon, LogoutIcon, ShareIcon } from './components/IconComponents';
 import { generateAndDownloadHtml } from './services/htmlExporter';
 
-
+// Fix: Define defaultSettings to initialize the settings state.
 const defaultSettings: PlanSettings = {
     persons: 2,
-    kcal: 1500,
-    dietaryPreference: 'vegetarian',
-    dietType: 'low-carb',
+    kcal: 2000,
+    dietaryPreference: 'omnivore',
+    dietType: 'balanced',
     excludedIngredients: '',
     desiredIngredients: '',
     isGlutenFree: false,
     isLactoseFree: false,
     breakfastOption: 'quark',
-    customBreakfast: ''
+    customBreakfast: '',
 };
+
 
 // Helper function to compress images before uploading them for sharing.
 // This is crucial to prevent "413 Content Too Large" errors.
-async function compressImageForSharing(base64Url: string, maxWidth = 800, quality = 0.8): Promise<string> {
+async function compressImageForSharing(base64Url: string, maxWidth = 600, quality = 0.7): Promise<string> {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
@@ -205,6 +206,9 @@ const App: React.FC = () => {
             });
     
             if (!response.ok) {
+                 if (response.status === 413) {
+                    throw new Error("Die Datenmenge des Plans (insbesondere die Bilder) ist zu groß für die aktuellen Server-Einstellungen. Bitte kontaktieren Sie den Administrator, um das Upload-Limit zu erhöhen (siehe README).");
+                }
                 // Try to get a meaningful error message from the server response
                 let errorData;
                 const contentType = response.headers.get("content-type");
@@ -223,12 +227,7 @@ const App: React.FC = () => {
     
         } catch (err) {
             console.error("Fehler beim Teilen:", err);
-            // Check for the specific JSON parsing error and provide a user-friendly message
-            if (err instanceof SyntaxError) {
-                 alert("Der Plan konnte nicht geteilt werden: Der Server hat eine unerwartete Antwort gesendet. Dies kann passieren, wenn die Datenmenge zu groß ist.");
-            } else {
-                 alert(`Der Plan konnte nicht geteilt werden: ${(err as Error).message}`);
-            }
+            alert(`Der Plan konnte nicht geteilt werden: ${(err as Error).message}`);
         } finally {
             setIsSharing(false);
             setShareStatus('Teilen');

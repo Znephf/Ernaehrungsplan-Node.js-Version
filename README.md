@@ -126,6 +126,18 @@ Die `server.js`-Datei ist so konfiguriert, dass sie diese Datei automatisch lies
     -   **Prüfen Sie als Erstes die Umgebungsvariablen!** Sind alle sieben erforderlichen Variablen vorhanden und korrekt?
     -   **Überprüfen Sie die Log-Dateien (`stderr`)** auf der Node.js-Verwaltungsseite in Plesk. Der Server gibt dort klare Fehlermeldungen aus, wenn Variablen fehlen oder die Datenbankverbindung fehlschlägt.
     -   **Haben Sie die App nach Änderungen neu gestartet?**
+
+-   **Fehler "413 Content Too Large" beim Teilen:**
+    -   **Problem:** Die generierten Bilder sind zu groß für die Standard-Upload-Limits des Webservers (Nginx/Apache), der vor der Node.js-Anwendung läuft.
+    -   **Lösung:** Sie müssen das Limit in Plesk manuell erhöhen.
+        1.  Gehen Sie in Plesk zu **Websites & Domains** > **Ihre Domain** > **Einstellungen für Apache & nginx**.
+        2.  Scrollen Sie nach unten zum Feld **Zusätzliche nginx-Anweisungen**.
+        3.  Fügen Sie die folgende Zeile hinzu, um das Limit auf 50 Megabyte zu erhöhen:
+            ```nginx
+            client_max_body_size 50m;
+            ```
+        4.  Klicken Sie auf **OK** oder **Anwenden**. Dies behebt das Problem in den meisten Fällen.
+
 -   **API-Fehler bei Plangenerierung:**
     -   Ist der `API_KEY` korrekt?
     -   Ist die Gemini API für Ihren Schlüssel aktiviert?
