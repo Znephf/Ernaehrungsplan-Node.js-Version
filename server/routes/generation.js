@@ -47,7 +47,7 @@ router.get('/job-status/:jobId', async (req, res) => {
                 }
 
                 const newPlanEntry = {
-                    id: row.id.toString(),
+                    id: row.id, // KORREKTUR: .toString() entfernt, um eine Zahl zurückzugeben
                     createdAt: new Date(row.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
                     shareId: row.shareId || null,
                     name: planData.name || 'Unbenannter Plan',
@@ -61,7 +61,7 @@ router.get('/job-status/:jobId', async (req, res) => {
             }
         }
         
-        res.json({ status, planId: planId?.toString(), error: errorMessage });
+        res.json({ status, planId, error: errorMessage });
 
     } catch (error) {
         console.error(`Fehler beim Abrufen des Status für Job ${jobId}:`, error);

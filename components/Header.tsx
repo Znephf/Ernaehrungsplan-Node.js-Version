@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { View } from '../types';
 import { DownloadIcon, LogoutIcon, ShareIcon } from './IconComponents';
@@ -63,7 +62,7 @@ const Header: React.FC<HeaderProps> = ({
                         title="Aktuellen Plan als öffentlichen Link teilen"
                     >
                         <ShareIcon />
-                        <span className="hidden sm:inline">{isSharing ? shareStatus : 'Teilen'}</span>
+                        <span className="hidden sm:inline">{isSharing ? 'Teile...' : 'Teilen'}</span>
                     </button>
                      <button
                         onClick={onDownload}
@@ -72,7 +71,7 @@ const Header: React.FC<HeaderProps> = ({
                         title="Aktuellen Plan als interaktive HTML-Datei speichern"
                     >
                         <DownloadIcon />
-                        <span className="hidden sm:inline">{isDownloading ? downloadStatus : 'Speichern'}</span>
+                        <span className="hidden sm:inline">{isDownloading ? 'Speichere...' : 'Speichern'}</span>
                     </button>
                      <button
                         onClick={onLogout}

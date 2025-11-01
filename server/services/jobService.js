@@ -92,7 +92,7 @@ async function processShareJob(jobId) {
 
         const row = planRows[0];
         plan = {
-            id: row.id.toString(),
+            id: row.id,
             shareId: row.shareId,
             ...(typeof row.settings === 'string' ? JSON.parse(row.settings) : row.settings),
             ...(typeof row.planData === 'string' ? JSON.parse(row.planData) : row.planData),
