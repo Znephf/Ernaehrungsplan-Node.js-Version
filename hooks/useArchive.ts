@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import type { ArchiveEntry } from '../types';
 import * as apiService from '../services/apiService';
 
@@ -14,10 +14,6 @@ export const useArchive = () => {
             console.error("Konnte Archiv nicht vom Server laden.", error);
         }
     }, []);
-
-    useEffect(() => {
-        fetchArchive();
-    }, [fetchArchive]);
     
     const deletePlanFromArchive = useCallback(async (id: string) => {
         if (window.confirm("Diesen Plan wirklich aus dem Archiv löschen?")) {

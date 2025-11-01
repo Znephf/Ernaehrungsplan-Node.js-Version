@@ -46,18 +46,23 @@ const App: React.FC = () => {
     const { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState, setImageUrlsFromArchive } = useImageGenerator(fetchArchive);
     
     useEffect(() => {
-        const checkAuth = async () => {
+        const initializeApp = async () => {
+            setIsAuthLoading(true);
             try {
                 await apiService.checkAuth();
                 setIsAuthenticated(true);
+                // WICHTIG: Lade das Archiv erst nach erfolgreicher Authentifizierung
+                await fetchArchive();
             } catch (error) {
-                console.error("Nicht authentifiziert.");
+                console.error("Nicht authentifiziert oder Initialisierungsfehler.");
+                setIsAuthenticated(false);
             } finally {
+                // Blende den Ladebildschirm aus, NACHDEM alles geladen ist
                 setIsAuthLoading(false);
             }
         };
-        checkAuth();
-    }, []);
+        initializeApp();
+    }, [fetchArchive]);
 
     const handleLoadPlan = useCallback((id: string) => {
         const planToLoad = loadPlanFromArchive(id);
