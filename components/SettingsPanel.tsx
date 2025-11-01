@@ -27,6 +27,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
     });
   };
   
+  const handlePersonStep = (amount: number) => {
+    const currentPersons = settings.persons || 1;
+    let newPersons = currentPersons + amount;
+    if (newPersons < 1) {
+        newPersons = 1;
+    }
+    onSettingsChange({ ...settings, persons: newPersons });
+  };
+
+  const handlePersonBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const numValue = parseInt(e.target.value, 10);
+    if (isNaN(numValue) || numValue < 1) {
+        onSettingsChange({ ...settings, persons: 1 });
+    }
+  };
+  
   const handleKcalStep = (amount: number) => {
     const currentKcal = settings.kcal || 1000;
     let newKcal = currentKcal + amount;
@@ -60,7 +76,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
       <div className="space-y-4">
         <div>
           <label htmlFor="persons" className="block text-sm font-medium text-slate-700">Anzahl Personen</label>
-          <input type="number" name="persons" id="persons" value={settings.persons} onChange={handleChange} min="1" className={inputStyles} />
+          <div className="flex items-center mt-1">
+                <button type="button" onClick={() => handlePersonStep(-1)} className={`${stepButtonStyles} rounded-l-md h-10`} aria-label="Anzahl Personen um 1 verringern">−</button>
+                <input 
+                    type="number" 
+                    name="persons" 
+                    id="persons" 
+                    value={settings.persons === 0 ? '' : settings.persons} 
+                    onChange={handleChange} 
+                    onBlur={handlePersonBlur}
+                    step="1" 
+                    min="1" 
+                    className="w-full text-center appearance-none bg-white text-slate-900 border-t border-b border-slate-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 focus:z-10 sm:text-sm h-10"
+                    style={{ MozAppearance: 'textfield' }}
+                />
+                <button type="button" onClick={() => handlePersonStep(1)} className={`${stepButtonStyles} rounded-r-md h-10`} aria-label="Anzahl Personen um 1 erhöhen">+</button>
+            </div>
         </div>
         <div>
             <label htmlFor="kcal" className="block text-sm font-medium text-slate-700">Kcal pro Tag/Person</label>
