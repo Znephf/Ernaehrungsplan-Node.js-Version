@@ -27,12 +27,31 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
     });
   };
   
+  const handleKcalStep = (amount: number) => {
+    const currentKcal = settings.kcal || 1000;
+    let newKcal = currentKcal + amount;
+    if (newKcal < 1000) {
+        newKcal = 1000;
+    }
+    onSettingsChange({ ...settings, kcal: newKcal });
+  };
+
+  const handleKcalBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const numValue = parseInt(e.target.value, 10);
+    if (!isNaN(numValue) && numValue < 1000) {
+        onSettingsChange({ ...settings, kcal: 1000 });
+    } else if (e.target.value === '' || isNaN(numValue)) {
+        onSettingsChange({ ...settings, kcal: 1000 });
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onGeneratePlan();
   };
 
   const inputStyles = "mt-1 block w-full bg-white text-slate-900 rounded-md border-slate-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm";
+  const stepButtonStyles = "px-4 bg-slate-200 text-slate-700 font-bold border border-slate-300 hover:bg-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:z-10 transition-colors";
 
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -44,8 +63,23 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
           <input type="number" name="persons" id="persons" value={settings.persons} onChange={handleChange} min="1" className={inputStyles} />
         </div>
         <div>
-          <label htmlFor="kcal" className="block text-sm font-medium text-slate-700">Kcal pro Tag/Person</label>
-          <input type="number" name="kcal" id="kcal" value={settings.kcal} onChange={handleChange} step="50" min="1000" className={inputStyles} />
+            <label htmlFor="kcal" className="block text-sm font-medium text-slate-700">Kcal pro Tag/Person</label>
+            <div className="flex items-center mt-1">
+                <button type="button" onClick={() => handleKcalStep(-50)} className={`${stepButtonStyles} rounded-l-md h-10`} aria-label="Kalorien um 50 verringern">−</button>
+                <input 
+                    type="number" 
+                    name="kcal" 
+                    id="kcal" 
+                    value={settings.kcal === 0 ? '' : settings.kcal} 
+                    onChange={handleChange} 
+                    onBlur={handleKcalBlur}
+                    step="50" 
+                    min="1000" 
+                    className="w-full text-center appearance-none bg-white text-slate-900 border-t border-b border-slate-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 focus:z-10 sm:text-sm h-10"
+                    style={{ MozAppearance: 'textfield' }} // Spinner auf Firefox ausblenden
+                />
+                <button type="button" onClick={() => handleKcalStep(50)} className={`${stepButtonStyles} rounded-r-md h-10`} aria-label="Kalorien um 50 erhöhen">+</button>
+            </div>
         </div>
       </div>
 
