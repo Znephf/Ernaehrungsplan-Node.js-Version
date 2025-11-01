@@ -71,7 +71,7 @@ router.put('/archive/image', async (req, res) => {
         // Base64-Daten in eine Datei umwandeln
         const base64Data = imageUrl.split(';base64,').pop();
         const imageBuffer = Buffer.from(base64Data, 'base64');
-        const fileName = `${crypto.randomUUID()}.jpg`;
+        const fileName = `${crypto.randomBytes(16).toString('hex')}.jpg`;
         const filePath = path.join(publicImagesDir, fileName);
         
         fs.writeFileSync(filePath, imageBuffer);

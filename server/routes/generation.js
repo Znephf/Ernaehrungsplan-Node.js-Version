@@ -11,7 +11,7 @@ router.post('/generate-plan-job', async (req, res) => {
      if (!payload.settings) {
         return res.status(400).json({ error: 'Einstellungen fehlen in der Anfrage.' });
     }
-    const jobId = crypto.randomUUID();
+    const jobId = crypto.randomBytes(16).toString('hex');
     try {
         await pool.query('INSERT INTO generation_jobs (jobId, payload) VALUES (?, ?)', [jobId, JSON.stringify(payload)]);
         

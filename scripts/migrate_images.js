@@ -85,7 +85,7 @@ async function migrateImages() {
                         
                         const fileExtension = url.substring("data:image/".length, url.indexOf(";base64")) === 'jpeg' ? 'jpg' : 'png';
                         // We'll save as jpg for consistency and smaller size
-                        const fileName = `${crypto.randomUUID()}.jpg`;
+                        const fileName = `${crypto.randomBytes(16).toString('hex')}.jpg`;
                         const filePath = path.join(imagesDir, fileName);
                         const fileUrl = `/images/recipes/${fileName}`;
                         
