@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import type { ArchiveEntry } from '../types';
 import * as apiService from '../services/apiService';
@@ -15,7 +14,7 @@ export const useArchive = () => {
         }
     }, []);
     
-    const deletePlanFromArchive = useCallback(async (id: string) => {
+    const deletePlanFromArchive = useCallback(async (id: number) => {
         if (window.confirm("Diesen Plan wirklich aus dem Archiv löschen?")) {
             try {
                 await apiService.deletePlan(id);
@@ -27,7 +26,7 @@ export const useArchive = () => {
         }
     }, [fetchArchive]);
 
-    const loadPlanFromArchive = useCallback((id: string): ArchiveEntry | null => {
+    const loadPlanFromArchive = useCallback((id: number): ArchiveEntry | null => {
         return archive.find(entry => entry.id === id) || null;
     }, [archive]);
     

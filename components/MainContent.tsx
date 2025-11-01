@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { View, ArchiveEntry, Recipe, Recipes } from '../types';
 import ShoppingListComponent from './ShoppingList';
@@ -14,10 +13,10 @@ interface MainContentProps {
     loadingImages: Set<string>;
     imageErrors: { [key: string]: string | null };
     onSelectRecipe: (day: string) => void;
-    onLoadPlan: (id: string) => void;
-    onDeletePlan: (id: string) => void;
-    onGenerateImage: (recipe: Recipe, planId: string | null) => Promise<void>;
-    onGenerateMissingImages: (recipes: Recipe[], planId: string | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
+    onLoadPlan: (id: number) => void;
+    onDeletePlan: (id: number) => void;
+    onGenerateImage: (recipe: Recipe, planId: number | null) => Promise<void>;
+    onGenerateMissingImages: (recipes: Recipe[], planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
 }
 
 const MainContent: React.FC<MainContentProps> = ({

@@ -1,4 +1,3 @@
-
 import type { ArchiveEntry, PlanSettings, Recipe } from '../types';
 
 // --- Auth Service ---
@@ -43,7 +42,7 @@ export const getArchive = async (): Promise<ArchiveEntry[]> => {
     return response.json();
 };
 
-export const deletePlan = async (id: string): Promise<{ message: string }> => {
+export const deletePlan = async (id: number): Promise<{ message: string }> => {
     const response = await fetch(`/api/archive/${id}`, { method: 'DELETE' });
     if (!response.ok) {
         throw new Error('Failed to delete plan');
@@ -52,7 +51,7 @@ export const deletePlan = async (id: string): Promise<{ message: string }> => {
 };
 
 // Sends base64, expects back the new file URL
-export const saveImageUrl = async (planId: string, day: string, imageUrl: string): Promise<{ message: string, imageUrl: string }> => {
+export const saveImageUrl = async (planId: number, day: string, imageUrl: string): Promise<{ message: string, imageUrl: string }> => {
     const response = await fetch('/api/archive/image', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -109,7 +108,7 @@ export const generateImage = async (recipe: Recipe, attempt: number): Promise<{ 
 
 // --- Job Service (for Sharing etc.) ---
 
-export const startShareJob = async (planId: string): Promise<{ jobId: string }> => {
+export const startShareJob = async (planId: number): Promise<{ jobId: string }> => {
     const response = await fetch('/api/jobs/share', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

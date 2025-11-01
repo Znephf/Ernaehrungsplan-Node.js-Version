@@ -98,7 +98,6 @@ async function processShareJob(jobId) {
             ...(typeof row.planData === 'string' ? JSON.parse(row.planData) : row.planData),
         };
 
-        // 1. Prüfen, ob bereits ein Link existiert
         if (plan.shareId) {
             const existingFile = path.join(publicSharesDir, `${plan.shareId}.html`);
             if (fs.existsSync(existingFile)) {
@@ -109,34 +108,43 @@ async function processShareJob(jobId) {
             }
         }
 
-        // 2. Bilder generieren, falls nötig
         const recipesToGenerate = plan.recipes.filter(r => !(plan.imageUrls && plan.imageUrls[r.day]));
         if (recipesToGenerate.length > 0) {
             for (let i = 0; i < recipesToGenerate.length; i++) {
                 const recipe = recipesToGenerate[i];
-                const progressText = `Generiere Bild ${i + 1} von ${recipesToGenerate.length}: ${recipe.title}`;
+                const progressText = `Generiere Bild ${i + 1}/${recipesToGenerate.length}: ${recipe.title}`;
                 await pool.query('UPDATE app_jobs SET status = "processing", progressText = ? WHERE jobId = ?', [progressText, jobId]);
 
                 const imageResult = await generateImageForRecipe(recipe, 1);
-                const imagePart = imageResult.apiResponse?.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+                const response = imageResult.apiResponse;
+
+                if (response.promptFeedback?.blockReason) {
+                    console.warn(`[Job ${jobId}] Bild-Generierung für "${recipe.title}" blockiert: ${response.promptFeedback.blockReason}. Überspringe.`);
+                    continue;
+                }
+
+                const candidate = response?.candidates?.[0];
+                if (!candidate || (candidate.finishReason && candidate.finishReason !== 'STOP')) {
+                    console.warn(`[Job ${jobId}] Ungültiger Kandidat für "${recipe.title}". Grund: ${candidate?.finishReason || 'unbekannt'}. Überspringe.`);
+                    continue;
+                }
+                
+                const imagePart = candidate.content?.parts?.find(p => p.inlineData);
                 
                 if (imagePart?.inlineData?.data) {
                     const fileUrl = await saveImageAndUpdatePlan(plan.id, recipe.day, imagePart.inlineData.data);
-                    // Den Plan im Speicher aktualisieren, damit der nächste Schritt die URL hat
                     if (!plan.imageUrls) plan.imageUrls = {};
                     plan.imageUrls[recipe.day] = fileUrl;
                 } else {
-                    console.warn(`[Job ${jobId}] Konnte kein Bild für "${recipe.title}" generieren. Überspringe.`);
+                    console.warn(`[Job ${jobId}] Konnte kein Bild für "${recipe.title}" generieren (keine Bilddaten in Antwort). Überspringe.`);
                 }
-                 await new Promise(resolve => setTimeout(resolve, 1000)); // Kurze Pause
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
         
-        // 3. Finalen Link erstellen
         await pool.query('UPDATE app_jobs SET status = "processing", progressText = "Link wird erstellt..." WHERE jobId = ?', [jobId]);
         const finalShareUrl = await createShareLink(plan);
         
-        // 4. Job abschließen
         await pool.query('UPDATE app_jobs SET status = "complete", resultJson = ? WHERE jobId = ?', [JSON.stringify({ shareUrl: finalShareUrl }), jobId]);
         console.log(`[Job ${jobId}] Share-Job erfolgreich abgeschlossen.`);
 

@@ -4,8 +4,8 @@ import { TrashIcon } from './IconComponents';
 
 interface ArchiveComponentProps {
   archive: ArchiveEntry[];
-  onLoadPlan: (id: string) => void;
-  onDeletePlan: (id: string) => void;
+  onLoadPlan: (id: number) => void;
+  onDeletePlan: (id: number) => void;
 }
 
 const dietPreferenceLabels: Record<Diet, string> = {

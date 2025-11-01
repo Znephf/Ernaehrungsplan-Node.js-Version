@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../services/database');
@@ -20,7 +19,7 @@ router.get('/archive', async (req, res) => {
                 }
 
                 return {
-                    id: row.id.toString(),
+                    id: row.id,
                     createdAt: new Date(row.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
                     shareId: row.shareId || null,
                     name: planData.name,

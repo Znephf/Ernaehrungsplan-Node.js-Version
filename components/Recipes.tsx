@@ -7,12 +7,12 @@ import GeneratedRecipeImage from './GeneratedRecipeImage';
 
 interface RecipesComponentProps {
   recipes: Recipes;
-  planId: string | null;
+  planId: number | null;
   imageUrls: { [key: string]: string };
   loadingImages: Set<string>;
   imageErrors: { [key: string]: string | null };
-  generateImage: (recipe: Recipe, planId: string | null) => Promise<void>;
-  generateMissingImages: (recipes: Recipe[], planId: string | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
+  generateImage: (recipe: Recipe, planId: number | null) => Promise<void>;
+  generateMissingImages: (recipes: Recipe[], planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
 }
 
 const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages }) => {

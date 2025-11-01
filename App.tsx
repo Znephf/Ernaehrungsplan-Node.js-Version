@@ -90,7 +90,7 @@ const App: React.FC = () => {
         fetchArchive();
     }, [fetchArchive]);
 
-    const handleLoadPlan = useCallback((id: string) => {
+    const handleLoadPlan = useCallback((id: number) => {
         const planToLoad = loadPlanFromArchive(id);
         if (planToLoad) {
             setPlan(planToLoad);

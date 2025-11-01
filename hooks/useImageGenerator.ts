@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import type { Recipe } from '../types';
 import * as apiService from '../services/apiService';
@@ -53,7 +52,7 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
         return null;
     }, []);
 
-    const generateImage = useCallback(async (recipe: Recipe, planId: string | null) => {
+    const generateImage = useCallback(async (recipe: Recipe, planId: number | null) => {
         if (loadingImages.has(recipe.day) || !planId) return;
 
         setLoadingImages(prev => new Set(prev).add(recipe.day));
@@ -77,7 +76,7 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
 
     }, [loadingImages, executeImageGeneration, onImageSaved]);
 
-    const generateMissingImages = useCallback(async (recipes: Recipe[], planId: string | null, onProgress?: (status: string) => void): Promise<{[key: string]: string}> => {
+    const generateMissingImages = useCallback(async (recipes: Recipe[], planId: number | null, onProgress?: (status: string) => void): Promise<{[key: string]: string}> => {
         const recipesToGenerate = recipes.filter(r => !imageUrls[r.day] && !loadingImages.has(r.day));
         const finalUrls = { ...imageUrls };
 
