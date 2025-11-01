@@ -1,0 +1,80 @@
+
+import React from 'react';
+import type { View, ArchiveEntry, Recipe, Recipes } from '../types';
+import ShoppingListComponent from './ShoppingList';
+import WeeklyPlanComponent from './WeeklyPlan';
+import RecipesComponent from './Recipes';
+import ArchiveComponent from './Archive';
+
+interface MainContentProps {
+    view: View;
+    plan: ArchiveEntry | null;
+    archive: ArchiveEntry[];
+    imageUrls: { [key: string]: string };
+    loadingImages: Set<string>;
+    imageErrors: { [key: string]: string | null };
+    onSelectRecipe: (day: string) => void;
+    onLoadPlan: (id: string) => void;
+    onDeletePlan: (id: string) => void;
+    onGenerateImage: (recipe: Recipe, planId: string | null) => Promise<void>;
+    onGenerateMissingImages: (recipes: Recipe[], planId: string | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
+}
+
+const MainContent: React.FC<MainContentProps> = ({
+    view,
+    plan,
+    archive,
+    imageUrls,
+    loadingImages,
+    imageErrors,
+    onSelectRecipe,
+    onLoadPlan,
+    onDeletePlan,
+    onGenerateImage,
+    onGenerateMissingImages
+}) => {
+
+    const renderView = () => {
+        switch (view) {
+            case 'shopping':
+                return plan ? <ShoppingListComponent shoppingList={plan.shoppingList} /> : null;
+            case 'plan':
+                return plan ? <WeeklyPlanComponent 
+                                weeklyPlan={plan.weeklyPlan} 
+                                planName={plan.name} 
+                                onSelectRecipe={onSelectRecipe}
+                                isGlutenFree={plan.isGlutenFree}
+                                isLactoseFree={plan.isLactoseFree}
+                             /> : null;
+            case 'recipes':
+                return plan ? <RecipesComponent 
+                            recipes={plan.recipes} 
+                            planId={plan.id}
+                            imageUrls={imageUrls}
+                            loadingImages={loadingImages}
+                            imageErrors={imageErrors}
+                            generateImage={onGenerateImage}
+                            generateMissingImages={onGenerateMissingImages}
+                        /> : null;
+            case 'archive':
+                return <ArchiveComponent archive={archive} onLoadPlan={onLoadPlan} onDeletePlan={onDeletePlan} />;
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <>
+            {renderView()}
+
+            {!plan && view !== 'archive' && (
+                <div className="text-center py-16 bg-white rounded-lg shadow-md">
+                    <h2 className="text-2xl font-bold text-slate-700 mb-2">Willkommen beim KI Ernährungsplaner</h2>
+                    <p className="text-slate-500">Erstellen Sie oben einen neuen Plan oder laden Sie einen bestehenden aus dem Archiv.</p>
+                </div>
+            )}
+        </>
+    );
+};
+
+export default MainContent;

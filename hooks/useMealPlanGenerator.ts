@@ -1,5 +1,7 @@
+
 import { useState } from 'react';
 import type { PlanSettings, ArchiveEntry } from '../types';
+import * as apiService from '../services/apiService';
 
 interface GenerationResult {
     success: boolean;
@@ -8,7 +10,6 @@ interface GenerationResult {
 }
 
 export const useMealPlanGenerator = () => {
-    // FIX: The state now holds the complete ArchiveEntry to include settings, not just plan data.
     const [plan, setPlan] = useState<ArchiveEntry | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
@@ -20,33 +21,20 @@ export const useMealPlanGenerator = () => {
         setGenerationStatus('pending');
 
         try {
-            const jobResponse = await fetch('/api/generate-plan-job', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 
-                    settings,
-                    previousPlanRecipes: plan ? plan.recipes : [] 
-                }),
+            const { jobId } = await apiService.startPlanGenerationJob({ 
+                settings,
+                previousPlanRecipes: plan ? plan.recipes : [] 
             });
 
-            if (!jobResponse.ok) {
-                const errorData = await jobResponse.json();
-                throw new Error(errorData.error || `Serverfehler: ${jobResponse.statusText}`);
-            }
-
-            const { jobId } = await jobResponse.json();
-
             return new Promise((resolve) => {
-                const pollInterval = 5000; // 5 Sekunden
+                const pollInterval = 5000;
                 let attempts = 0;
-                const maxAttempts = (10 * 60 * 1000) / pollInterval; // 10 Minuten Timeout
+                const maxAttempts = 120; // 10 Minuten Timeout
 
                 const intervalId = setInterval(async () => {
                     if (attempts++ > maxAttempts) {
                         clearInterval(intervalId);
-                        setError('Die Anfrage hat zu lange gedauert und wurde abgebrochen.');
+                        setError('Die Anfrage hat zu lange gedauert.');
                         setIsLoading(false);
                         setGenerationStatus('idle');
                         resolve({ success: false, newPlan: null, newPlanId: null });
@@ -54,13 +42,7 @@ export const useMealPlanGenerator = () => {
                     }
 
                     try {
-                        const statusResponse = await fetch(`/api/job-status/${jobId}`);
-                        if (!statusResponse.ok) {
-                           console.warn(`Job-Status-Abfrage fehlgeschlagen: ${statusResponse.status}`);
-                           return; 
-                        }
-
-                        const { status, plan: newPlanData, planId, error: jobError } = await statusResponse.json();
+                        const { status, plan: newPlanData, planId, error: jobError } = await apiService.getJobStatus(jobId);
                         setGenerationStatus(status);
 
                         if (status === 'complete') {
@@ -70,26 +52,26 @@ export const useMealPlanGenerator = () => {
                             if (newPlanData) {
                                 resolve({ success: true, newPlan: newPlanData, newPlanId: newPlanData.id });
                             } else {
-                                console.warn('Plan-Generierung erfolgreich, aber Plandaten fehlten. Refetch wird benötigt.');
+                                console.warn('Plan-Generierung erfolgreich, aber Plandaten fehlten.');
                                 resolve({ success: true, newPlan: null, newPlanId: planId });
                             }
                         }
 
                         if (status === 'error') {
                             clearInterval(intervalId);
-                            setError(`Der Ernährungsplan konnte nicht erstellt werden: ${jobError}`);
+                            setError(`Plan konnte nicht erstellt werden: ${jobError}`);
                             setIsLoading(false);
                             setGenerationStatus('idle');
                             resolve({ success: false, newPlan: null, newPlanId: null });
                         }
                     } catch (pollError) {
-                        console.warn("Netzwerkfehler beim Abrufen des Job-Status:", pollError);
+                        console.warn("Fehler beim Abrufen des Job-Status:", pollError);
                     }
                 }, pollInterval);
             });
 
         } catch (startJobError) {
-            setError(`Der Generierungs-Job konnte nicht gestartet werden: ${(startJobError as Error).message}`);
+            setError(`Job konnte nicht gestartet werden: ${(startJobError as Error).message}`);
             setIsLoading(false);
             setGenerationStatus('idle');
             return { success: false, newPlan: null, newPlanId: null };

@@ -1,5 +1,7 @@
+
 import { useState, useCallback } from 'react';
 import type { Recipe } from '../types';
+import * as apiService from '../services/apiService';
 
 export const useImageGenerator = (onImageSaved?: () => void) => {
     const [imageUrls, setImageUrls] = useState<{ [key: string]: string }>({});
@@ -12,23 +14,9 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
         
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                const rawApiResponse = await fetch('/api/generate-image', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ recipe, attempt })
-                });
+                const { apiResponse, debug } = await apiService.generateImage(recipe, attempt);
 
-                if (!rawApiResponse.ok) {
-                    const errorData = await rawApiResponse.json();
-                    throw new Error(errorData.error || `Serverfehler: ${rawApiResponse.statusText}`);
-                }
-                
-                const { apiResponse, debug } = await rawApiResponse.json();
-
-                console.groupCollapsed(`[DEBUG] Bild-Generierung für: "${recipe.title}"`);
-                console.log('--- Gesendetes Rezept-Objekt ---');
-                console.log(recipe);
-                console.log(`--- Prompt (Versuch ${attempt}) ---`);
+                console.groupCollapsed(`[DEBUG] Bild-Generierung für: "${recipe.title}" (Versuch ${attempt})`);
                 console.log(debug.imagePrompt);
                 console.groupEnd();
 
@@ -37,10 +25,7 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
                 }
 
                 const candidate = apiResponse?.candidates?.[0];
-                if (!candidate) {
-                    throw new Error("Keine Bild-Vorschläge von der API erhalten.");
-                }
-
+                if (!candidate) throw new Error("Keine Bild-Vorschläge erhalten.");
                 if (candidate.finishReason && candidate.finishReason !== 'STOP') {
                     if (candidate.finishReason === 'SAFETY') throw new Error("Aus Sicherheitsgründen blockiert.");
                     throw new Error(`Generierung gestoppt: ${candidate.finishReason}`);
@@ -48,38 +33,26 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
 
                 const imagePart = candidate.content?.parts?.find((p: any) => p.inlineData);
                 if (imagePart?.inlineData) {
-                    const base64ImageBytes: string = imagePart.inlineData.data;
-                    const url = `data:image/png;base64,${base64ImageBytes}`;
+                    const url = `data:image/png;base64,${imagePart.inlineData.data}`;
                     setImageUrls(prev => ({ ...prev, [recipe.day]: url }));
-                    setLoadingImages(prev => {
-                        const newSet = new Set(prev);
-                        newSet.delete(recipe.day);
-                        return newSet;
-                    });
+                    setLoadingImages(prev => { const newSet = new Set(prev); newSet.delete(recipe.day); return newSet; });
                     return url;
                 } else {
                     throw new Error("Antwort enthält keine Bilddaten.");
                 }
             } catch (e) {
                 lastKnownError = e as Error;
-                console.warn(`Bildgenerierungsversuch ${attempt} für "${recipe.title}" fehlgeschlagen:`, e);
+                console.warn(`Bildgenerierungsversuch ${attempt} fehlgeschlagen:`, e);
                 const errorMsg = (lastKnownError.message || '').toLowerCase();
-                // Stop retrying on safety blocks OR quota errors to avoid unnecessary calls
                 if (errorMsg.includes('blockiert') || errorMsg.includes('sicherheit') || errorMsg.includes('quota')) {
                     break;
                 }
             }
         }
 
-        // The server now sends a user-friendly message, so we can use it directly.
-        const finalErrorMessage = lastKnownError?.message || "Ein unbekannter Fehler ist aufgetreten.";
+        const finalErrorMessage = lastKnownError?.message || "Unbekannter Fehler.";
         setImageErrors(prev => ({ ...prev, [recipe.day]: `Fehler: ${finalErrorMessage}` }));
-        setLoadingImages(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(recipe.day);
-            return newSet;
-        });
-
+        setLoadingImages(prev => { const newSet = new Set(prev); newSet.delete(recipe.day); return newSet; });
         return null;
     }, []);
 
@@ -93,17 +66,10 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
 
         if (newImageUrl) {
             try {
-                const response = await fetch('/api/archive/image', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ planId, day: recipe.day, imageUrl: newImageUrl })
-                });
-                if (response.ok && onImageSaved) {
-                    onImageSaved();
-                }
+                await apiService.saveImageUrl(planId, recipe.day, newImageUrl);
+                if (onImageSaved) onImageSaved();
             } catch (e) {
                 console.error("Konnte Bild-URL nicht im Backend speichern:", e);
-                // Optional: UI-Feedback geben, dass Speichern fehlgeschlagen ist.
             }
         }
     }, [loadingImages, executeImageGeneration, onImageSaved]);
@@ -112,15 +78,11 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
         const recipesToGenerate = recipes.filter(r => !imageUrls[r.day] && !loadingImages.has(r.day));
         const finalUrls = { ...imageUrls };
 
-        if (recipesToGenerate.length === 0) {
-            return finalUrls;
-        }
+        if (recipesToGenerate.length === 0) return finalUrls;
         
         for (let i = 0; i < recipesToGenerate.length; i++) {
             const recipe = recipesToGenerate[i];
-            if (onProgress) {
-                onProgress(`Generiere Bild ${i + 1} von ${recipesToGenerate.length}...`);
-            }
+            onProgress?.(`Generiere Bild ${i + 1}/${recipesToGenerate.length}...`);
             
             setLoadingImages(prev => new Set(prev).add(recipe.day));
             setImageErrors(prev => ({ ...prev, [recipe.day]: null }));
@@ -130,26 +92,16 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
                 finalUrls[recipe.day] = newUrl;
                  if (planId) {
                     try {
-                        const response = await fetch('/api/archive/image', {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ planId, day: recipe.day, imageUrl: newUrl })
-                        });
-                        if (response.ok && onImageSaved) {
-                            onImageSaved();
-                        } else if (!response.ok) {
-                            console.warn(`Bild-URL für ${recipe.day} konnte nicht im Backend gespeichert werden. Status: ${response.status}`);
-                        }
+                        await apiService.saveImageUrl(planId, recipe.day, newUrl);
+                        if (onImageSaved) onImageSaved();
                     } catch (e) {
-                        console.error(`Konnte Bild für ${recipe.day} nicht im Backend speichern:`, e);
+                        console.error(`Konnte Bild für ${recipe.day} nicht speichern:`, e);
                     }
                 }
             }
 
             if (i < recipesToGenerate.length - 1) {
-                if (onProgress) {
-                   onProgress(`Warte 3s...`);
-                }
+                onProgress?.(`Warte 3s...`);
                 await new Promise(resolve => setTimeout(resolve, 3000));
             }
         }
@@ -167,7 +119,6 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
         setLoadingImages(new Set());
         setImageErrors({});
     }, []);
-
 
     return { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState, setImageUrlsFromArchive };
 };

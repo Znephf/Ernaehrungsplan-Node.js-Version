@@ -1,3 +1,4 @@
+
 # KI Ernährungsplaner - Deployment auf Plesk VPS
 
 Diese Anleitung beschreibt, wie Sie die KI-Ernährungsplaner-Anwendung auf einem Virtual Private Server (VPS) mit Plesk als Verwaltungsoberfläche bereitstellen.
@@ -7,7 +8,7 @@ Diese Anleitung beschreibt, wie Sie die KI-Ernährungsplaner-Anwendung auf einem
 Die Anwendung besteht aus zwei Hauptteilen:
 
 1.  **Frontend:** Eine in React und TypeScript geschriebene Single-Page-Application (SPA), die mit Vite gebaut wird.
-2.  **Backend:** Ein Node.js-Server mit Express, der als sicherer Proxy für die Google Gemini API dient und die Archiv-Daten in einer MariaDB-Datenbank verwaltet.
+2.  **Backend:** Ein modularisierter Node.js-Server mit Express, der als sicherer Proxy für die Google Gemini API dient und die Archiv-Daten in einer MariaDB-Datenbank verwaltet. Das Backend ist in Routen und Services aufgeteilt, um die Wartbarkeit zu verbessern.
 
 Dieses Setup stellt sicher, dass Ihr API-Schlüssel niemals im Browser offengelegt wird. Ein serverseitiger Passwortschutz sichert die gesamte Anwendung ab.
 
@@ -37,7 +38,7 @@ Stellen Sie sicher, dass auf Ihrem Server die folgenden Komponenten installiert 
 4.  Geben Sie diesem Benutzer alle Berechtigungen (`ALL PRIVILEGES`) für die neu erstellte Datenbank.
 5.  Notieren Sie sich den Datenbanknamen, den Benutzernamen und das Passwort.
 
-Der Node.js-Server wird die benötigte Tabelle (`archived_plans`) beim ersten Start automatisch erstellen.
+Der Node.js-Server wird die benötigten Tabellen (`archived_plans`, `generation_jobs`) beim ersten Start automatisch erstellen.
 
 ## Schritt 2: Code auf den Server laden
 
@@ -75,7 +76,7 @@ Der Node.js-Server wird die benötigte Tabelle (`archived_plans`) beim ersten St
     -   **Anwendungsmodus:** `production`
     -   **Anwendungs-URL:** Wird automatisch angezeigt.
     -   **Anwendungsstamm:** `/var/www/vhosts/ihredomain.de/ernaehrungsplaner` (passen Sie den Pfad an).
-    -   **Anwendungsstartdatei:** `server.js`
+    -   **Anwendungsstartdatei:** `server/index.js` (WICHTIG: Der Pfad hat sich geändert!)
 
 6.  Klicken Sie auf **OK** oder **Speichern**. 
 
@@ -118,7 +119,7 @@ DB_PASSWORD=Ihr_lokales_DB_Passwort
 DB_NAME=ernaehrungsplan
 DB_PORT=3306
 ```
-Die `server.js`-Datei ist so konfiguriert, dass sie diese Datei automatisch liest. Stellen Sie sicher, dass die `.env`-Datei in Ihrer `.gitignore`-Datei aufgeführt ist.
+Die `server/index.js`-Datei ist so konfiguriert, dass sie diese Datei automatisch liest. Stellen Sie sicher, dass die `.env`-Datei in Ihrer `.gitignore`-Datei aufgeführt ist.
 
 ## Fehlerbehebung
 
@@ -126,6 +127,7 @@ Die `server.js`-Datei ist so konfiguriert, dass sie diese Datei automatisch lies
     -   **Prüfen Sie als Erstes die Umgebungsvariablen!** Sind alle sieben erforderlichen Variablen vorhanden und korrekt?
     -   **Überprüfen Sie die Log-Dateien (`stderr`)** auf der Node.js-Verwaltungsseite in Plesk. Der Server gibt dort klare Fehlermeldungen aus, wenn Variablen fehlen oder die Datenbankverbindung fehlschlägt.
     -   **Haben Sie die App nach Änderungen neu gestartet?**
+    -   **Ist der Pfad zur Startdatei korrekt?** Er muss jetzt `server/index.js` lauten.
 
 -   **Fehler "413 Content Too Large" beim Teilen:**
     -   **Problem:** Die generierten Bilder sind zu groß für die Standard-Upload-Limits des Webservers (Nginx/Apache), der vor der Node.js-Anwendung läuft.

@@ -1,4 +1,6 @@
+
 import React, { useState } from 'react';
+import * as apiService from '../services/apiService';
 
 interface LoginComponentProps {
   onLoginSuccess: () => void;
@@ -15,22 +17,10 @@ const LoginComponent: React.FC<LoginComponentProps> = ({ onLoginSuccess }) => {
     setError(null);
 
     try {
-      const response = await fetch('/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ password }),
-      });
-
-      if (response.ok) {
-        onLoginSuccess();
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Ein unbekannter Fehler ist aufgetreten.');
-      }
+      await apiService.login(password);
+      onLoginSuccess();
     } catch (err) {
-      setError('Verbindung zum Server fehlgeschlagen.');
+      setError((err as Error).message || 'Ein unbekannter Fehler ist aufgetreten.');
     } finally {
       setIsLoading(false);
     }

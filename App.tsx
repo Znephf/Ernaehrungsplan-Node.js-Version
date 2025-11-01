@@ -1,20 +1,19 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
-import ShoppingListComponent from './components/ShoppingList';
-import WeeklyPlanComponent from './components/WeeklyPlan';
-import RecipesComponent from './components/Recipes';
-import ArchiveComponent from './components/Archive';
+import Header from './components/Header';
+import MainContent from './components/MainContent';
 import SettingsPanel from './components/SettingsPanel';
 import LoadingOverlay from './components/LoadingOverlay';
 import LoginComponent from './components/Login';
 import ShareModal from './components/ShareModal';
+import { ChevronUpIcon, ChevronDownIcon } from './components/IconComponents';
 import type { View, PlanSettings, ArchiveEntry } from './types';
 import { useArchive } from './hooks/useArchive';
 import { useMealPlanGenerator } from './hooks/useMealPlanGenerator';
 import { useImageGenerator } from './hooks/useImageGenerator';
-import { ChevronUpIcon, ChevronDownIcon, DownloadIcon, LogoutIcon, ShareIcon } from './components/IconComponents';
 import { generateAndDownloadHtml } from './services/htmlExporter';
+import * as apiService from './services/apiService';
 
-// Fix: Define defaultSettings to initialize the settings state.
 const defaultSettings: PlanSettings = {
     persons: 2,
     kcal: 2000,
@@ -28,34 +27,25 @@ const defaultSettings: PlanSettings = {
     customBreakfast: '',
 };
 
-
-// Helper function to compress images before uploading them for sharing.
-// This is crucial to prevent "413 Content Too Large" errors.
 async function compressImageForSharing(base64Url: string, maxWidth = 600, quality = 0.7): Promise<string> {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
             const canvas = document.createElement('canvas');
             const ratio = img.width / img.height;
-            const width = Math.min(img.width, maxWidth);
-            const height = width / ratio;
-            canvas.width = width;
-            canvas.height = height;
+            canvas.width = Math.min(img.width, maxWidth);
+            canvas.height = canvas.width / ratio;
             const ctx = canvas.getContext('2d');
-            if (!ctx) return reject(new Error('Konnte Canvas-Kontext nicht abrufen'));
-            
-            // Fill background with white for JPG to avoid black backgrounds from transparency
+            if (!ctx) return reject(new Error('Canvas-Kontext nicht abrufbar'));
             ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, width, height);
-            
-            ctx.drawImage(img, 0, 0, width, height);
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             resolve(canvas.toDataURL('image/jpeg', quality));
         };
         img.onerror = (err) => reject(err);
         img.src = base64Url;
     });
 }
-
 
 const App: React.FC = () => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -67,27 +57,21 @@ const App: React.FC = () => {
     
     const [isDownloading, setIsDownloading] = useState(false);
     const [downloadStatus, setDownloadStatus] = useState('Speichern');
-
     const [isSharing, setIsSharing] = useState(false);
     const [shareStatus, setShareStatus] = useState('Teilen');
     const [shareUrl, setShareUrl] = useState<string | null>(null);
 
-
     const { archive, deletePlanFromArchive, loadPlanFromArchive, fetchArchive, updatePlanInArchive } = useArchive();
     const { plan, setPlan, isLoading, error, generateNewPlan, generationStatus } = useMealPlanGenerator();
     const { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState, setImageUrlsFromArchive } = useImageGenerator(fetchArchive);
-
-    const currentPlanId = plan ? plan.id : null;
     
     useEffect(() => {
         const checkAuth = async () => {
             try {
-                const response = await fetch('/api/check-auth');
-                if (response.ok) {
-                    setIsAuthenticated(true);
-                }
+                await apiService.checkAuth();
+                setIsAuthenticated(true);
             } catch (error) {
-                console.error("Authentifizierungsprüfung fehlgeschlagen:", error);
+                console.error("Nicht authentifiziert.");
             } finally {
                 setIsAuthLoading(false);
             }
@@ -101,35 +85,26 @@ const App: React.FC = () => {
             setPlan(planToLoad);
             setImageUrlsFromArchive(planToLoad.imageUrls || {});
             setCurrentView('plan');
-            // Scroll to top to see the new plan
             window.scrollTo(0, 0);
         }
     }, [loadPlanFromArchive, setPlan, setImageUrlsFromArchive]);
 
     const handleGenerateRequest = async () => {
         const result = await generateNewPlan(panelSettings);
-    
         if (result.success) {
             if (result.newPlan) {
-                // BEST CASE: We got the full plan data directly.
-                // Load it into state, bypassing the archive fetch race condition.
                 setPlan(result.newPlan); 
                 setImageUrlsFromArchive(result.newPlan.imageUrls || {});
                 setCurrentView('plan');
                 window.scrollTo(0, 0);
-    
-                // Update the archive list in the background for the archive view.
                 fetchArchive();
-    
             } else if (result.newPlanId) {
-                // FALLBACK: We only got an ID. Use the old (potentially racy) logic.
-                console.warn("Fallback-Logik wird verwendet, um den Plan zu laden. Dies könnte fehlschlagen.");
+                console.warn("Fallback-Logik wird verwendet, um den Plan zu laden.");
                 resetImageState(); 
                 await fetchArchive(); 
                 handleLoadPlan(result.newPlanId);
             }
         }
-        // Error is handled by the hook and displayed in the UI already.
     };
 
     const handleSelectRecipe = (day: string) => {
@@ -154,11 +129,8 @@ const App: React.FC = () => {
         if (!plan || isDownloading) return;
         setIsDownloading(true);
         setDownloadStatus('Prüfe Bilder...');
-        
         const finalImageUrls = await generateMissingImages(plan.recipes, plan.id, setDownloadStatus);
-        
         setDownloadStatus('Erstelle Datei...');
-
         try {
             await generateAndDownloadHtml(plan, finalImageUrls);
         } catch (err) {
@@ -172,72 +144,61 @@ const App: React.FC = () => {
 
     const handleShare = async () => {
         if (!plan || isSharing) return;
-
-        // The client-side check is removed. The server will now be the single source of truth.
-        // It will check if a link exists and return it, or create a new one.
-        // This makes the logic more robust against client-side state issues.
-
         setIsSharing(true);
-        setShareStatus('Prüfe Bilder...');
-    
-        const finalImageUrls = await generateMissingImages(plan.recipes, plan.id, setShareStatus);
-        
-        setShareStatus('Komprimiere Bilder...');
-        
-        const compressedImageUrls: { [key: string]: string } = {};
-        const imageCompressionPromises = Object.keys(finalImageUrls).map(async day => {
-            const url = finalImageUrls[day];
-            if (url && url.startsWith('data:image/')) {
-                try {
-                    compressedImageUrls[day] = await compressImageForSharing(url);
-                } catch (e) {
-                    console.error(`Konnte Bild für ${day} nicht komprimieren, verwende Original:`, e);
-                    compressedImageUrls[day] = url; // Fallback to original if compression fails
-                }
-            } else {
-                compressedImageUrls[day] = url; // Keep non-base64 URLs (if any)
-            }
-        });
-        
-        await Promise.all(imageCompressionPromises);
-    
-        setShareStatus('Link erstellen...');
     
         try {
-            const response = await fetch('/api/share-plan', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan, imageUrls: compressedImageUrls }) // Send compressed images
-            });
-    
-            if (!response.ok) {
-                 if (response.status === 413) {
-                    throw new Error("Die Datenmenge des Plans (insbesondere die Bilder) ist zu groß für die aktuellen Server-Einstellungen. Bitte kontaktieren Sie den Administrator, um das Upload-Limit zu erhöhen (siehe README).");
-                }
-                let errorData;
-                const contentType = response.headers.get("content-type");
-                if (contentType && contentType.indexOf("application/json") !== -1) {
-                    errorData = await response.json();
-                } else {
-                    errorData = { error: `Serverfehler: ${response.status} ${response.statusText}` };
-                }
-                throw new Error(errorData.error || 'Unbekannter Serverfehler beim Erstellen des Links.');
-            }
-    
-            const data = await response.json();
-            const fullUrl = `${window.location.origin}${data.shareUrl}`;
+            setShareStatus('Prüfe Link...');
+            const existingLink = await apiService.checkShareLink(plan.id);
+            const fullUrl = `${window.location.origin}${existingLink.shareUrl}`;
             setShareUrl(fullUrl);
-
-            // Update local state with the new shareId to prevent re-sharing
-            if (plan.shareId !== data.shareId) {
-                const updatedPlan = { ...plan, shareId: data.shareId };
-                setPlan(updatedPlan);
-                updatePlanInArchive(updatedPlan);
-            }
+            setShareStatus('Teilen');
+            setIsSharing(false);
+            return; 
     
-        } catch (err) {
-            console.error("Fehler beim Teilen:", err);
-            alert(`Der Plan konnte nicht geteilt werden: ${(err as Error).message}`);
+        } catch (error) {
+            if ((error as Error).message !== 'Not Found') {
+                console.error("Fehler beim Prüfen des Share-Links:", error);
+                alert(`Der Plan konnte nicht geteilt werden: ${(error as Error).message}`);
+                setIsSharing(false);
+                setShareStatus('Teilen');
+                return;
+            }
+            
+            // Link nicht gefunden, also neuen erstellen
+            try {
+                setShareStatus('Prüfe Bilder...');
+                const finalImageUrls = await generateMissingImages(plan.recipes, plan.id, setShareStatus);
+                
+                setShareStatus('Komprimiere Bilder...');
+                const compressedImageUrls: { [key: string]: string } = {};
+                await Promise.all(Object.keys(finalImageUrls).map(async day => {
+                    const url = finalImageUrls[day];
+                    if (url && url.startsWith('data:image/')) {
+                         try {
+                            compressedImageUrls[day] = await compressImageForSharing(url);
+                        } catch (e) {
+                            console.error(`Konnte Bild für ${day} nicht komprimieren:`, e);
+                            compressedImageUrls[day] = url;
+                        }
+                    } else {
+                        compressedImageUrls[day] = url;
+                    }
+                }));
+            
+                setShareStatus('Link erstellen...');
+                const data = await apiService.createShareLink(plan, compressedImageUrls);
+                const fullUrl = `${window.location.origin}${data.shareUrl}`;
+                setShareUrl(fullUrl);
+    
+                if (plan.shareId !== data.shareId) {
+                    const updatedPlan = { ...plan, shareId: data.shareId };
+                    setPlan(updatedPlan);
+                    updatePlanInArchive(updatedPlan);
+                }
+            } catch (creationError) {
+                 console.error("Fehler beim Teilen:", creationError);
+                 alert(`Der Plan konnte nicht geteilt werden: ${(creationError as Error).message}`);
+            }
         } finally {
             setIsSharing(false);
             setShareStatus('Teilen');
@@ -246,41 +207,11 @@ const App: React.FC = () => {
 
     const handleLogout = async () => {
         try {
-            await fetch('/logout', { method: 'POST' });
-            // The reload will trigger the auth check again, showing the login screen.
+            await apiService.logout();
             window.location.reload();
         } catch (error) {
             console.error('Fehler beim Abmelden:', error);
-            alert('Abmeldung fehlgeschlagen. Bitte versuchen Sie, die Seite neu zu laden.');
-        }
-    };
-
-    const renderView = () => {
-        switch (currentView) {
-            case 'shopping':
-                return plan ? <ShoppingListComponent shoppingList={plan.shoppingList} /> : null;
-            case 'plan':
-                return plan ? <WeeklyPlanComponent 
-                                weeklyPlan={plan.weeklyPlan} 
-                                planName={plan.name} 
-                                onSelectRecipe={handleSelectRecipe}
-                                isGlutenFree={plan.isGlutenFree}
-                                isLactoseFree={plan.isLactoseFree}
-                             /> : null;
-            case 'recipes':
-                return plan ? <RecipesComponent 
-                            recipes={plan.recipes} 
-                            planId={currentPlanId}
-                            imageUrls={imageUrls}
-                            loadingImages={loadingImages}
-                            imageErrors={imageErrors}
-                            generateImage={generateImage}
-                            generateMissingImages={generateMissingImages}
-                        /> : null;
-            case 'archive':
-                return <ArchiveComponent archive={archive} onLoadPlan={handleLoadPlan} onDeletePlan={deletePlanFromArchive} />;
-            default:
-                return null;
+            alert('Abmeldung fehlgeschlagen.');
         }
     };
 
@@ -302,66 +233,23 @@ const App: React.FC = () => {
         return <LoginComponent onLoginSuccess={() => setIsAuthenticated(true)} />;
     }
 
-    const NavButton: React.FC<{ view: View; label: string; disabled?: boolean }> = ({ view, label, disabled = false }) => (
-        <button
-            onClick={() => !disabled && setCurrentView(view)}
-            disabled={disabled}
-            className={`px-4 py-2 text-sm sm:text-base font-medium rounded-md transition-colors ${
-                currentView === view
-                ? 'bg-emerald-600 text-white shadow'
-                : 'text-slate-600 hover:bg-slate-200'
-            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-            {label}
-        </button>
-    );
-
     return (
         <div className="bg-slate-100 min-h-screen font-sans">
             {isLoading && <LoadingOverlay status={generationStatus} />}
             {shareUrl && <ShareModal url={shareUrl} onClose={() => setShareUrl(null)} />}
-            <header className="bg-white shadow-md sticky top-0 z-10">
-                <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <h1 className="text-2xl font-bold text-slate-800">
-                        KI Ernährungsplaner
-                    </h1>
-                    <div className="flex flex-wrap items-center justify-center gap-2">
-                        <nav className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 p-1 bg-slate-100 rounded-lg">
-                            <NavButton view="plan" label="Wochenplan" />
-                            <NavButton view="shopping" label="Einkaufsliste" disabled={!plan} />
-                            <NavButton view="recipes" label="Rezepte" disabled={!plan} />
-                            <NavButton view="archive" label="Archiv" />
-                        </nav>
-                        <div className="hidden sm:block h-8 border-l border-slate-300 mx-2"></div>
-                         <button
-                            onClick={handleShare}
-                            disabled={isSharing || !plan}
-                            className="flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed rounded-md transition-colors w-28 text-center"
-                            title="Aktuellen Plan als öffentlichen Link teilen"
-                        >
-                            <ShareIcon />
-                            <span className="hidden sm:inline">{isSharing ? shareStatus : 'Teilen'}</span>
-                        </button>
-                         <button
-                            onClick={handleDownload}
-                            disabled={isDownloading || !plan}
-                            className="flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed rounded-md transition-colors w-28 text-center"
-                            title="Aktuellen Plan als interaktive HTML-Datei speichern"
-                        >
-                            <DownloadIcon />
-                            <span className="hidden sm:inline">{isDownloading ? downloadStatus : 'Speichern'}</span>
-                        </button>
-                         <button
-                            onClick={handleLogout}
-                            className="flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-red-100 hover:text-red-600 rounded-md transition-colors"
-                            title="Abmelden"
-                        >
-                            <LogoutIcon />
-                            <span className="hidden sm:inline">Abmelden</span>
-                        </button>
-                    </div>
-                </div>
-            </header>
+            
+            <Header
+                currentView={currentView}
+                onSetView={setCurrentView}
+                planExists={!!plan}
+                isSharing={isSharing}
+                shareStatus={shareStatus}
+                onShare={handleShare}
+                isDownloading={isDownloading}
+                downloadStatus={downloadStatus}
+                onDownload={handleDownload}
+                onLogout={handleLogout}
+            />
 
             <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {currentView === 'plan' && (
@@ -377,9 +265,7 @@ const App: React.FC = () => {
                         </button>
                         <div
                             id="settings-panel"
-                            className={`grid transition-[grid-template-rows] duration-500 ease-in-out ${
-                                isSettingsVisible ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
-                            }`}
+                            className={`grid transition-[grid-template-rows] duration-500 ease-in-out ${isSettingsVisible ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
                         >
                             <div className="overflow-hidden">
                                 <div className="p-6 pt-0">
@@ -402,14 +288,19 @@ const App: React.FC = () => {
                     </div>
                 )}
                 
-                {renderView()}
-
-                {!plan && currentView !== 'archive' && !isLoading && (
-                    <div className="text-center py-16 bg-white rounded-lg shadow-md">
-                        <h2 className="text-2xl font-bold text-slate-700 mb-2">Willkommen beim KI Ernährungsplaner</h2>
-                        <p className="text-slate-500">Erstellen Sie oben einen neuen Plan oder laden Sie einen bestehenden aus dem Archiv.</p>
-                    </div>
-                )}
+                <MainContent
+                    view={currentView}
+                    plan={plan}
+                    archive={archive}
+                    imageUrls={imageUrls}
+                    loadingImages={loadingImages}
+                    imageErrors={imageErrors}
+                    onSelectRecipe={handleSelectRecipe}
+                    onLoadPlan={handleLoadPlan}
+                    onDeletePlan={deletePlanFromArchive}
+                    onGenerateImage={generateImage}
+                    onGenerateMissingImages={generateMissingImages}
+                />
             </main>
         </div>
     );
