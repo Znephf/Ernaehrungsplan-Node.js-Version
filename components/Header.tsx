@@ -1,7 +1,7 @@
 import React from 'react';
 import type { View } from '../types';
 import { DownloadIcon, LogoutIcon, ShareIcon } from './IconComponents';
-
+ 
 interface HeaderProps {
     currentView: View;
     onSetView: (view: View) => void;
