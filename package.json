@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "start": "node server/index.js",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "migrate:images": "node scripts/migrate_images.js",
+    "migrate:complexity": "node scripts/migrate_complexity.js"
   },
   "dependencies": {
     "@google/genai": "latest",
