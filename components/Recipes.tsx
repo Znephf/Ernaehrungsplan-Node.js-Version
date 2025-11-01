@@ -8,6 +8,7 @@ import GeneratedRecipeImage from './GeneratedRecipeImage';
 interface RecipesComponentProps {
   recipes: Recipes;
   planId: number | null;
+  persons: number;
   imageUrls: { [key: string]: string };
   loadingImages: Set<string>;
   imageErrors: { [key: string]: string | null };
@@ -15,7 +16,7 @@ interface RecipesComponentProps {
   generateMissingImages: (recipes: Recipe[], planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
 }
 
-const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages }) => {
+const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, persons, imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages }) => {
   const [isCreatingPdf, setIsCreatingPdf] = useState(false);
   const [pdfStatus, setPdfStatus] = useState('');
   const [isPdfGenerationQueued, setIsPdfGenerationQueued] = useState(false);
@@ -141,7 +142,7 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, planId, im
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="text-center sm:text-left">
           <h2 className="text-2xl font-bold text-slate-700">Kochanleitungen für das Abendessen</h2>
-          <p className="text-slate-500">Alle Rezepte sind für 2 Personen ausgelegt.</p>
+          <p className="text-slate-500">Alle Rezepte sind für {persons} Personen ausgelegt.</p>
         </div>
         <button
           onClick={handleCreatePdf}

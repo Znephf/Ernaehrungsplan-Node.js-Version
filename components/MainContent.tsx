@@ -47,6 +47,7 @@ const MainContent: React.FC<MainContentProps> = ({
                 return plan ? <RecipesComponent 
                             recipes={plan.recipes} 
                             planId={plan.id}
+                            persons={plan.persons}
                             imageUrls={imageUrls}
                             loadingImages={loadingImages}
                             imageErrors={imageErrors}
