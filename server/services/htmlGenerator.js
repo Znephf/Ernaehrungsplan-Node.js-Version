@@ -1,4 +1,7 @@
 
+const fs = require('fs');
+const path = require('path');
+
 const escapeHtml = (unsafe) => {
     if (typeof unsafe !== 'string') return '';
     return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
@@ -11,7 +14,36 @@ const Icons = {
     fat: `<svg class="h-6 w-6 text-emerald-600" stroke-width="1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.002 9.002 0 008.485-6.132l-1.39-1.39a2.25 2.25 0 00-3.182 0l-1.09 1.09a2.25 2.25 0 01-3.182 0l-1.09-1.09a2.25 2.25 0 00-3.182 0L2.514 14.868A9.002 9.002 0 0012 21zM5.334 12.793a9.002 9.002 0 0113.332 0" /></svg>`,
 };
 
-function generateShareableHtml(plan, imageUrls) {
+// New helper function to read an image file and convert it to a base64 data URL
+const imageFileToBase64 = (filePath) => {
+    try {
+        const fullPath = path.join(__dirname, '..', '..', 'public', filePath);
+        if (!fs.existsSync(fullPath)) {
+            console.warn(`Image file not found at: ${fullPath}`);
+            return null;
+        }
+        const fileBuffer = fs.readFileSync(fullPath);
+        const mimeType = path.extname(filePath) === '.png' ? 'image/png' : 'image/jpeg';
+        return `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
+    } catch (error) {
+        console.error(`Error reading image file ${filePath}:`, error);
+        return null;
+    }
+};
+
+async function generateShareableHtml(plan, imageUrls) {
+    // Convert all image file paths to base64 for embedding
+    const embeddedImageUrls = {};
+    for (const day in imageUrls) {
+        const url = imageUrls[day];
+        if (url && url.startsWith('/')) { // Check if it's a file path
+            embeddedImageUrls[day] = imageFileToBase64(url);
+        } else {
+            embeddedImageUrls[day] = url; // Keep it if it's already base64 or external
+        }
+    }
+
+
     const weeklyPlanHtml = `
     <div class="space-y-8">
         <h2 class="text-3xl font-bold text-center text-slate-700">${escapeHtml(plan.name)}</h2>
@@ -68,8 +100,8 @@ function generateShareableHtml(plan, imageUrls) {
       <div class="space-y-12">
         ${plan.recipes.map(recipe => `
           <div id="recipe-${escapeHtml(recipe.day)}" class="bg-white rounded-lg shadow-lg overflow-hidden">
-            ${imageUrls[recipe.day] 
-              ? `<div class="bg-slate-200"><img src="${imageUrls[recipe.day]}" alt="${escapeHtml(recipe.title)}" class="w-full h-auto object-cover aspect-video"/></div>` 
+            ${embeddedImageUrls[recipe.day] 
+              ? `<div class="bg-slate-200"><img src="${embeddedImageUrls[recipe.day]}" alt="${escapeHtml(recipe.title)}" class="w-full h-auto object-cover aspect-video"/></div>` 
               : `<div class="aspect-video bg-slate-200 flex items-center justify-center"><p class="text-slate-500">Kein Bild generiert</p></div>`}
             <div class="p-6">
               <div class="flex flex-wrap items-center justify-between gap-2">

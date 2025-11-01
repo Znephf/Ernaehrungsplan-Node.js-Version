@@ -27,12 +27,16 @@ if (missingVars.length > 0) {
     process.exit(1);
 }
 
-// Erstelle Verzeichnisse für öffentliche Freigaben
+// Erstelle notwendige öffentliche Verzeichnisse
 const publicSharesDir = path.join(__dirname, '..', 'public', 'shares');
-if (!fs.existsSync(publicSharesDir)) {
-    fs.mkdirSync(publicSharesDir, { recursive: true });
-    console.log(`Verzeichnis für geteilte Pläne erstellt unter: ${publicSharesDir}`);
-}
+const publicImagesDir = path.join(__dirname, '..', 'public', 'images', 'recipes');
+[publicSharesDir, publicImagesDir].forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`Verzeichnis erstellt unter: ${dir}`);
+    }
+});
+
 
 // --- App-Setup ---
 const app = express();
@@ -57,7 +61,7 @@ app.use('/api', requireAuth, shareRoutes);
 // ======================================================
 // --- BEREITSTELLUNG DER REACT-APP ---
 // ======================================================
-// Statische Dateien für die geteilten Pläne bereitstellen
+// Statische Dateien für die geteilten Pläne und Bilder bereitstellen
 app.use(express.static(path.join(__dirname, '..', 'public')));
 // Statische Dateien für die gebaute React-App bereitstellen
 app.use(express.static(path.join(__dirname, '..', 'dist')));

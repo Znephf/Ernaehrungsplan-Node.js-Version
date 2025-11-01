@@ -51,14 +51,16 @@ export const deletePlan = async (id: string): Promise<{ message: string }> => {
     return response.json();
 };
 
-export const saveImageUrl = async (planId: string, day: string, imageUrl: string): Promise<{ message: string }> => {
+// Sends base64, expects back the new file URL
+export const saveImageUrl = async (planId: string, day: string, imageUrl: string): Promise<{ message: string, imageUrl: string }> => {
     const response = await fetch('/api/archive/image', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ planId, day, imageUrl }),
     });
     if (!response.ok) {
-        throw new Error('Failed to save image URL');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save image URL');
     }
     return response.json();
 };

@@ -44,11 +44,19 @@ router.post('/share-plan', async (req, res) => {
         }
 
         let shareId = rows[0].shareId;
+        const generateHtml = async () => {
+            try {
+                return await generateShareableHtml(plan, imageUrls);
+            } catch (htmlError) {
+                console.error(`Konnte HTML für shareId ${shareId} nicht erstellen:`, htmlError);
+                throw new Error('Fehler beim Erstellen der HTML-Datei.');
+            }
+        };
         
         if (!shareId) {
             // Fall 1: Es gibt noch keinen Link, also erstellen wir einen neuen.
             shareId = crypto.randomBytes(12).toString('hex');
-            const htmlContent = generateShareableHtml(plan, imageUrls);
+            const htmlContent = await generateHtml();
             const fileName = `${shareId}.html`;
             const filePath = path.join(publicSharesDir, fileName);
 
@@ -70,7 +78,7 @@ router.post('/share-plan', async (req, res) => {
             const filePath = path.join(publicSharesDir, fileName);
             if (!fs.existsSync(filePath)) {
                 console.warn(`Share-Datei für ${shareId} nicht gefunden. Erstelle sie neu.`);
-                const htmlContent = generateShareableHtml(plan, imageUrls);
+                const htmlContent = await generateHtml();
                 fs.writeFileSync(filePath, htmlContent, 'utf-8');
             }
         }

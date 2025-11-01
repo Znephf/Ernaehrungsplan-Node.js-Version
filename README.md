@@ -12,6 +12,8 @@ Die Anwendung besteht aus zwei Hauptteilen:
 
 Dieses Setup stellt sicher, dass Ihr API-Schlüssel niemals im Browser offengelegt wird. Ein serverseitiger Passwortschutz sichert die gesamte Anwendung ab.
 
+**Bildspeicherung:** Generierte Bilder werden als `.jpg`-Dateien im Verzeichnis `public/images/recipes/` auf dem Server gespeichert. In der Datenbank wird nur der Pfad zur Bilddatei hinterlegt, was die Datenbank schlank und performant hält.
+
 ### Verwendete KI-Modelle
 
 -   **Textgenerierung (Pläne, Rezepte, Einkaufslisten):** `gemini-2.5-flash`
@@ -105,21 +107,11 @@ Ihre geheimen Schlüssel und Datenbank-Zugangsdaten müssen sicher als Umgebungs
 1.  Auf der Node.js-Verwaltungsseite in Plesk, klicken Sie auf **App neu starten**. Dies ist nach jeder Änderung der Umgebungsvariablen zwingend erforderlich.
 2.  Besuchen Sie Ihre Domain. Sie sollten nun von der Login-Seite begrüßt werden.
 
-## Lokale Entwicklung (Optional)
+## Backup-Strategie
 
-Um die Anwendung lokal auszuführen, erstellen Sie eine Datei namens `.env` im Hauptverzeichnis. Fügen Sie Ihre Geheimnisse und lokalen DB-Infos in diese Datei ein:
-```
-API_KEY=Ihr_lokaler_API_Schlüssel
-COOKIE_SECRET=Ein_lokaler_zufälliger_String
-APP_PASSWORD=Ein_lokales_Passwort
-
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=Ihr_lokales_DB_Passwort
-DB_NAME=ernaehrungsplan
-DB_PORT=3306
-```
-Die `server/index.js`-Datei ist so konfiguriert, dass sie diese Datei automatisch liest. Stellen Sie sicher, dass die `.env`-Datei in Ihrer `.gitignore`-Datei aufgeführt ist.
+Denken Sie daran, regelmäßige Backups zu erstellen. Sichern Sie dabei:
+1.  **Die MariaDB-Datenbank**, die alle Pläne und Einstellungen enthält.
+2.  **Das Verzeichnis `public/images/recipes/`**, da es alle generierten Bilder enthält.
 
 ## Fehlerbehebung
 
@@ -128,6 +120,9 @@ Die `server/index.js`-Datei ist so konfiguriert, dass sie diese Datei automatisc
     -   **Überprüfen Sie die Log-Dateien (`stderr`)** auf der Node.js-Verwaltungsseite in Plesk. Der Server gibt dort klare Fehlermeldungen aus, wenn Variablen fehlen oder die Datenbankverbindung fehlschlägt.
     -   **Haben Sie die App nach Änderungen neu gestartet?**
     -   **Ist der Pfad zur Startdatei korrekt?** Er muss jetzt `server/index.js` lauten.
+
+-   **Bilder werden nicht angezeigt (404-Fehler):**
+    -   Prüfen Sie die Dateiberechtigungen für das Verzeichnis `public/images/recipes/`. Der Webserver-Benutzer (z.B. `nginx`, `apache`) muss Leserechte haben.
 
 -   **Fehler "413 Content Too Large" beim Teilen:**
     -   **Problem:** Die generierten Bilder sind zu groß für die Standard-Upload-Limits des Webservers (Nginx/Apache), der vor der Node.js-Anwendung läuft.

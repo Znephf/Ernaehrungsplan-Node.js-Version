@@ -27,26 +27,6 @@ const defaultSettings: PlanSettings = {
     customBreakfast: '',
 };
 
-async function compressImageForSharing(base64Url: string, maxWidth = 600, quality = 0.7): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const ratio = img.width / img.height;
-            canvas.width = Math.min(img.width, maxWidth);
-            canvas.height = canvas.width / ratio;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return reject(new Error('Canvas-Kontext nicht abrufbar'));
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', quality));
-        };
-        img.onerror = (err) => reject(err);
-        img.src = base64Url;
-    });
-}
-
 const App: React.FC = () => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -151,9 +131,7 @@ const App: React.FC = () => {
             const existingLink = await apiService.checkShareLink(plan.id);
             const fullUrl = `${window.location.origin}${existingLink.shareUrl}`;
             setShareUrl(fullUrl);
-            setShareStatus('Teilen');
-            setIsSharing(false);
-            return; 
+            return;
     
         } catch (error) {
             if ((error as Error).message !== 'Not Found') {
@@ -169,24 +147,8 @@ const App: React.FC = () => {
                 setShareStatus('Prüfe Bilder...');
                 const finalImageUrls = await generateMissingImages(plan.recipes, plan.id, setShareStatus);
                 
-                setShareStatus('Komprimiere Bilder...');
-                const compressedImageUrls: { [key: string]: string } = {};
-                await Promise.all(Object.keys(finalImageUrls).map(async day => {
-                    const url = finalImageUrls[day];
-                    if (url && url.startsWith('data:image/')) {
-                         try {
-                            compressedImageUrls[day] = await compressImageForSharing(url);
-                        } catch (e) {
-                            console.error(`Konnte Bild für ${day} nicht komprimieren:`, e);
-                            compressedImageUrls[day] = url;
-                        }
-                    } else {
-                        compressedImageUrls[day] = url;
-                    }
-                }));
-            
                 setShareStatus('Link erstellen...');
-                const data = await apiService.createShareLink(plan, compressedImageUrls);
+                const data = await apiService.createShareLink(plan, finalImageUrls);
                 const fullUrl = `${window.location.origin}${data.shareUrl}`;
                 setShareUrl(fullUrl);
     

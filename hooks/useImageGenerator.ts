@@ -8,6 +8,7 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
     const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
     const [imageErrors, setImageErrors] = useState<{ [key: string]: string | null }>({});
     
+    // This function now returns the raw base64 data URL
     const executeImageGeneration = useCallback(async (recipe: Recipe): Promise<string | null> => {
         const maxAttempts = 10;
         let lastKnownError: Error | null = null;
@@ -33,10 +34,7 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
 
                 const imagePart = candidate.content?.parts?.find((p: any) => p.inlineData);
                 if (imagePart?.inlineData) {
-                    const url = `data:image/png;base64,${imagePart.inlineData.data}`;
-                    setImageUrls(prev => ({ ...prev, [recipe.day]: url }));
-                    setLoadingImages(prev => { const newSet = new Set(prev); newSet.delete(recipe.day); return newSet; });
-                    return url;
+                    return `data:image/png;base64,${imagePart.inlineData.data}`;
                 } else {
                     throw new Error("Antwort enthält keine Bilddaten.");
                 }
@@ -52,7 +50,6 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
 
         const finalErrorMessage = lastKnownError?.message || "Unbekannter Fehler.";
         setImageErrors(prev => ({ ...prev, [recipe.day]: `Fehler: ${finalErrorMessage}` }));
-        setLoadingImages(prev => { const newSet = new Set(prev); newSet.delete(recipe.day); return newSet; });
         return null;
     }, []);
 
@@ -62,16 +59,22 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
         setLoadingImages(prev => new Set(prev).add(recipe.day));
         setImageErrors(prev => ({ ...prev, [recipe.day]: null }));
 
-        const newImageUrl = await executeImageGeneration(recipe);
+        const base64ImageUrl = await executeImageGeneration(recipe);
 
-        if (newImageUrl) {
+        if (base64ImageUrl) {
             try {
-                await apiService.saveImageUrl(planId, recipe.day, newImageUrl);
+                // Send the base64 to the backend, which saves it as a file and returns the file URL
+                const { imageUrl: fileUrl } = await apiService.saveImageUrl(planId, recipe.day, base64ImageUrl);
+                setImageUrls(prev => ({ ...prev, [recipe.day]: fileUrl }));
                 if (onImageSaved) onImageSaved();
             } catch (e) {
-                console.error("Konnte Bild-URL nicht im Backend speichern:", e);
+                console.error("Konnte Bild nicht im Backend speichern:", e);
+                setImageErrors(prev => ({ ...prev, [recipe.day]: `Speicherfehler: ${(e as Error).message}` }));
             }
         }
+        
+        setLoadingImages(prev => { const newSet = new Set(prev); newSet.delete(recipe.day); return newSet; });
+
     }, [loadingImages, executeImageGeneration, onImageSaved]);
 
     const generateMissingImages = useCallback(async (recipes: Recipe[], planId: string | null, onProgress?: (status: string) => void): Promise<{[key: string]: string}> => {
@@ -87,18 +90,19 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
             setLoadingImages(prev => new Set(prev).add(recipe.day));
             setImageErrors(prev => ({ ...prev, [recipe.day]: null }));
             
-            const newUrl = await executeImageGeneration(recipe);
-            if (newUrl) {
-                finalUrls[recipe.day] = newUrl;
-                 if (planId) {
-                    try {
-                        await apiService.saveImageUrl(planId, recipe.day, newUrl);
-                        if (onImageSaved) onImageSaved();
-                    } catch (e) {
-                        console.error(`Konnte Bild für ${recipe.day} nicht speichern:`, e);
-                    }
+            const base64Url = await executeImageGeneration(recipe);
+            if (base64Url && planId) {
+                try {
+                    const { imageUrl: fileUrl } = await apiService.saveImageUrl(planId, recipe.day, base64Url);
+                    finalUrls[recipe.day] = fileUrl;
+                    setImageUrls(prev => ({ ...prev, [recipe.day]: fileUrl }));
+                    if (onImageSaved) onImageSaved();
+                } catch (e) {
+                    console.error(`Konnte Bild für ${recipe.day} nicht speichern:`, e);
                 }
             }
+
+             setLoadingImages(prev => { const newSet = new Set(prev); newSet.delete(recipe.day); return newSet; });
 
             if (i < recipesToGenerate.length - 1) {
                 onProgress?.(`Warte 3s...`);
