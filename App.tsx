@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useEffect } from 'react';
 import Header from './components/Header';
 import MainContent from './components/MainContent';
@@ -62,6 +63,11 @@ const App: React.FC = () => {
             }
         };
         initializeApp();
+    }, [fetchArchive]);
+    
+    const handleLoginSuccess = useCallback(() => {
+        setIsAuthenticated(true);
+        fetchArchive(); // Lade das Archiv direkt nach dem erfolgreichen Login
     }, [fetchArchive]);
 
     const handleLoadPlan = useCallback((id: string) => {
@@ -197,7 +203,7 @@ const App: React.FC = () => {
     }
 
     if (!isAuthenticated) {
-        return <LoginComponent onLoginSuccess={() => setIsAuthenticated(true)} />;
+        return <LoginComponent onLoginSuccess={handleLoginSuccess} />;
     }
 
     return (
