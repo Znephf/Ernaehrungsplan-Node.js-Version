@@ -22,7 +22,7 @@ router.get('/archive', async (req, res) => {
                 const settings = typeof row.settings === 'string' ? JSON.parse(row.settings) : row.settings;
                 const planData = typeof row.planData === 'string' ? JSON.parse(row.planData) : row.planData;
                 
-                if (!planData || typeof planData !== 'object' || !planData.name || !Array.isArray(planData.weeklyPlan) || !Array.isArray(planData.recipes) || !Array.isArray(planData.shoppingList)) {
+                if (!planData || typeof planData !== 'object' || !Array.isArray(planData.weeklyPlan) || !Array.isArray(planData.recipes) || !Array.isArray(planData.shoppingList)) {
                     console.warn(`[Archiv] Plan mit ID ${row.id} wird übersprungen, da Plandaten korrupt sind.`);
                     return null;
                 }
@@ -41,7 +41,7 @@ router.get('/archive', async (req, res) => {
                     id: row.id,
                     createdAt: new Date(row.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
                     shareId: row.shareId || null,
-                    name: planData.name,
+                    name: row.name, // Wichtig: Name aus der dedizierten Spalte verwenden
                     ...settings,
                     ...planData
                 };
@@ -93,7 +93,11 @@ router.post('/archive/custom-plan', async (req, res) => {
         return res.status(400).json({ error: 'Unvollständige Plandaten erhalten.' });
     }
 
+    let connection;
     try {
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+
         // 1. Wochenplan erstellen
         const weeklyPlan = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"].map(day => {
             const dinnerEntry = dinners.find(d => d.day === day);
@@ -112,22 +116,20 @@ router.post('/archive/custom-plan', async (req, res) => {
         // 3. Einkaufsliste generieren
         const shoppingList = await generateShoppingListForRecipes(usedRecipes, persons);
 
-        // 4. Plan-Daten und Einstellungen zusammenstellen
+        // 4. Plan-Daten (ohne redundanten Namen) und Einstellungen zusammenstellen
         const planData = {
-            name,
             weeklyPlan,
             recipes: usedRecipes,
             shoppingList,
-            // imageUrls wird bewusst weggelassen, da es jetzt dynamisch geladen wird
         };
 
         const settings = {
             persons: parseInt(persons, 10),
-            kcal: Math.round(weeklyPlan.reduce((sum, day) => sum + day.dinnerCalories, 0) / 7), // Durchschnittliche Kcal
-            dietaryPreference: 'omnivore', // Standard, könnte man ableiten
+            kcal: Math.round(weeklyPlan.reduce((sum, day) => sum + day.dinnerCalories, 0) / 7) || 0,
+            dietaryPreference: 'omnivore',
             dietType: 'balanced',
             dishComplexity: 'simple',
-            isGlutenFree: false, // Standard, könnte man ableiten
+            isGlutenFree: false,
             isLactoseFree: false,
             excludedIngredients: 'Individuell',
             desiredIngredients: 'Individuell',
@@ -136,19 +138,27 @@ router.post('/archive/custom-plan', async (req, res) => {
         };
 
         // 5. In Datenbank speichern
-        const [result] = await pool.query(
+        const [result] = await connection.query(
             'INSERT INTO archived_plans (name, settings, planData) VALUES (?, ?, ?)',
             [name, JSON.stringify(settings), JSON.stringify(planData)]
         );
         const newPlanId = result.insertId;
+
+        await connection.commit();
         
-        // 6. Neuen Plan abrufen und zurückgeben (optional, aber gut für die UI)
-        const [rows] = await pool.query('SELECT * FROM archived_plans WHERE id = ?', [newPlanId]);
+        // 6. Neuen Plan abrufen und zurückgeben, um die UI zu aktualisieren
+        const [rows] = await connection.query('SELECT * FROM archived_plans WHERE id = ?', [newPlanId]);
+        
+        if (rows.length === 0) {
+            throw new Error('Der neu erstellte Plan konnte nicht sofort wiedergefunden werden.');
+        }
+
         const newPlanRow = rows[0];
         const newPlan = {
             id: newPlanRow.id,
             createdAt: new Date(newPlanRow.createdAt).toLocaleString('de-DE'),
             shareId: newPlanRow.shareId,
+            name: newPlanRow.name, // Explizit den Namen aus der DB-Spalte verwenden
             ...JSON.parse(newPlanRow.settings),
             ...JSON.parse(newPlanRow.planData)
         };
@@ -156,8 +166,11 @@ router.post('/archive/custom-plan', async (req, res) => {
         res.status(201).json(newPlan);
 
     } catch (error) {
+        if (connection) await connection.rollback();
         console.error('Fehler beim Speichern des individuellen Plans:', error);
         res.status(500).json({ error: 'Der individuelle Plan konnte nicht gespeichert werden.' });
+    } finally {
+        if (connection) connection.release();
     }
 });
 
