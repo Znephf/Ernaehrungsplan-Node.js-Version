@@ -67,6 +67,7 @@ export interface PlanSettings {
     isGlutenFree: boolean;
     isLactoseFree: boolean;
     includedMeals: MealCategory[];
+    mainMealFocus?: 'lunch' | 'dinner' | 'none';
     // Deprecated fields, kept for backward compatibility with old archive data
     breakfastOption?: 'beeren' | 'walnuss' | 'mandel' | 'custom';
     customBreakfast?: string;

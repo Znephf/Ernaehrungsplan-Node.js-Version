@@ -42,6 +42,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
     onGeneratePlan();
   };
 
+  const showMainMealFocus = (settings.includedMeals || []).includes('lunch') && (settings.includedMeals || []).includes('dinner');
+
   const inputStyles = "mt-1 block w-full bg-white text-slate-900 rounded-md border-slate-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm";
   const stepButtonStyles = "px-4 bg-slate-200 text-slate-700 font-bold border border-slate-300 hover:bg-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:z-10 transition-colors";
 
@@ -128,6 +130,28 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
           ))}
         </div>
       </div>
+
+      {showMainMealFocus && (
+        <div className="pt-2">
+          <label className="block text-sm font-medium text-slate-700">Hauptmahlzeit-Fokus</label>
+          <p className="text-xs text-slate-500 mt-1 mb-2">Wenn Mittag- & Abendessen gewählt sind, welche Mahlzeit soll üppiger ausfallen?</p>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            {(['none', 'lunch', 'dinner'] as const).map(focus => (
+              <label key={focus} className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700">
+                <input
+                  type="radio"
+                  name="mainMealFocus"
+                  value={focus}
+                  checked={(settings.mainMealFocus || 'none') === focus}
+                  onChange={handleChange}
+                  className="h-4 w-4 border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span>{focus === 'none' ? 'Kein Fokus' : (focus === 'lunch' ? 'Mittagessen' : 'Abendessen')}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
       
       {/* Full width rows */}
       <div>

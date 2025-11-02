@@ -44,6 +44,7 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
     }, []);
     
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedMealCategories, setSelectedMealCategories] = useState<Set<MealCategory>>(new Set());
     const [selectedPreferences, setSelectedPreferences] = useState<Set<Diet>>(new Set());
     const [selectedDietTypes, setSelectedDietTypes] = useState<Set<DietType>>(new Set());
     const [selectedComplexities, setSelectedComplexities] = useState<Set<DishComplexity>>(new Set());
@@ -91,15 +92,16 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
     const filteredRecipes = useMemo(() => {
         return allRecipes.filter(recipe => {
             const matchesSearch = !searchTerm.trim() || recipe.title.toLowerCase().includes(searchTerm.toLowerCase().trim());
+            const matchesCategory = selectedMealCategories.size === 0 || selectedMealCategories.has(recipe.category);
             const matchesPreference = selectedPreferences.size === 0 || (recipe.dietaryPreference && selectedPreferences.has(recipe.dietaryPreference));
             const matchesDietType = selectedDietTypes.size === 0 || (recipe.dietType && selectedDietTypes.has(recipe.dietType));
             const matchesComplexity = selectedComplexities.size === 0 || (recipe.dishComplexity && selectedComplexities.has(recipe.dishComplexity));
             const matchesGlutenFree = !filterGlutenFree || !!recipe.isGlutenFree;
             const matchesLactoseFree = !filterLactoseFree || !!recipe.isLactoseFree;
             
-            return matchesSearch && matchesPreference && matchesDietType && matchesComplexity && matchesGlutenFree && matchesLactoseFree;
+            return matchesSearch && matchesCategory && matchesPreference && matchesDietType && matchesComplexity && matchesGlutenFree && matchesLactoseFree;
         });
-    }, [allRecipes, searchTerm, selectedPreferences, selectedDietTypes, selectedComplexities, filterGlutenFree, filterLactoseFree]);
+    }, [allRecipes, searchTerm, selectedMealCategories, selectedPreferences, selectedDietTypes, selectedComplexities, filterGlutenFree, filterLactoseFree]);
     
     const handleFilterToggle = <T extends string>(value: T, currentFilters: Set<T>, setFilters: React.Dispatch<React.SetStateAction<Set<T>>>) => {
         const newFilters = new Set(currentFilters);
@@ -191,6 +193,7 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
         <h2 className="text-2xl font-bold text-slate-700 mb-4">Gerichte-Bibliothek</h2>
         <input type="text" placeholder="Suche..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full rounded-md border-slate-300 mb-4" />
         <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Mahlzeit:</span>{(Object.keys(MealCategoryLabels) as MealCategory[]).map(key => <FilterToggleButton key={key} label={MealCategoryLabels[key]} isSelected={selectedMealCategories.has(key)} onClick={() => handleFilterToggle(key, selectedMealCategories, setSelectedMealCategories)} />)}</div>
             <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Ernährung:</span>{(Object.keys(dietPreferenceLabels) as Diet[]).map(key => <FilterToggleButton key={key} label={dietPreferenceLabels[key]} isSelected={selectedPreferences.has(key)} onClick={() => handleFilterToggle(key,selectedPreferences,setSelectedPreferences)} />)}</div>
             <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Diät-Typ:</span>{(Object.keys(dietTypeLabels) as DietType[]).map(key => <FilterToggleButton key={key} label={dietTypeLabels[key]} isSelected={selectedDietTypes.has(key)} onClick={() => handleFilterToggle(key,selectedDietTypes,setSelectedDietTypes)} />)}</div>
             <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Niveau:</span>{(Object.keys(dishComplexityLabels) as DishComplexity[]).map(key => <FilterToggleButton key={key} label={dishComplexityLabels[key]} isSelected={selectedComplexities.has(key)} onClick={() => handleFilterToggle(key,selectedComplexities,setSelectedComplexities)} />)}</div>

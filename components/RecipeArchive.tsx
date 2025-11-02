@@ -1,10 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import type { Recipe, Diet, DietType, DishComplexity, MealCategory } from '../types';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import type { Recipe, Diet, MealCategory } from '../types';
 import * as apiService from '../services/apiService';
 import { MealCategoryLabels } from '../types';
-import { ProteinIcon, CarbsIcon, FatIcon, ChevronDownIcon } from './IconComponents';
-
-interface RecipeArchiveProps {}
+import RecipeDetailModal from './RecipeDetailModal';
+import { useImageGenerator } from '../hooks/useImageGenerator';
 
 const dietPreferenceLabels: Record<Diet, string> = { omnivore: 'Alles', vegetarian: 'Vegetarisch', vegan: 'Vegan' };
 
@@ -12,16 +11,23 @@ const FilterToggleButton: React.FC<{ label: string; isSelected: boolean; onClick
     <button onClick={onClick} className={`px-3 py-1 text-sm rounded-full transition-colors font-medium whitespace-nowrap ${ isSelected ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-200 text-slate-700 hover:bg-slate-300' }`}>{label}</button>
 );
 
-const RecipeCard: React.FC<{ recipe: Recipe }> = ({ recipe }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-
+const RecipeCard: React.FC<{ recipe: Recipe; onSelect: (recipe: Recipe) => void }> = ({ recipe, onSelect }) => {
     return (
-        <div className="bg-white rounded-xl shadow-md overflow-hidden transition-shadow hover:shadow-lg flex flex-col">
-            {recipe.image_url && (
-                <div className="aspect-video bg-slate-100">
+        <div 
+            className="bg-white rounded-xl shadow-md overflow-hidden transition-shadow hover:shadow-lg flex flex-col cursor-pointer"
+            onClick={() => onSelect(recipe)}
+            role="button"
+            aria-label={`Details für ${recipe.title} anzeigen`}
+        >
+            <div className="aspect-video bg-slate-100 flex items-center justify-center">
+                {recipe.image_url ? (
                     <img src={recipe.image_url} alt={recipe.title} className="w-full h-full object-cover" />
-                </div>
-            )}
+                ) : (
+                    <svg className="w-16 h-16 text-slate-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                    </svg>
+                )}
+            </div>
             <div className="p-5 flex flex-col flex-grow">
                 <p className="text-sm font-semibold text-emerald-600 tracking-wide uppercase">{MealCategoryLabels[recipe.category]}</p>
                 <h3 className="text-xl font-bold text-slate-800 mt-1 flex-grow leading-tight">{recipe.title}</h3>
@@ -30,65 +36,44 @@ const RecipeCard: React.FC<{ recipe: Recipe }> = ({ recipe }) => {
                     {recipe.dietaryPreference && <span className="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-1 rounded-full capitalize">{recipe.dietaryPreference === 'omnivore' ? 'Alles' : recipe.dietaryPreference}</span>}
                 </div>
             </div>
-
-            <div className={`transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
-                <div className="px-5 pb-5 pt-2 space-y-4">
-                     {recipe.protein !== undefined && (
-                        <div className="flex justify-around items-start text-center gap-x-2 gap-y-1 text-slate-600 p-2 bg-slate-50 rounded-lg">
-                             <span className="flex flex-col items-center text-xs space-y-1">
-                                <ProteinIcon className="h-5 w-5 text-emerald-600" />
-                                <span className="font-bold">{recipe.protein}g</span>
-                                <span className="text-slate-500 text-xs">Protein</span>
-                            </span>
-                             <span className="flex flex-col items-center text-xs space-y-1">
-                                <CarbsIcon className="h-5 w-5 text-emerald-600" />
-                                <span className="font-bold">{recipe.carbs}g</span>
-                                <span className="text-slate-500 text-xs">Kohlenh.</span>
-                            </span>
-                             <span className="flex flex-col items-center text-xs space-y-1">
-                                <FatIcon className="h-5 w-5 text-emerald-600" />
-                                <span className="font-bold">{recipe.fat}g</span>
-                                <span className="text-slate-500 text-xs">Fett</span>
-                            </span>
-                        </div>
-                    )}
-                    <div>
-                        <h4 className="font-semibold text-slate-700 text-sm mb-1">Zutaten:</h4>
-                        <ul className="space-y-1 list-disc list-inside text-slate-600 text-sm">{(recipe.ingredients || []).map((ing, i) => <li key={i}>{ing}</li>)}</ul>
-                    </div>
-                     <div>
-                        <h4 className="font-semibold text-slate-700 text-sm mb-1">Anleitung:</h4>
-                        <ol className="space-y-2 list-decimal list-inside text-slate-600 text-sm">{(recipe.instructions || []).map((step, i) => <li key={i}>{step}</li>)}</ol>
-                    </div>
-                </div>
-            </div>
-            
-            <div className="border-t border-slate-200 mt-auto">
-                 <button onClick={() => setIsExpanded(!isExpanded)} className="flex items-center justify-center gap-2 w-full px-5 py-3 text-sm text-emerald-600 font-semibold hover:bg-emerald-50 transition-colors">
-                    <span>{isExpanded ? 'Weniger anzeigen' : 'Mehr erfahren'}</span>
-                    <ChevronDownIcon className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                </button>
-            </div>
         </div>
     );
 };
 
-
-const RecipeArchiveComponent: React.FC<RecipeArchiveProps> = () => {
+const RecipeArchiveComponent: React.FC = () => {
     const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
 
-    useEffect(() => {
+    const fetchRecipes = useCallback(() => {
         apiService.getAllRecipes()
             .then(data => {
                 setAllRecipes(data);
-                setIsLoading(false);
             })
             .catch(error => {
                 console.error("Failed to fetch recipe archive:", error);
+            })
+            .finally(() => {
                 setIsLoading(false);
             });
     }, []);
+
+    useEffect(() => {
+        setIsLoading(true);
+        fetchRecipes();
+    }, [fetchRecipes]);
+
+    const { imageUrls, loadingImages, imageErrors, generateImage, setImageUrlsFromArchive } = useImageGenerator(fetchRecipes);
+    
+    useEffect(() => {
+        const initialImageUrls: { [id: number]: string } = {};
+        allRecipes.forEach(recipe => {
+            if (recipe.image_url) {
+                initialImageUrls[recipe.id] = recipe.image_url;
+            }
+        });
+        setImageUrlsFromArchive(initialImageUrls);
+    }, [allRecipes, setImageUrlsFromArchive]);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedMealCategories, setSelectedMealCategories] = useState<Set<MealCategory>>(new Set());
@@ -127,9 +112,9 @@ const RecipeArchiveComponent: React.FC<RecipeArchiveProps> = () => {
             </div>
 
             {filteredRecipes.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
                     {filteredRecipes.map(recipe => (
-                        <RecipeCard key={recipe.id} recipe={recipe} />
+                        <RecipeCard key={recipe.id} recipe={recipe} onSelect={setSelectedRecipe} />
                     ))}
                 </div>
             ) : (
@@ -137,6 +122,17 @@ const RecipeArchiveComponent: React.FC<RecipeArchiveProps> = () => {
                     <h2 className="text-xl font-bold text-slate-600 mb-2">Keine Rezepte gefunden</h2>
                     <p className="text-slate-500">Für die aktuellen Filter wurden keine Rezepte gefunden. Versuchen Sie, die Filter anzupassen.</p>
                 </div>
+            )}
+
+            {selectedRecipe && (
+                <RecipeDetailModal
+                    recipe={selectedRecipe}
+                    onClose={() => setSelectedRecipe(null)}
+                    imageUrl={imageUrls[selectedRecipe.id] || null}
+                    isLoading={loadingImages.has(selectedRecipe.id)}
+                    error={imageErrors[selectedRecipe.id] || null}
+                    onGenerate={generateImage}
+                />
             )}
         </div>
     );

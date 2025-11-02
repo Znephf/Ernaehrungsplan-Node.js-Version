@@ -14,7 +14,8 @@ const MEAL_CATEGORIES = ['breakfast', 'lunch', 'coffee', 'dinner', 'snack'];
 const generatePlanAndShoppingList = async (settings, previousPlanRecipes = []) => {
     const {
         persons, kcal, dietaryPreference, dietType, dishComplexity,
-        excludedIngredients, desiredIngredients, isGlutenFree, isLactoseFree, includedMeals
+        excludedIngredients, desiredIngredients, isGlutenFree, isLactoseFree, includedMeals,
+        mainMealFocus
     } = settings;
 
     const includedMealsText = includedMeals && includedMeals.length > 0
@@ -29,6 +30,10 @@ const generatePlanAndShoppingList = async (settings, previousPlanRecipes = []) =
     
     const previousRecipesText = previousPlanRecipes.length > 0
         ? `To ensure variety, please AVOID generating recipes with these titles from the user's last plan: ${previousPlanRecipes.map(r => `"${r.title}"`).join(', ')}.`
+        : '';
+
+    const mainMealFocusText = (mainMealFocus && mainMealFocus !== 'none' && includedMeals.includes('lunch') && includedMeals.includes('dinner'))
+        ? `The user has specified a focus on '${mainMealFocus}' as the main meal. Please make sure the recipes for this meal are more substantial, while the other meal (lunch or dinner) can be lighter.`
         : '';
         
     const systemInstruction = `You are an expert nutritionist and chef specializing in creating balanced, delicious, and practical weekly meal plans. Your responses must be in valid JSON format. Do not include any text outside the JSON structure.
@@ -61,6 +66,7 @@ Create a new weekly meal plan based on these settings:
 - Desired ingredients: ${desiredIngredients || 'None'}
 - Gluten-free: ${isGlutenFree ? 'Yes' : 'No'}
 - Lactose-free: ${isLactoseFree ? 'Yes' : 'No'}
+${mainMealFocusText}
 ${previousRecipesText}
 
 Please generate the full plan in the specified JSON format.

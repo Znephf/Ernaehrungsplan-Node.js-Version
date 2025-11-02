@@ -12,7 +12,8 @@ router.get('/archive', async (req, res) => {
                 p.name, 
                 p.createdAt, 
                 p.settings, 
-                p.shareId
+                p.shareId,
+                p.shoppingList
             FROM plans p
             ORDER BY p.createdAt DESC
         `);
@@ -20,57 +21,61 @@ router.get('/archive', async (req, res) => {
         const archiveEntries = [];
 
         for (const plan of plans) {
-            // Hole alle Rezepte, die zu diesem Plan gehören
-            const [recipes] = await pool.query(`
+            // Eine einzige Abfrage, um alle verknüpften Rezeptdaten zu erhalten
+            const [recipeLinks] = await pool.query(`
                 SELECT 
                     r.id, r.title, r.ingredients, r.instructions, r.totalCalories, r.protein, r.carbs, r.fat, r.category,
                     r.dietaryPreference, r.dietType, r.dishComplexity, r.isGlutenFree, r.isLactoseFree,
-                    ri.image_url
+                    ri.image_url,
+                    pr.day_of_week,
+                    pr.meal_type
                 FROM plan_recipes pr
                 JOIN recipes r ON pr.recipe_id = r.id
                 LEFT JOIN recipe_images ri ON r.title = ri.recipe_title
                 WHERE pr.plan_id = ?
             `, [plan.id]);
-            
-            // Hole die Tageszuordnung für diesen Plan
-            const [planDays] = await pool.query(
-                'SELECT recipe_id, day_of_week, meal_type FROM plan_recipes WHERE plan_id = ?', 
-                [plan.id]
-            );
 
             const weeklyPlan = [];
-            const shoppingList = []; // Die Generierung der Einkaufsliste erfolgt serverseitig beim Erstellen, hier wird sie nur aus dem JSON gelesen, falls vorhanden
-            
-            // Die JSON-basierten `weeklyPlan` und `shoppingList` sind nicht mehr direkt in der DB,
-            // daher muss die Struktur für das Frontend hier rekonstruiert werden.
-            
-            const daysOfWeek = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
-            const recipeMap = new Map(recipes.map(r => [r.id, r]));
+            const recipes = [];
+            const recipeMap = new Map(); // Zum Deduplizieren von Rezepten
 
-            for (const day of daysOfWeek) {
-                const mealsForDay = planDays
-                    .filter(pd => pd.day_of_week === day)
-                    .map(pd => ({
-                        mealType: pd.meal_type,
-                        recipe: recipeMap.get(pd.recipe_id)
-                    }))
-                    .filter(meal => meal.recipe); // Nur Mahlzeiten mit gültigem Rezept
-
-                if (mealsForDay.length > 0) {
-                     weeklyPlan.push({
-                        day,
-                        meals: mealsForDay,
-                        totalCalories: mealsForDay.reduce((sum, meal) => sum + (meal.recipe.totalCalories || 0), 0)
-                    });
+            for (const link of recipeLinks) {
+                let recipe = recipeMap.get(link.id);
+                if (!recipe) {
+                    recipe = {
+                        id: link.id,
+                        title: link.title,
+                        ingredients: JSON.parse(link.ingredients || '[]'),
+                        instructions: JSON.parse(link.instructions || '[]'),
+                        totalCalories: link.totalCalories,
+                        protein: link.protein,
+                        carbs: link.carbs,
+                        fat: link.fat,
+                        category: link.category,
+                        dietaryPreference: link.dietaryPreference,
+                        dietType: link.dietType,
+                        dishComplexity: link.dishComplexity,
+                        isGlutenFree: link.isGlutenFree,
+                        isLactoseFree: link.isLactoseFree,
+                        image_url: link.image_url,
+                    };
+                    recipeMap.set(link.id, recipe);
+                    recipes.push(recipe);
                 }
+
+                let dayPlan = weeklyPlan.find(dp => dp.day === link.day_of_week);
+                if (!dayPlan) {
+                    dayPlan = { day: link.day_of_week, meals: [], totalCalories: 0 };
+                    weeklyPlan.push(dayPlan);
+                }
+                
+                dayPlan.meals.push({ mealType: link.meal_type, recipe: recipe });
+                dayPlan.totalCalories += recipe.totalCalories || 0;
             }
-            
-            // parse ingredients and instructions
-            const parsedRecipes = recipes.map(r => ({
-                ...r,
-                ingredients: JSON.parse(r.ingredients || '[]'),
-                instructions: JSON.parse(r.instructions || '[]')
-            }));
+
+            // Sortiere die Tage in der korrekten Reihenfolge
+            const daysOrder = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+            weeklyPlan.sort((a, b) => daysOrder.indexOf(a.day) - daysOrder.indexOf(b.day));
 
             archiveEntries.push({
                 id: plan.id,
@@ -79,8 +84,8 @@ router.get('/archive', async (req, res) => {
                 settings: JSON.parse(plan.settings || '{}'),
                 shareId: plan.shareId,
                 weeklyPlan,
-                recipes: parsedRecipes,
-                shoppingList: JSON.parse(plan.shoppingList || '[]') // shoppingList ist noch Teil von `plans`
+                recipes,
+                shoppingList: JSON.parse(plan.shoppingList || '[]')
             });
         }
         
