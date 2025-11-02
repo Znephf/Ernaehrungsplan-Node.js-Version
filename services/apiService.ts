@@ -3,11 +3,16 @@ import type { PlanSettings, ArchiveEntry, Recipe } from '../types';
 // Helper function to handle fetch responses
 async function handleResponse<T>(response: Response): Promise<T> {
     if (response.ok) {
-        // Handle empty responses, e.g., for logout
+        // FIX: The original implementation returned `null` for empty responses, which is not type-safe
+        // for callers that expect a JSON object. Since all current usages of this helper expect a JSON body,
+        // an empty response is now treated as an error. The comment about 'logout' appears to be outdated.
         if (response.status === 204 || response.headers.get('content-length') === '0') {
-            return null as T;
+            throw new Error('API returned an empty response when content was expected.');
         }
-        return response.json() as Promise<T>;
+        // Await the json parsing and then cast, to be more explicit for the type system,
+        // especially when it resolves to `unknown`.
+        const data = await response.json();
+        return data as T;
     }
     
     // Try to parse the error message from the server
@@ -18,15 +23,17 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 // --- Auth ---
 export const checkAuth = async (): Promise<{ isAuthenticated: boolean }> => {
-    return fetch('/api/check-auth').then(handleResponse);
+    const response = await fetch('/api/check-auth');
+    return handleResponse(response);
 };
 
 export const login = async (password: string): Promise<{ message: string }> => {
-    return fetch('/login', {
+    const response = await fetch('/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
-    }).then(handleResponse);
+    });
+    return handleResponse(response);
 };
 
 export const logout = async (): Promise<void> => {
@@ -35,15 +42,17 @@ export const logout = async (): Promise<void> => {
 
 // --- Archive ---
 export const getArchive = async (): Promise<ArchiveEntry[]> => {
-    return fetch('/api/archive').then(handleResponse);
+    const response = await fetch('/api/archive');
+    return handleResponse(response);
 };
 
 export const updatePlan = async (plan: ArchiveEntry): Promise<ArchiveEntry> => {
-    return fetch(`/api/archive/${plan.id}`, {
+    const response = await fetch(`/api/archive/${plan.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(plan),
-    }).then(handleResponse);
+    });
+    return handleResponse(response);
 };
 
 // --- Plan Generation ---
@@ -57,11 +66,12 @@ interface JobStartResponse {
 }
 
 export const startPlanGenerationJob = async (payload: JobStartPayload): Promise<JobStartResponse> => {
-    return fetch('/api/generate-plan-job', {
+    const response = await fetch('/api/generate-plan-job', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-    }).then(handleResponse);
+    });
+    return handleResponse(response);
 };
 
 
@@ -72,7 +82,8 @@ interface JobStatusResponse {
 }
 
 export const getJobStatus = async (jobId: string): Promise<JobStatusResponse> => {
-    return fetch(`/api/job-status/${jobId}`).then(handleResponse);
+    const response = await fetch(`/api/job-status/${jobId}`);
+    return handleResponse(response);
 };
 
 
@@ -114,13 +125,23 @@ export const generateImage = async (recipe: Recipe, attempt: number): Promise<{ 
     };
 };
 
+export const saveRecipeImage = async (recipeTitle: string, imageUrl: string): Promise<{ message: string }> => {
+    const response = await fetch('/api/recipe-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipeTitle, imageUrl }),
+    });
+    return handleResponse(response);
+};
+
 // --- Sharing ---
 export const startShareJob = async (planId: number): Promise<{ jobId: string }> => {
-    return fetch('/api/jobs/share', {
+    const response = await fetch('/api/jobs/share', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ planId }),
-    }).then(handleResponse);
+    });
+    return handleResponse(response);
 };
 
 
@@ -132,7 +153,8 @@ interface ShareJobStatusResponse {
 }
 
 export const getShareJobStatus = async (jobId: string): Promise<ShareJobStatusResponse> => {
-    return fetch(`/api/jobs/${jobId}`).then(handleResponse);
+    const response = await fetch(`/api/jobs/${jobId}`);
+    return handleResponse(response);
 };
 
 // --- Custom Planner ---
@@ -142,9 +164,10 @@ interface CustomPlanPayload {
 }
 
 export const saveCustomPlan = async (payload: CustomPlanPayload): Promise<ArchiveEntry> => {
-    return fetch('/api/archive/custom', {
+    const response = await fetch('/api/archive/custom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-    }).then(handleResponse);
+    });
+    return handleResponse(response);
 };

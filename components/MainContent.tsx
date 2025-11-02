@@ -15,8 +15,8 @@ interface MainContentProps {
     imageErrors: { [key: string]: string | null };
     onSelectRecipe: (day: string) => void;
     onLoadPlan: (id: number) => void;
-    onGenerateImage: (recipe: Recipe, planId: number | null) => Promise<void>;
-    onGenerateMissingImages: (recipes: Recipe[], planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
+    onGenerateImage: (recipe: Recipe) => Promise<void>;
+    onGenerateMissingImages: (recipes: Recipe[], onProgress?: (status: string) => void) => Promise<void>;
     onCustomPlanSaved: () => void;
 }
 
@@ -49,13 +49,12 @@ const MainContent: React.FC<MainContentProps> = ({
             case 'recipes':
                 return plan ? <RecipesComponent 
                             recipes={plan.recipes} 
-                            planId={plan.id}
                             persons={plan.persons}
                             imageUrls={imageUrls}
                             loadingImages={loadingImages}
                             imageErrors={imageErrors}
                             generateImage={onGenerateImage}
-                            generateMissingImages={onGenerateMissingImages}
+                            generateMissingImages={(recipes: Recipe[], onProgress?: (status: string) => void) => onGenerateMissingImages(recipes, onProgress)}
                         /> : null;
             case 'archive':
                 return <ArchiveComponent archive={archive} onLoadPlan={onLoadPlan} />;

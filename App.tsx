@@ -54,13 +54,9 @@ const App: React.FC = () => {
 
     const { isProcessing: isSharing, status: shareStatus, shareUrl, setShareUrl, startSharingProcess } = useShareProcessor(handleShareComplete);
 
-    const updatePlanAndArchive = useCallback((plan: ArchiveEntry) => {
-        setCurrentPlan(plan);
-        updatePlanInArchive(plan);
-    }, [setCurrentPlan, updatePlanInArchive]);
+    const { loadingImages, imageErrors, generateImage, generateMissingImages } = useImageGenerator(fetchArchive);
     
-    const { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageStateForNewPlan } = useImageGenerator(currentPlan, updatePlanAndArchive);
-
+    const imageUrls = currentPlan?.imageUrls || {};
 
     useEffect(() => {
         apiService.checkAuth()
@@ -88,7 +84,6 @@ const App: React.FC = () => {
                 breakfastOption: planToLoad.breakfastOption,
                 customBreakfast: planToLoad.customBreakfast
             });
-            resetImageStateForNewPlan(planToLoad);
             setCurrentView('plan');
         }
     };
@@ -98,7 +93,6 @@ const App: React.FC = () => {
             if (newPlan) {
                 setCurrentPlan(newPlan);
                 fetchArchive();
-                resetImageStateForNewPlan(newPlan);
                 setCurrentView('plan');
             }
         });
@@ -173,8 +167,8 @@ const App: React.FC = () => {
                     imageErrors={imageErrors}
                     onSelectRecipe={handleSelectRecipe}
                     onLoadPlan={handleLoadPlan}
-                    onGenerateImage={(recipe: Recipe, planId: number | null) => generateImage(recipe, planId)}
-                    onGenerateMissingImages={generateMissingImages}
+                    onGenerateImage={(recipe: Recipe) => generateImage(recipe)}
+                    onGenerateMissingImages={(recipes, onProgress) => generateMissingImages(recipes, imageUrls, onProgress)}
                     onCustomPlanSaved={() => {
                         fetchArchive();
                         setCurrentView('archive');

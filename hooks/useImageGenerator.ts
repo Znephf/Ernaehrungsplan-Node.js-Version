@@ -1,120 +1,75 @@
-import { useState, useCallback, useEffect } from 'react';
-import type { Recipe, ArchiveEntry } from '../types';
+import { useState, useCallback } from 'react';
+import type { Recipe } from '../types';
 import * as apiService from '../services/apiService';
 
-export const useImageGenerator = (
-    currentPlan: ArchiveEntry | null,
-    updatePlanInState: (plan: ArchiveEntry) => void
-) => {
-    const [imageUrls, setImageUrls] = useState<{ [key: string]: string }>({});
+export const useImageGenerator = (onImageSaved: () => void) => {
     const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
     const [imageErrors, setImageErrors] = useState<{ [key: string]: string | null }>({});
-    
-    // Effect to update local state when a new plan is loaded
-    useEffect(() => {
-        setImageUrls(currentPlan?.imageUrls || {});
-    }, [currentPlan]);
 
-    const generateImage = useCallback(async (recipe: Recipe, planId: number | null, attempt = 1): Promise<void> => {
-        if (!planId || !currentPlan) return;
-
-        setLoadingImages(prev => new Set(prev).add(recipe.day));
-        setImageErrors(prev => ({ ...prev, [recipe.day]: null }));
+    const generateImage = useCallback(async (recipe: Recipe, attempt = 1): Promise<void> => {
+        const uiKey = recipe.day || recipe.title; // Use day if available, otherwise title as a unique key for loading state
+        setLoadingImages(prev => new Set(prev).add(uiKey));
+        setImageErrors(prev => ({ ...prev, [uiKey]: null }));
 
         try {
             const result = await apiService.generateImage(recipe, attempt);
-            const newImageUrl = result.imageUrl;
-
-            // Update local state immediately for responsiveness
-            setImageUrls(prev => ({ ...prev, [recipe.day]: newImageUrl }));
-
-            // Create a deep copy of the plan to avoid direct mutation
-            const updatedPlan = JSON.parse(JSON.stringify(currentPlan));
-            if (!updatedPlan.imageUrls) {
-                updatedPlan.imageUrls = {};
-            }
-            updatedPlan.imageUrls[recipe.day] = newImageUrl;
-
-            // Update the plan in the parent state
-            updatePlanInState(updatedPlan);
-
-            // Persist the change to the backend
-            await apiService.updatePlan(updatedPlan);
-
+            await apiService.saveRecipeImage(recipe.title, result.imageUrl);
+            onImageSaved(); // This will refetch the archive and update all UIs
         } catch (error) {
             console.error(`Error generating image for ${recipe.title}:`, error);
-            setImageErrors(prev => ({ ...prev, [recipe.day]: (error as Error).message }));
-            // Retry logic
-            if (attempt < 3) {
-                console.log(`Retrying image generation for ${recipe.title} (attempt ${attempt + 1})`);
-                setTimeout(() => generateImage(recipe, planId, attempt + 1), 2000);
-            }
+            setImageErrors(prev => ({ ...prev, [uiKey]: (error as Error).message }));
+            // Optional: retry logic can be added here if needed
         } finally {
             setLoadingImages(prev => {
                 const newSet = new Set(prev);
-                newSet.delete(recipe.day);
+                newSet.delete(uiKey);
                 return newSet;
             });
         }
-    }, [currentPlan, updatePlanInState]);
+    }, [onImageSaved]);
 
-     const generateMissingImages = useCallback(async (
+    const generateMissingImages = useCallback(async (
         recipes: Recipe[],
-        planId: number | null,
+        currentImageUrls: { [key: string]: string },
         onProgress?: (status: string) => void
-    ): Promise<{ [key: string]: string }> => {
-        if (!planId || !currentPlan) return {};
+    ): Promise<void> => {
+        const recipesToGenerate = recipes.filter(r => !currentImageUrls[r.day]);
+        if (recipesToGenerate.length === 0) return;
 
-        const recipesToGenerate = recipes.filter(r => !(currentPlan.imageUrls && currentPlan.imageUrls[r.day]));
-        if (recipesToGenerate.length === 0) return currentPlan.imageUrls || {};
-
-        const newImageUrls: { [key: string]: string } = { ...(currentPlan.imageUrls || {}) };
+        let imagesGenerated = false;
 
         for (let i = 0; i < recipesToGenerate.length; i++) {
             const recipe = recipesToGenerate[i];
-            
             if (onProgress) {
                 onProgress(`Generiere Bild ${i + 1}/${recipesToGenerate.length}: ${recipe.title}`);
             }
-
+            const uiKey = recipe.day;
+            setLoadingImages(prev => new Set(prev).add(uiKey));
             try {
-                // We don't use the stateful `generateImage` here to avoid multiple separate updates.
-                setLoadingImages(prev => new Set(prev).add(recipe.day));
                 const result = await apiService.generateImage(recipe, 1);
-                newImageUrls[recipe.day] = result.imageUrl;
-                setImageUrls(prev => ({ ...prev, [recipe.day]: result.imageUrl }));
+                await apiService.saveRecipeImage(recipe.title, result.imageUrl);
+                imagesGenerated = true; // Mark that at least one image was saved
             } catch (error) {
                 console.error(`Error generating image for ${recipe.title} during batch generation:`, error);
-                setImageErrors(prev => ({ ...prev, [recipe.day]: (error as Error).message }));
+                setImageErrors(prev => ({ ...prev, [uiKey]: (error as Error).message }));
             } finally {
                 setLoadingImages(prev => {
                     const newSet = new Set(prev);
-                    newSet.delete(recipe.day);
+                    newSet.delete(uiKey);
                     return newSet;
                 });
             }
         }
         
-        const updatedPlan = { ...currentPlan, imageUrls: newImageUrls };
-        updatePlanInState(updatedPlan);
-        await apiService.updatePlan(updatedPlan);
-
-        return newImageUrls;
-    }, [currentPlan, updatePlanInState]);
-
-    // This function is needed to reset image state when loading a new plan
-    const resetImageStateForNewPlan = (plan: ArchiveEntry | null) => {
-        setImageUrls(plan?.imageUrls || {});
-        setLoadingImages(new Set());
-        setImageErrors({});
-    };
+        if (imagesGenerated) {
+            onImageSaved(); // Refetch archive once after all images are processed
+        }
+    }, [onImageSaved]);
 
     return { 
-        imageUrls, 
         loadingImages, 
         imageErrors, 
         generateImage, 
-        generateMissingImages, 
-        resetImageStateForNewPlan 
+        generateMissingImages,
     };
 };

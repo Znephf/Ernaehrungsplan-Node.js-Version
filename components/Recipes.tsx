@@ -5,17 +5,16 @@ import { DownloadIcon, FireIcon, ProteinIcon, CarbsIcon, FatIcon, ChevronUpIcon,
 
 interface RecipesComponentProps {
   recipes: Recipes;
-  planId: number | null;
   persons: number;
   imageUrls: { [key:string]: string };
   loadingImages: Set<string>;
   imageErrors: { [key:string]: string | null };
-  generateImage: (recipe: Recipe, planId: number | null) => Promise<void>;
-  generateMissingImages: (recipes: Recipe[], planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
+  generateImage: (recipe: Recipe) => Promise<void>;
+  generateMissingImages: (recipes: Recipe[], onProgress?: (status: string) => void) => Promise<void>;
 }
 
 const RecipesComponent: React.FC<RecipesComponentProps> = ({ 
-    recipes, planId, persons, imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages
+    recipes, persons, imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages
 }) => {
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generationStatus, setGenerationStatus] = useState('');
@@ -25,7 +24,7 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({
     setIsGeneratingAll(true);
     setGenerationStatus('Starte Bildgenerierung...');
     try {
-        await generateMissingImages(recipes, planId, (status) => {
+        await generateMissingImages(recipes, (status) => {
             setGenerationStatus(status);
         });
     } catch (error) {
@@ -88,7 +87,7 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({
                         imageUrl={imageUrls[recipe.day] || null}
                         isLoading={loadingImages.has(recipe.day)}
                         error={imageErrors[recipe.day] || null}
-                        onGenerate={() => generateImage(recipe, planId)}
+                        onGenerate={() => generateImage(recipe)}
                     />
                     <div className="p-6">
                         <div className="flex flex-wrap items-center justify-between gap-2">
