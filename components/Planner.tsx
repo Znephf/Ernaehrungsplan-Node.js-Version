@@ -245,41 +245,39 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
     return (
         <div>
             {isDesktop ? (
-                <div className="space-y-6">
-                    {filterControls}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                        <div className="lg:col-span-1">
-                            <div className="max-h-[80vh] overflow-y-auto pr-2">
-                                {recipeList(() => {})}
-                            </div>
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+                    <div className="lg:col-span-2 space-y-6">
+                        {filterControls}
+                        <div className="max-h-[65vh] overflow-y-auto pr-2">
+                            {recipeList(() => {})}
                         </div>
-                        <div className="lg:col-span-2 space-y-6">
-                            <div className="bg-white p-6 rounded-lg shadow-lg">
-                              <h2 className="text-2xl font-bold text-slate-700 mb-4">Mein Wochenplan</h2>
-                              <div className="bg-slate-50 p-4 rounded-md mb-6">
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Mahlzeiten-Slots auswählen</label>
-                                <div className="flex flex-wrap gap-4">
-                                  {(Object.keys(MealCategoryLabels) as MealCategory[]).map(mealType => (
-                                    <label key={mealType} className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700">
-                                        <input type="checkbox" checked={visibleMeals.has(mealType)} onChange={(e) => handleMealVisibilityChange(mealType, e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
-                                        <span>{MealCategoryLabels[mealType]}</span>
-                                    </label>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-1 gap-6">
-                                {WEEKDAYS.map(day => (
-                                    <div key={day} className="border border-slate-200 p-4 rounded-lg">
-                                        <h3 className="font-bold text-slate-600 mb-3 text-lg">{day}</h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {sortedVisibleMeals.map(mealType => mealDropZone(day, mealType))}
-                                        </div>
+                    </div>
+                    <div className="lg:col-span-3 space-y-6">
+                        <div className="bg-white p-6 rounded-lg shadow-lg">
+                          <h2 className="text-2xl font-bold text-slate-700 mb-4">Mein Wochenplan</h2>
+                          <div className="bg-slate-50 p-4 rounded-md mb-6">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Mahlzeiten-Slots auswählen</label>
+                            <div className="flex flex-wrap gap-4">
+                              {(Object.keys(MealCategoryLabels) as MealCategory[]).map(mealType => (
+                                <label key={mealType} className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700">
+                                    <input type="checkbox" checked={visibleMeals.has(mealType)} onChange={(e) => handleMealVisibilityChange(mealType, e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                                    <span>{MealCategoryLabels[mealType]}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 gap-6">
+                            {WEEKDAYS.map(day => (
+                                <div key={day} className="border border-slate-200 p-4 rounded-lg">
+                                    <h3 className="font-bold text-slate-600 mb-3 text-lg">{day}</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {sortedVisibleMeals.map(mealType => mealDropZone(day, mealType))}
                                     </div>
-                                ))}
-                              </div>
-                            </div>
-                            {SavePlanUI}
+                                </div>
+                            ))}
+                          </div>
                         </div>
+                        {SavePlanUI}
                     </div>
                 </div>
             ) : (
