@@ -7,8 +7,7 @@ const fs = require('fs');
 const { initializeDatabase } = require('./services/database');
 
 // Lade Umgebungsvariablen IMMER aus der .env-Datei im Projekt-Stammverzeichnis.
-// HINWEIS: In einer Produktionsumgebung wird empfohlen, stattdessen
-// die systemeigenen Umgebungsvariablen des Hosters (z.B. in Plesk) zu verwenden.
+// Dies stellt das alte Verhalten wieder her und gewährleistet die Funktion auf dem Plesk-Server.
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 
