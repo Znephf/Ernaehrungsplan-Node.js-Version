@@ -1,3 +1,4 @@
+
 const { GoogleGenAI } = require('@google/genai');
 const { pool } = require('./database');
 
@@ -113,7 +114,51 @@ const generateImageForRecipe = async (recipe, attempt) => {
     return { apiResponse: response, debug: { imagePrompt } };
 };
 
+const generateShoppingListOnly = async (settings, recipes) => {
+    const { persons } = settings;
+    const recipeTitles = recipes.map(r => `"${r.title}"`).join(', ');
+
+    const systemInstruction = `You are an expert shopping list generator. Your task is to create a complete, categorized shopping list based on a list of recipes and the number of people. Your response must be in valid JSON format, containing only the shopping list.
+The JSON must strictly follow this schema:
+{
+  "shoppingList": [ { "category": "string (e.g., 'Obst & Gemüse')", "items": ["string (German, with quantities)"] } ]
+}
+- Consolidate ingredients from all recipes.
+- Calculate the total required quantity of each item for the specified number of people for one week.
+- All text must be in German.
+- Do not use markdown or add any comments in the JSON.
+`;
+
+    const userPrompt = `
+Generate a weekly shopping list for ${persons} people based on the following recipes: ${recipeTitles}.
+
+Please provide only the "shoppingList" part of the response in the specified JSON format.
+`;
+
+    console.log('Generating shopping list with Gemini...');
+    
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-pro',
+        contents: userPrompt,
+        config: {
+            systemInstruction: systemInstruction,
+            responseMimeType: 'application/json',
+        }
+    });
+
+    try {
+        const text = response.text.trim();
+        const shoppingListData = JSON.parse(text);
+        return shoppingListData.shoppingList;
+    } catch (e) {
+        console.error("Failed to parse Gemini response for shopping list as JSON.", e);
+        console.error("Raw response text:", response.text);
+        throw new Error("The AI response for the shopping list was not in the expected format.");
+    }
+};
+
 module.exports = {
     generatePlanAndShoppingList,
     generateImageForRecipe,
+    generateShoppingListOnly,
 };

@@ -1,3 +1,4 @@
+
 {
   "name": "ernaehrungsplan-app",
   "version": "1.0.0",
@@ -14,7 +15,8 @@
     "migrate:to-images-table": "node scripts/migrate_to_recipe_images.js",
     "migrate:to-normalized-db": "node scripts/migrate_to_normalized_db.js",
     "migrate:link-images": "node scripts/migrate_link_images.js",
-    "migrate:fix-legacy": "node scripts/migrate_from_legacy.js"
+    "migrate:fix-legacy": "node scripts/migrate_from_legacy.js",
+    "fix:shopping-list": "node scripts/regenerate_shopping_list.js"
   },
   "keywords": [
     "ernaehrungsplan",
