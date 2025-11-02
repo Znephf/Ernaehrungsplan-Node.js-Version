@@ -16,7 +16,8 @@
     "migrate:to-normalized-db": "node scripts/migrate_to_normalized_db.js",
     "migrate:link-images": "node scripts/migrate_link_images.js",
     "migrate:fix-legacy": "node scripts/migrate_from_legacy.js",
-    "fix:shopping-list": "node scripts/regenerate_shopping_list.js"
+    "fix:shopping-list": "node scripts/regenerate_shopping_list.js",
+    "regenerate:shares": "node scripts/regenerate_shares.js"
   },
   "keywords": [
     "ernaehrungsplan",

@@ -1,6 +1,8 @@
 
 const express = require('express');
 const unprotectedRouter = express.Router();
+const { pool } = require('../services/database');
+const { getFullPlanById } = require('../services/jobService'); // Importiert für den öffentlichen Endpunkt
 const { APP_PASSWORD } = process.env;
 
 // Middleware zur Überprüfung der Authentifizierung
@@ -42,6 +44,28 @@ unprotectedRouter.get('/api/check-auth', (req, res) => {
         res.status(200).json({ isAuthenticated: true });
     } else {
         res.status(401).json({ isAuthenticated: false });
+    }
+});
+
+// Neuer öffentlicher Endpunkt zum Abrufen von Plandaten über die Share-ID
+unprotectedRouter.get('/api/public/plan/:shareId', async (req, res) => {
+    const { shareId } = req.params;
+    try {
+        const [[planMeta]] = await pool.query('SELECT id FROM plans WHERE shareId = ?', [shareId]);
+        if (!planMeta) {
+            return res.status(404).json({ error: 'Plan nicht gefunden.' });
+        }
+        
+        const fullPlan = await getFullPlanById(planMeta.id);
+        if (!fullPlan) {
+             return res.status(404).json({ error: 'Plandaten konnten nicht geladen werden.' });
+        }
+        
+        res.json(fullPlan);
+
+    } catch (error) {
+        console.error(`Fehler beim Abrufen des geteilten Plans ${shareId}:`, error);
+        res.status(500).json({ error: 'Interner Serverfehler' });
     }
 });
 

@@ -1,14 +1,64 @@
 
+
 const { GoogleGenAI } = require('@google/genai');
 const { pool } = require('./database');
-
 const { API_KEY, API_KEY_FALLBACK } = process.env;
 
-const keyToUse = API_KEY || API_KEY_FALLBACK;
-if (!keyToUse) {
-    throw new Error("FATAL: No API_KEY or API_KEY_FALLBACK found in environment variables.");
+/**
+ * Führt eine API-Anfrage an Gemini aus und verwendet bei einem Fehler automatisch einen Fallback-API-Schlüssel.
+ * @param {object} requestPayload - Das Objekt, das an `ai.models.generateContent` übergeben wird.
+ * @returns {Promise<any>} Die erfolgreiche Antwort von der API.
+ * @throws {Error} Wirft einen Fehler, wenn beide API-Schlüssel fehlschlagen oder keiner verfügbar ist.
+ */
+async function generateWithFallback(requestPayload) {
+    let lastError = null;
+
+    // 1. Sicherstellen, dass mindestens ein Schlüssel verfügbar ist.
+    if (!API_KEY && !API_KEY_FALLBACK) {
+        throw new Error('FATAL: Es wurden keine API_KEY oder API_KEY_FALLBACK in den Umgebungsvariablen gefunden.');
+    }
+
+    // 2. Versuche den API-Aufruf mit dem primären API_KEY.
+    if (API_KEY) {
+        try {
+            console.log('Versuche API-Aufruf mit primärem API_KEY...');
+            const ai = new GoogleGenAI({ apiKey: API_KEY });
+            const response = await ai.models.generateContent(requestPayload);
+            console.log('API-Aufruf mit primärem Schlüssel erfolgreich.');
+            return response;
+        } catch (error) {
+            console.warn(`API-Aufruf mit primärem API_KEY fehlgeschlagen: ${error.message}`);
+            lastError = error; // Speichere den Fehler und fahre mit dem Fallback fort.
+        }
+    } else {
+        console.log('Primärer API_KEY nicht gesetzt, gehe direkt zum Fallback-Schlüssel.');
+    }
+
+    // 3. Wenn der primäre Schlüssel fehlgeschlagen ist oder nicht vorhanden war, versuche es mit dem Fallback-Schlüssel.
+    if (API_KEY_FALLBACK) {
+        try {
+            console.log('Versuche API-Aufruf mit API_KEY_FALLBACK...');
+            const ai = new GoogleGenAI({ apiKey: API_KEY_FALLBACK });
+            const response = await ai.models.generateContent(requestPayload);
+            console.log('API-Aufruf mit Fallback-Schlüssel erfolgreich.');
+            return response;
+        } catch (error) {
+            console.error(`API-Aufruf mit Fallback-Schlüssel API_KEY_FALLBACK ebenfalls fehlgeschlagen: ${error.message}`);
+            lastError = error; // Aktualisiere den Fehler mit dem neuesten Fehlschlag.
+        }
+    } else {
+        console.log('Fallback-Schlüssel API_KEY_FALLBACK nicht gesetzt.');
+    }
+
+    // 4. Wenn alle Versuche fehlgeschlagen sind, werfe den zuletzt aufgezeichneten Fehler.
+    if (lastError) {
+        throw lastError;
+    }
+    
+    // Dieser Fall sollte durch die anfängliche Prüfung abgedeckt sein, dient aber als Absicherung.
+    throw new Error('Keine API-Schlüssel verfügbar, um die Anfrage zu versuchen.');
 }
-const ai = new GoogleGenAI({ apiKey: keyToUse });
+
 
 const MEAL_CATEGORIES = ['breakfast', 'lunch', 'coffee', 'dinner', 'snack'];
 
@@ -75,8 +125,8 @@ Please generate the full plan in the specified JSON format.
 
     console.log('Generating plan with Gemini...');
     
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-pro',
+    const response = await generateWithFallback({
+        model: 'gemini-2.5-flash',
         contents: userPrompt,
         config: {
             systemInstruction: systemInstruction,
@@ -103,7 +153,7 @@ const generateImageForRecipe = async (recipe, attempt) => {
 
     const imagePrompt = `${detailLevel} The dish is called "${recipe.title}". It contains: ${recipe.ingredients.join(', ')}. Do not show any text or branding.`;
 
-    const response = await ai.models.generateContent({
+    const response = await generateWithFallback({
         model: 'gemini-2.5-flash-image',
         contents: { parts: [{ text: imagePrompt }] },
         config: {
@@ -137,8 +187,8 @@ Please provide only the "shoppingList" part of the response in the specified JSO
 
     console.log('Generating shopping list with Gemini...');
     
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-pro',
+    const response = await generateWithFallback({
+        model: 'gemini-2.5-flash',
         contents: userPrompt,
         config: {
             systemInstruction: systemInstruction,

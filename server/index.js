@@ -13,12 +13,13 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // --- Starup-Diagnose ---
 console.log('--- Starte Server und prüfe Umgebungsvariablen ---');
-const requiredVars = ['COOKIE_SECRET', 'APP_PASSWORD', 'API_KEY', 'DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
+// API_KEY ist nun optional und wird separat geprüft.
+const requiredVars = ['COOKIE_SECRET', 'APP_PASSWORD', 'DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
 requiredVars.forEach(v => {
-    // In der Diagnose wird der Wert nun explizit angezeigt, um Klarheit zu schaffen.
     console.log(`Wert für ${v}:`, process.env[v] ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
 });
-console.log(`Wert für API_KEY_FALLBACK:`, process.env.API_KEY_FALLBACK ? '*** (gesetzt, Fallback-Schlüssel aktiv)' : 'Nicht gesetzt (optional)');
+console.log(`Wert für API_KEY:`, process.env.API_KEY ? '*** (gesetzt)' : 'Nicht gesetzt');
+console.log(`Wert für API_KEY_FALLBACK:`, process.env.API_KEY_FALLBACK ? '*** (gesetzt, Fallback-Schlüssel aktiv)' : 'Nicht gesetzt');
 console.log(`Wert für DB_PORT:`, process.env.DB_PORT ? process.env.DB_PORT : 'Nicht gesetzt, Standard: 3306');
 console.log('--- Diagnose Ende ---');
 
@@ -28,6 +29,13 @@ if (missingVars.length > 0) {
     console.error(`FATAL ERROR: Die Umgebungsvariable(n) ${missingVars.join(', ')} sind nicht gesetzt. Bitte fügen Sie diese in der Plesk Node.js-Verwaltung hinzu. Die Anwendung wird beendet.`);
     process.exit(1);
 }
+
+// Spezifische Prüfung, ob mindestens ein API-Schlüssel vorhanden ist.
+if (!process.env.API_KEY && !process.env.API_KEY_FALLBACK) {
+    console.error(`FATAL ERROR: Es muss mindestens eine API-Schlüssel-Umgebungsvariable (API_KEY oder API_KEY_FALLBACK) gesetzt sein. Die Anwendung wird beendet.`);
+    process.exit(1);
+}
+
 
 // Erstelle notwendige öffentliche Verzeichnisse
 const publicSharesDir = path.join(__dirname, '..', 'public', 'shares');

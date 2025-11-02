@@ -24,6 +24,8 @@ async function getFullPlanById(planId) {
     const recipes = [];
     const recipeMap = new Map();
 
+    const daysOrder = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+
     for (const link of recipeLinks) {
         let recipe = recipeMap.get(link.id);
         if (!recipe) {
@@ -37,6 +39,11 @@ async function getFullPlanById(planId) {
                 carbs: link.carbs,
                 fat: link.fat,
                 category: link.category,
+                dietaryPreference: link.dietaryPreference,
+                dietType: link.dietType,
+                dishComplexity: link.dishComplexity,
+                isGlutenFree: link.isGlutenFree,
+                isLactoseFree: link.isLactoseFree,
                 image_url: link.image_url,
             };
             recipeMap.set(link.id, recipe);
@@ -52,6 +59,9 @@ async function getFullPlanById(planId) {
         dayPlan.meals.push({ mealType: link.meal_type, recipe });
         dayPlan.totalCalories += recipe.totalCalories || 0;
     }
+    
+    weeklyPlan.sort((a, b) => daysOrder.indexOf(a.day) - daysOrder.indexOf(b.day));
+
 
     return {
         id: plan.id,
@@ -126,13 +136,15 @@ async function processShareJob(jobId) {
         const [[job]] = await pool.query('SELECT relatedPlanId FROM app_jobs WHERE jobId = ?', [jobId]);
         if (!job) throw new Error("Job-Metadaten nicht gefunden.");
         
-        const plan = await getFullPlanById(job.relatedPlanId);
+        const [[plan]] = await pool.query('SELECT id, name FROM plans WHERE id = ?', [job.relatedPlanId]);
         if (!plan) throw new Error(`Plan mit ID ${job.relatedPlanId} konnte nicht geladen werden.`);
 
-        await pool.query('UPDATE app_jobs SET progressText = ? WHERE jobId = ?', ['Generiere HTML-Datei...', jobId]);
-        const htmlContent = await generateShareableHtml(plan);
+        await pool.query('UPDATE app_jobs SET progressText = ? WHERE jobId = ?', ['Generiere dynamische HTML-Datei...', jobId]);
         
         const shareId = crypto.randomBytes(8).toString('hex');
+        // Übergebe den Namen für den <title>-Tag
+        const htmlContent = await generateShareableHtml({ name: plan.name });
+        
         const fileName = `${shareId}.html`;
         const filePath = path.join(__dirname, '..', '..', 'public', 'shares', fileName);
         
