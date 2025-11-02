@@ -43,6 +43,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
   };
 
   const showMainMealFocus = (settings.includedMeals || []).includes('lunch') && (settings.includedMeals || []).includes('dinner');
+  const showBreakfastOption = (settings.includedMeals || []).includes('breakfast');
+  const showSnackOption = (settings.includedMeals || []).includes('snack');
 
   const inputStyles = "mt-1 block w-full bg-white text-slate-900 rounded-md border-slate-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm";
   const stepButtonStyles = "px-4 bg-slate-200 text-slate-700 font-bold border border-slate-300 hover:bg-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:z-10 transition-colors";
@@ -130,6 +132,74 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
           ))}
         </div>
       </div>
+
+      {/* New section for recurring meals */}
+      {(showBreakfastOption || showSnackOption) && (
+          <div className="pt-2">
+              <label className="block text-sm font-medium text-slate-700">Tägliche Routinen (Optional)</label>
+              <p className="text-xs text-slate-500 mt-1 mb-2">Hier können Sie angeben, ob Sie jeden Tag das gleiche Frühstück oder den gleichen Snack essen möchten.</p>
+              <div className="space-y-4">
+                  {showBreakfastOption && (
+                      <div className="bg-slate-50 p-4 rounded-lg">
+                          <label htmlFor="useSameBreakfast" className="flex items-center space-x-2 cursor-pointer font-medium">
+                              <input 
+                                  type="checkbox" 
+                                  name="useSameBreakfast" 
+                                  id="useSameBreakfast" 
+                                  checked={!!settings.useSameBreakfast} 
+                                  onChange={handleChange} 
+                                  className="h-4 w-4 rounded" 
+                              />
+                              <span>Jeden Tag das gleiche Frühstück</span>
+                          </label>
+                          {settings.useSameBreakfast && (
+                              <div className="mt-2">
+                                  <label htmlFor="customBreakfastText" className="block text-xs font-medium text-slate-600 mb-1">Beschreiben Sie Ihr Frühstück:</label>
+                                  <textarea 
+                                      name="customBreakfastText" 
+                                      id="customBreakfastText" 
+                                      value={settings.customBreakfastText || ''} 
+                                      onChange={handleChange} 
+                                      rows={2} 
+                                      placeholder="z.B. Protein-Shake mit Haferflocken und Banane" 
+                                      className={inputStyles}
+                                  ></textarea>
+                              </div>
+                          )}
+                      </div>
+                  )}
+                  {showSnackOption && (
+                     <div className="bg-slate-50 p-4 rounded-lg">
+                          <label htmlFor="useSameSnack" className="flex items-center space-x-2 cursor-pointer font-medium">
+                              <input 
+                                  type="checkbox" 
+                                  name="useSameSnack" 
+                                  id="useSameSnack" 
+                                  checked={!!settings.useSameSnack} 
+                                  onChange={handleChange} 
+                                  className="h-4 w-4 rounded" 
+                              />
+                              <span>Jeden Tag den gleichen Snack</span>
+                          </label>
+                          {settings.useSameSnack && (
+                              <div className="mt-2">
+                                  <label htmlFor="customSnackText" className="block text-xs font-medium text-slate-600 mb-1">Beschreiben Sie Ihren Snack:</label>
+                                  <textarea 
+                                      name="customSnackText" 
+                                      id="customSnackText" 
+                                      value={settings.customSnackText || ''} 
+                                      onChange={handleChange} 
+                                      rows={2} 
+                                      placeholder="z.B. Ein Apfel und eine Handvoll Nüsse" 
+                                      className={inputStyles}
+                                  ></textarea>
+                              </div>
+                          )}
+                      </div>
+                  )}
+              </div>
+          </div>
+      )}
 
       {showMainMealFocus && (
         <div className="pt-2">

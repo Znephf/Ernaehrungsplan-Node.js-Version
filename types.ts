@@ -68,6 +68,13 @@ export interface PlanSettings {
     isLactoseFree: boolean;
     includedMeals: MealCategory[];
     mainMealFocus?: 'lunch' | 'dinner' | 'none';
+    
+    // New fields for recurring meals
+    useSameBreakfast?: boolean;
+    customBreakfastText?: string;
+    useSameSnack?: boolean;
+    customSnackText?: string;
+
     // Deprecated fields, kept for backward compatibility with old archive data
     breakfastOption?: 'beeren' | 'walnuss' | 'mandel' | 'custom';
     customBreakfast?: string;

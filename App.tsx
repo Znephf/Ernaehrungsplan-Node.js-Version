@@ -24,7 +24,11 @@ const initialSettings: PlanSettings = {
     desiredIngredients: '',
     isGlutenFree: false,
     isLactoseFree: false,
-    includedMeals: ['breakfast', 'dinner']
+    includedMeals: ['breakfast', 'dinner'],
+    useSameBreakfast: false,
+    customBreakfastText: '',
+    useSameSnack: false,
+    customSnackText: '',
 };
 
 const App: React.FC = () => {
