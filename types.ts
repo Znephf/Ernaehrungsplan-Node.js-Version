@@ -26,6 +26,7 @@ export interface Recipe {
     carbs?: number;
     fat?: number;
     category: MealCategory;
+    dietaryPreference?: Diet;
     image_url?: string | null;
 }
 

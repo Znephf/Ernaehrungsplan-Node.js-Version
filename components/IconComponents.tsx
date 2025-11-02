@@ -94,28 +94,27 @@ export const EmailIcon: React.FC<{className?: string}> = ({className = "h-8 w-8"
 );
 
 
-const MacroIconProps = {
-  className: "h-6 w-6 text-emerald-600",
+const MacroIconBaseProps = {
   strokeWidth: "1.5",
   fill: "none",
   viewBox: "0 0 24 24",
   stroke: "currentColor"
 };
 
-export const ProteinIcon: React.FC = () => (
-    <svg {...MacroIconProps} xmlns="http://www.w3.org/2000/svg">
+export const ProteinIcon: React.FC<{ className?: string }> = ({ className = "h-6 w-6 text-emerald-600" }) => (
+    <svg {...MacroIconBaseProps} className={className} xmlns="http://www.w3.org/2000/svg">
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
     </svg>
 );
 
-export const CarbsIcon: React.FC = () => (
-    <svg {...MacroIconProps} xmlns="http://www.w3.org/2000/svg">
+export const CarbsIcon: React.FC<{ className?: string }> = ({ className = "h-6 w-6 text-emerald-600" }) => (
+    <svg {...MacroIconBaseProps} className={className} xmlns="http://www.w3.org/2000/svg">
         <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
     </svg>
 );
 
-export const FatIcon: React.FC = () => (
-    <svg {...MacroIconProps} xmlns="http://www.w3.org/2000/svg">
+export const FatIcon: React.FC<{ className?: string }> = ({ className = "h-6 w-6 text-emerald-600" }) => (
+    <svg {...MacroIconBaseProps} className={className} xmlns="http://www.w3.org/2000/svg">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.002 9.002 0 008.485-6.132l-1.39-1.39a2.25 2.25 0 00-3.182 0l-1.09 1.09a2.25 2.25 0 01-3.182 0l-1.09-1.09a2.25 2.25 0 00-3.182 0L2.514 14.868A9.002 9.002 0 0012 21zM5.334 12.793a9.002 9.002 0 0113.332 0" />
     </svg>
 );

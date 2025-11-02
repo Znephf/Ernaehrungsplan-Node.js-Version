@@ -91,4 +91,4 @@ Die Anwendung enthält Skripte zur Migration von Daten aus älteren Versionen. D
 
 **Wichtig:** Führen Sie diese Skripte nur aus, wenn Sie von einer älteren Version der App aktualisieren. Erstellen Sie vorher immer ein Backup Ihrer Datenbank.
 
--   `npm run migrate:fix-legacy`: Sucht in alten, archivierten Plänen nach Rezepten, die möglicherweise bei früheren Migrationen übersehen wurden, und fügt sie zur neuen Rezept-Datenbank hinzu. Dieses Skript kann sicher mehrfach ausgeführt werden.
+-   `npm run migrate:fix-legacy`: Sucht in alten, archivierten Plänen nach Rezepten, die möglicherweise bei früheren Migrationen übersehen wurden, und fügt sie zur neuen Rezept-Datenbank hinzu. **Dieses Skript sollte nach Updates erneut ausgeführt werden**, um sicherzustellen, dass alle Daten (z.B. die Ernährungsweise) für bestehende Rezepte korrekt nachgetragen werden. Es kann sicher mehrfach ausgeführt werden.

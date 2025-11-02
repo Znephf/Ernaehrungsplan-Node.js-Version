@@ -1,5 +1,5 @@
 import React, { useState, useMemo, DragEvent, useEffect } from 'react';
-import type { ArchiveEntry, Recipe, Diet, DietType, DishComplexity, MealCategory } from '../types';
+import type { Recipe, Diet, DietType, DishComplexity, MealCategory } from '../types';
 import { MealCategoryLabels, MEAL_ORDER } from '../types';
 import * as apiService from '../services/apiService';
 import { LoadingSpinnerIcon, CloseIcon } from './IconComponents';
@@ -19,28 +19,8 @@ const useMediaQuery = (query: string): boolean => {
 };
 
 interface PlannerComponentProps {
-  archive: ArchiveEntry[];
   onPlanSaved: () => void;
 }
-
-type PlannerRecipe = Recipe & { 
-    sourcePlanSettings: any;
-};
-
-const getUniqueRecipes = (archive: ArchiveEntry[]): PlannerRecipe[] => {
-    const uniqueRecipes = new Map<number, PlannerRecipe>();
-    archive.forEach(plan => {
-        (plan.recipes || []).forEach(recipe => {
-            if (!uniqueRecipes.has(recipe.id)) {
-                uniqueRecipes.set(recipe.id, { 
-                    ...recipe, 
-                    sourcePlanSettings: { ...plan.settings }
-                });
-            }
-        });
-    });
-    return Array.from(uniqueRecipes.values());
-};
 
 const dietPreferenceLabels: Record<Diet, string> = { omnivore: 'Alles', vegetarian: 'Vegetarisch', vegan: 'Vegan' };
 const dietTypeLabels: Record<DietType, string> = { balanced: 'Ausgewogen', 'low-carb': 'Low-Carb', keto: 'Ketogen', 'high-protein': 'High-Protein', mediterranean: 'Mediterran' };
@@ -51,11 +31,17 @@ const FilterToggleButton: React.FC<{ label: string; isSelected: boolean; onClick
 
 const WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 
-type WeeklySlots = { [day: string]: { recipe: PlannerRecipe; mealType: MealCategory; uniqueId: string }[] };
+type WeeklySlots = { [day: string]: { recipe: Recipe; mealType: MealCategory; uniqueId: string }[] };
 
-const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSaved }) => {
+const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
     const isDesktop = useMediaQuery('(min-width: 1024px)');
-    const allRecipes = useMemo(() => getUniqueRecipes(archive), [archive]);
+    const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
+    
+    useEffect(() => {
+        apiService.getAllRecipes()
+            .then(setAllRecipes)
+            .catch(err => console.error("Could not fetch recipes for planner:", err));
+    }, []);
     
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedPreferences, setSelectedPreferences] = useState<Set<Diet>>(new Set());
@@ -104,17 +90,13 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
 
     const filteredRecipes = useMemo(() => {
         return allRecipes.filter(recipe => {
-            const settings = recipe.sourcePlanSettings;
-            if (!settings) return false;
             const matchesSearch = !searchTerm.trim() || recipe.title.toLowerCase().includes(searchTerm.toLowerCase().trim());
-            const matchesPreference = selectedPreferences.size === 0 || selectedPreferences.has(settings.dietaryPreference);
-            const matchesDietType = selectedDietTypes.size === 0 || selectedDietTypes.has(settings.dietType);
-            const matchesComplexity = selectedComplexities.size === 0 || selectedComplexities.has(settings.dishComplexity);
-            const matchesGlutenFree = !filterGlutenFree || settings.isGlutenFree;
-            const matchesLactoseFree = !filterLactoseFree || settings.isLactoseFree;
-            return matchesSearch && matchesPreference && matchesDietType && matchesComplexity && matchesGlutenFree && matchesLactoseFree;
+            const matchesPreference = selectedPreferences.size === 0 || (recipe.dietaryPreference && selectedPreferences.has(recipe.dietaryPreference));
+            // Note: dietType, complexity, etc. are not stored per recipe, so filtering is not possible
+            // This could be a future improvement if those properties are added to the recipe model
+            return matchesSearch && matchesPreference;
         });
-    }, [allRecipes, searchTerm, selectedPreferences, selectedDietTypes, selectedComplexities, filterGlutenFree, filterLactoseFree]);
+    }, [allRecipes, searchTerm, selectedPreferences]);
     
     const handleFilterToggle = <T extends string>(value: T, currentFilters: Set<T>, setFilters: React.Dispatch<React.SetStateAction<Set<T>>>) => {
         const newFilters = new Set(currentFilters);
@@ -148,14 +130,14 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
         }));
     };
     
-    const handleDragStart = (e: DragEvent<HTMLDivElement>, recipe: PlannerRecipe) => { e.dataTransfer.setData('application/json', JSON.stringify(recipe)); e.dataTransfer.effectAllowed = 'copy'; };
+    const handleDragStart = (e: DragEvent<HTMLDivElement>, recipe: Recipe) => { e.dataTransfer.setData('application/json', JSON.stringify(recipe)); e.dataTransfer.effectAllowed = 'copy'; };
     
     const handleDrop = (e: DragEvent<HTMLDivElement>, day: string, mealType: MealCategory) => {
         e.preventDefault();
         e.stopPropagation();
         const recipeData = e.dataTransfer.getData('application/json');
         if (recipeData) {
-            const recipe = JSON.parse(recipeData) as PlannerRecipe;
+            const recipe = JSON.parse(recipeData) as Recipe;
             // Nur droppen, wenn die Kategorie passt
             if (recipe.category === mealType) {
                  setWeeklySlots(prev => ({
@@ -177,7 +159,7 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
         setAddingMealToDay(null);
     };
 
-    const handleSelectRecipeForDay = (recipe: PlannerRecipe) => {
+    const handleSelectRecipeForDay = (recipe: Recipe) => {
         if (modalDay && modalMealType) {
             setWeeklySlots(prev => ({
                 ...prev,
@@ -208,19 +190,21 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
         <div className="space-y-3">
           {/* FIX: Use Object.keys for type-safe iteration over string literal types. */}
           <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium">Typ:</span>{(Object.keys(dietPreferenceLabels) as Diet[]).map(key => <FilterToggleButton key={key} label={dietPreferenceLabels[key]} isSelected={selectedPreferences.has(key)} onClick={() => handleFilterToggle(key,selectedPreferences,setSelectedPreferences)} />)}</div>
-          <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium">Diät:</span>{(Object.keys(dietTypeLabels) as DietType[]).map(key => <FilterToggleButton key={key} label={dietTypeLabels[key]} isSelected={selectedDietTypes.has(key)} onClick={() => handleFilterToggle(key,selectedDietTypes,setSelectedDietTypes)} />)}</div>
-          <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium">Niveau:</span>{(Object.keys(dishComplexityLabels) as DishComplexity[]).map(key => <FilterToggleButton key={key} label={dishComplexityLabels[key]} isSelected={selectedComplexities.has(key)} onClick={() => handleFilterToggle(key,selectedComplexities,setSelectedComplexities)} />)}</div>
-          <div className="flex flex-wrap items-center gap-2 pt-2"><label className="flex items-center"><input type="checkbox" checked={filterGlutenFree} onChange={e => setFilterGlutenFree(e.target.checked)} className="mr-2 rounded" /> Glutenfrei</label><label className="flex items-center"><input type="checkbox" checked={filterLactoseFree} onChange={e => setFilterLactoseFree(e.target.checked)} className="mr-2 rounded" /> Laktosefrei</label></div>
+          
+          {/* The filters below are commented out as the data is not available on the recipe level yet */}
+          {/* <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium">Diät:</span>{(Object.keys(dietTypeLabels) as DietType[]).map(key => <FilterToggleButton key={key} label={dietTypeLabels[key]} isSelected={selectedDietTypes.has(key)} onClick={() => handleFilterToggle(key,selectedDietTypes,setSelectedDietTypes)} />)}</div> */}
+          {/* <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium">Niveau:</span>{(Object.keys(dishComplexityLabels) as DishComplexity[]).map(key => <FilterToggleButton key={key} label={dishComplexityLabels[key]} isSelected={selectedComplexities.has(key)} onClick={() => handleFilterToggle(key,selectedComplexities,setSelectedComplexities)} />)}</div> */}
+          {/* <div className="flex flex-wrap items-center gap-2 pt-2"><label className="flex items-center"><input type="checkbox" checked={filterGlutenFree} onChange={e => setFilterGlutenFree(e.target.checked)} className="mr-2 rounded" /> Glutenfrei</label><label className="flex items-center"><input type="checkbox" checked={filterLactoseFree} onChange={e => setFilterLactoseFree(e.target.checked)} className="mr-2 rounded" /> Laktosefrei</label></div> */}
         </div>
       </div>
     );
 
-    const recipeList = (onSelect: (recipe: PlannerRecipe) => void, mealTypeFilter?: MealCategory | null) => (
+    const recipeList = (onSelect: (recipe: Recipe) => void, mealTypeFilter?: MealCategory | null) => (
       <div className="space-y-3">
         {filteredRecipes.length > 0 ? filteredRecipes
             .filter(recipe => !mealTypeFilter || recipe.category === mealTypeFilter)
             .map(recipe => (
-          <div key={recipe.id} draggable={isDesktop} onDragStart={e => handleDragStart(e, recipe)} onClick={() => !isDesktop && onSelect(recipe)} className="bg-white p-3 rounded-md shadow hover:shadow-md cursor-grab active:cursor-grabbing flex items-center gap-4">
+          <div key={recipe.id} draggable={isDesktop} onDragStart={e => handleDragStart(e, recipe)} onClick={() => !isDesktop && onSelect(recipe)} className="bg-white p-3 rounded-lg shadow hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-grab active:cursor-grabbing flex items-center gap-4">
             {recipe.image_url && <img src={recipe.image_url} alt={recipe.title} className="w-12 h-12 rounded-md object-cover flex-shrink-0" />}
             <div className="flex-grow"><p className="font-semibold text-slate-700">{recipe.title}</p><p className="text-xs text-slate-400">{MealCategoryLabels[recipe.category]} &bull; {recipe.totalCalories} kcal</p></div>
           </div>

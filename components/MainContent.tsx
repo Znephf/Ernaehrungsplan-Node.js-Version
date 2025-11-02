@@ -78,9 +78,9 @@ const MainContent: React.FC<MainContentProps> = (props) => {
       case 'archive':
         return <ArchiveComponent archive={archive} onLoadPlan={onLoadPlan} />;
       case 'recipe-archive':
-        return <RecipeArchiveComponent archive={archive} />;
+        return <RecipeArchiveComponent />;
       case 'planner':
-        return <PlannerComponent archive={archive} onPlanSaved={onPlanSaved} />;
+        return <PlannerComponent onPlanSaved={onPlanSaved} />;
       default:
         return <SettingsPanel settings={settings} onSettingsChange={onSettingsChange} onGeneratePlan={onGeneratePlan} isLoading={isLoading} />;
     }

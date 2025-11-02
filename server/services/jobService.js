@@ -59,12 +59,13 @@ async function savePlanToDatabase(planData, settings) {
         const recipeIdMap = new Map();
         for (const recipe of planData.recipes) {
             const [recipeResult] = await connection.query(
-                `INSERT INTO recipes (title, ingredients, instructions, totalCalories, protein, carbs, fat, category) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                `INSERT INTO recipes (title, ingredients, instructions, totalCalories, protein, carbs, fat, category, dietaryPreference) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id), ingredients=VALUES(ingredients), instructions=VALUES(instructions)`,
                 [
                     recipe.title, JSON.stringify(recipe.ingredients), JSON.stringify(recipe.instructions),
-                    recipe.totalCalories, recipe.protein, recipe.carbs, recipe.fat, recipe.category
+                    recipe.totalCalories, recipe.protein, recipe.carbs, recipe.fat, recipe.category,
+                    settings.dietaryPreference // Save diet preference with the recipe
                 ]
             );
             

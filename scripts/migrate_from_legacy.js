@@ -25,6 +25,7 @@ const MealCategoryMap = {
     'Snack': 'snack',
     'Kaffee & Kuchen': 'coffee',
 };
+const MEAL_CATEGORIES = Object.values(MealCategoryMap);
 
 async function migrateLegacyData() {
     console.log('--- Starting Legacy Data Fix & Migration Script ---');
@@ -40,19 +41,22 @@ async function migrateLegacyData() {
             return;
         }
 
-        const [legacyPlans] = await pool.query("SELECT id, planData FROM legacy_archived_plans");
+        const [legacyPlans] = await pool.query("SELECT id, planData, settings FROM legacy_archived_plans");
         if (legacyPlans.length === 0) {
             console.log('No plans found in `legacy_archived_plans`. Exiting.');
             await pool.end();
             return;
         }
         
-        console.log(`Found ${legacyPlans.length} legacy plans to check for missing recipes.`);
+        console.log(`Found ${legacyPlans.length} legacy plans to check for missing recipes and data.`);
         let newRecipesAdded = 0;
+        let recipesUpdated = 0;
 
         for (const plan of legacyPlans) {
             try {
                 const planData = JSON.parse(plan.planData);
+                const settings = JSON.parse(plan.settings);
+                const planDietPreference = settings?.dietaryPreference || 'omnivore';
                 
                 let recipesToProcess = [];
                 if (planData.recipes && Array.isArray(planData.recipes)) {
@@ -75,19 +79,19 @@ async function migrateLegacyData() {
                 for (const recipe of uniqueRecipes) {
                     if (!recipe.title) continue;
 
-                    let category = 'dinner';
+                    let category = 'dinner'; // Default for old data
                     if (recipe.category && MEAL_CATEGORIES.includes(recipe.category)) {
                         category = recipe.category;
                     } else if (recipe.title.toLowerCase().includes('quark')) {
                         category = 'breakfast';
-                    } else if (MealCategoryMap[recipe.mealType]) {
+                    } else if (recipe.mealType && MealCategoryMap[recipe.mealType]) {
                         category = MealCategoryMap[recipe.mealType];
                     }
 
                     const [result] = await pool.query(
-                        `INSERT INTO recipes (title, ingredients, instructions, totalCalories, protein, carbs, fat, category) 
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                         ON DUPLICATE KEY UPDATE title=title`,
+                        `INSERT INTO recipes (title, ingredients, instructions, totalCalories, protein, carbs, fat, category, dietaryPreference) 
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         ON DUPLICATE KEY UPDATE dietaryPreference = IF(dietaryPreference IS NULL, VALUES(dietaryPreference), dietaryPreference)`,
                         [
                             recipe.title,
                             JSON.stringify(recipe.ingredients || []),
@@ -96,23 +100,28 @@ async function migrateLegacyData() {
                             recipe.protein || null,
                             recipe.carbs || null,
                             recipe.fat || null,
-                            category
+                            category,
+                            planDietPreference
                         ]
                     );
 
-                    if (result.affectedRows > 0) {
+                    if (result.insertId > 0) {
                         newRecipesAdded++;
-                        console.log(`  -> Added new recipe: "${recipe.title}"`);
+                        console.log(`  -> Added new recipe: "${recipe.title}" with diet: ${planDietPreference}`);
+                    } else if (result.affectedRows > 0) {
+                        recipesUpdated++;
+                         console.log(`  -> Updated existing recipe: "${recipe.title}" with diet: ${planDietPreference}`);
                     }
                 }
 
             } catch (e) {
-                console.error(`Could not parse planData for legacy plan ID ${plan.id}. Skipping. Error: ${e.message}`);
+                console.error(`Could not parse data for legacy plan ID ${plan.id}. Skipping. Error: ${e.message}`);
             }
         }
 
         console.log(`\n--- Migration Complete ---`);
-        console.log(`Total new recipes added to the database: ${newRecipesAdded}`);
+        console.log(`Total new recipes added: ${newRecipesAdded}`);
+        console.log(`Total existing recipes updated: ${recipesUpdated}`);
 
     } catch (error) {
         console.error('\n--- A CRITICAL ERROR OCCURRED ---');

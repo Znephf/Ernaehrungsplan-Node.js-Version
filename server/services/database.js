@@ -32,6 +32,7 @@ const initializeDatabase = async () => {
                 carbs FLOAT,
                 fat FLOAT,
                 category ENUM('breakfast', 'lunch', 'coffee', 'dinner', 'snack') NOT NULL,
+                dietaryPreference ENUM('omnivore', 'vegetarian', 'vegan'),
                 image_url VARCHAR(255),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE KEY (title)

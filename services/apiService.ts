@@ -57,6 +57,12 @@ export const saveCustomPlan = async (data: { name: string; persons: number; meal
     return handleResponse(response);
 };
 
+// Get all recipes
+export const getAllRecipes = async (): Promise<Recipe[]> => {
+    const response = await fetch('/api/recipes');
+    return handleResponse(response);
+};
+
 // Plan Generation
 // Fix: Converted to async/await to fix type inference issues.
 export const startPlanGenerationJob = async (data: { settings: PlanSettings; previousPlanRecipes: Recipe[] }): Promise<{ jobId: string }> => {
