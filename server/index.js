@@ -6,15 +6,27 @@ const cookieParser = require('cookie-parser');
 const fs = require('fs');
 const { initializeDatabase } = require('./services/database');
 
-// Lade Umgebungsvariablen aus der .env-Datei, ABER nur wenn wir NICHT in Produktion sind.
-if (process.env.NODE_ENV !== 'production') {
-  dotenv.config({ path: path.resolve(__dirname, '../.env') });
+// Lade Umgebungsvariablen aus der .env-Datei.
+// In der Produktion wird dies nur getan, wenn es explizit über eine Umgebungsvariable erzwungen wird.
+// Dies ist eine Sicherheitsmaßnahme. Die bevorzugte Methode für die Produktion sind die Plesk-Umgebungsvariablen.
+if (process.env.NODE_ENV !== 'production' || process.env.FORCE_DOTENV_IN_PROD === 'true') {
+  const envPath = path.resolve(__dirname, '../.env');
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('\n!!! SICHERHEITSWARNUNG !!!');
+      console.warn('Die .env-Datei wird in der Produktionsumgebung geladen, da FORCE_DOTENV_IN_PROD=true gesetzt ist.');
+      console.warn('Dies wird nicht empfohlen. Bitte verwenden Sie stattdessen die Plesk-Umgebungsvariablen für maximale Sicherheit.\n');
+    }
+  }
 }
+
 
 // --- Starup-Diagnose ---
 console.log('--- Starte Server und prüfe Umgebungsvariablen ---');
 const requiredVars = ['COOKIE_SECRET', 'APP_PASSWORD', 'API_KEY', 'DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
 requiredVars.forEach(v => {
+    // In der Diagnose wird der Wert nun explizit angezeigt, um Klarheit zu schaffen.
     console.log(`Wert für ${v}:`, process.env[v] ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
 });
 console.log(`Wert für API_KEY_FALLBACK:`, process.env.API_KEY_FALLBACK ? '*** (gesetzt, Fallback-Schlüssel aktiv)' : 'Nicht gesetzt (optional)');
