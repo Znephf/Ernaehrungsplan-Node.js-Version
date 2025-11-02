@@ -1,86 +1,96 @@
+// Fix: Implemented the MainContent component to act as a view router, displaying the correct component based on the current view state.
 import React from 'react';
-import type { View, ArchiveEntry, Recipe, Recipes, WeeklyPlan } from '../types';
-import ShoppingListComponent from './ShoppingList';
+import type { View, PlanData, PlanSettings, Recipe, ShoppingList, WeeklyPlan, ArchiveEntry } from '../types';
 import WeeklyPlanComponent from './WeeklyPlan';
+import ShoppingListComponent from './ShoppingList';
 import RecipesComponent from './Recipes';
 import ArchiveComponent from './Archive';
-import PlannerComponent from './Planner';
 import RecipeArchiveComponent from './RecipeArchive';
+import SettingsPanel from './SettingsPanel';
+import PlannerComponent from './Planner';
 
 interface MainContentProps {
-    view: View;
-    plan: ArchiveEntry | null;
-    archive: ArchiveEntry[];
-    imageUrls: { [id: number]: string };
-    loadingImages: Set<number>;
-    imageErrors: { [id: number]: string | null };
-    onSelectRecipe: (day: string) => void;
-    onLoadPlan: (id: number) => void;
-    onGenerateImage: (recipe: Recipe) => Promise<void>;
-    onGenerateMissingImages: (weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
-    onCustomPlanSaved: () => void;
+  currentView: View;
+  plan: PlanData | null;
+  settings: PlanSettings;
+  archive: ArchiveEntry[];
+  imageUrls: { [id: number]: string };
+  loadingImages: Set<number>;
+  imageErrors: { [id: number]: string | null };
+  isLoading: boolean;
+  onSettingsChange: (settings: PlanSettings) => void;
+  onGeneratePlan: () => void;
+  onLoadPlan: (id: number) => void;
+  onSelectRecipe: (day: string) => void;
+  onPlanSaved: () => void;
+  generateImage: (recipe: Recipe) => Promise<void>;
+  generateMissingImages: (weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
 }
 
-const MainContent: React.FC<MainContentProps> = ({
-    view,
+const MainContent: React.FC<MainContentProps> = (props) => {
+  const {
+    currentView,
     plan,
+    settings,
     archive,
     imageUrls,
     loadingImages,
     imageErrors,
-    onSelectRecipe,
+    isLoading,
+    onSettingsChange,
+    onGeneratePlan,
     onLoadPlan,
-    onGenerateImage,
-    onGenerateMissingImages,
-    onCustomPlanSaved,
-}) => {
+    onSelectRecipe,
+    onPlanSaved,
+    generateImage,
+    generateMissingImages,
+  } = props;
 
-    const renderView = () => {
-        switch (view) {
-            case 'shopping':
-                return plan ? <ShoppingListComponent shoppingList={plan.shoppingList} /> : null;
-            case 'plan':
-                return plan ? <WeeklyPlanComponent 
-                                weeklyPlan={plan.weeklyPlan} 
-                                planName={plan.name} 
-                                onSelectRecipe={onSelectRecipe}
-                                isGlutenFree={(plan.settings || {}).isGlutenFree}
-                                isLactoseFree={(plan.settings || {}).isLactoseFree}
-                             /> : null;
-            case 'recipes':
-                return plan ? <RecipesComponent 
-                            weeklyPlan={plan.weeklyPlan}
-                            recipes={plan.recipes} 
-                            persons={(plan.settings || {}).persons}
-                            imageUrls={imageUrls}
-                            loadingImages={loadingImages}
-                            imageErrors={imageErrors}
-                            generateImage={onGenerateImage}
-                            generateMissingImages={onGenerateMissingImages}
-                        /> : null;
-            case 'archive':
-                return <ArchiveComponent archive={archive} onLoadPlan={onLoadPlan} />;
-            case 'recipe-archive':
-                return <RecipeArchiveComponent archive={archive} />;
-            case 'planner':
-                return <PlannerComponent archive={archive} onPlanSaved={onCustomPlanSaved} />;
-            default:
-                return null;
-        }
-    };
+  const renderView = () => {
+    switch (currentView) {
+      case 'plan':
+        return plan ? (
+          <WeeklyPlanComponent
+            weeklyPlan={plan.weeklyPlan}
+            planName={plan.name}
+            onSelectRecipe={onSelectRecipe}
+            isGlutenFree={plan.settings.isGlutenFree}
+            isLactoseFree={plan.settings.isLactoseFree}
+          />
+        ) : (
+          <SettingsPanel settings={settings} onSettingsChange={onSettingsChange} onGeneratePlan={onGeneratePlan} isLoading={isLoading} />
+        );
+      case 'shopping':
+        return plan ? <ShoppingListComponent shoppingList={plan.shoppingList} /> : <p>Kein Plan zum Anzeigen der Einkaufsliste vorhanden.</p>;
+      case 'recipes':
+        return plan ? (
+          <RecipesComponent
+            weeklyPlan={plan.weeklyPlan}
+            recipes={plan.recipes}
+            persons={plan.settings.persons}
+            imageUrls={imageUrls}
+            loadingImages={loadingImages}
+            imageErrors={imageErrors}
+            generateImage={generateImage}
+            generateMissingImages={generateMissingImages}
+          />
+        ) : <p>Kein Plan zum Anzeigen der Rezepte vorhanden.</p>;
+      case 'archive':
+        return <ArchiveComponent archive={archive} onLoadPlan={onLoadPlan} />;
+      case 'recipe-archive':
+        return <RecipeArchiveComponent archive={archive} />;
+      case 'planner':
+        return <PlannerComponent archive={archive} onPlanSaved={onPlanSaved} />;
+      default:
+        return <SettingsPanel settings={settings} onSettingsChange={onSettingsChange} onGeneratePlan={onGeneratePlan} isLoading={isLoading} />;
+    }
+  };
 
-    return (
-        <>
-            {renderView()}
-
-            {!plan && view !== 'archive' && view !== 'planner' && view !== 'recipe-archive' && (
-                <div className="text-center py-16 bg-white rounded-lg shadow-md">
-                    <h2 className="text-2xl font-bold text-slate-700 mb-2">Willkommen beim KI Ernährungsplaner</h2>
-                    <p className="text-slate-500">Erstellen Sie oben einen neuen Plan oder laden Sie einen bestehenden aus dem Archiv.</p>
-                </div>
-            )}
-        </>
-    );
+  return (
+    <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {renderView()}
+    </main>
+  );
 };
 
 export default MainContent;

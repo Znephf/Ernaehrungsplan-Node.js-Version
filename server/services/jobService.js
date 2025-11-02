@@ -1,168 +1,179 @@
-const fs = require('fs');
+const fs = require('fs/promises');
 const path = require('path');
 const crypto = require('crypto');
 const { pool } = require('./database');
-const { generateImageForRecipe, generateShoppingListForRecipes } = require('./geminiService');
+const { generatePlanAndShoppingList } = require('./geminiService');
 const { generateShareableHtml } = require('./htmlGenerator');
 
-const publicSharesDir = path.join(__dirname, '..', '..', 'public', 'shares');
-const publicImagesDir = path.join(__dirname, '..', '..', 'public', 'images', 'recipes');
-const WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
-
-/**
- * Speichert ein Base64-codiertes Bild als Datei und aktualisiert den `image_url` des Rezepts in der Datenbank.
- * @param {string | number} recipeId - Die ID des Rezepts.
- * @param {string} base64Data - Die Base64-codierten Bilddaten (ohne Data-URI-Präfix).
- * @returns {Promise<string>} Die öffentliche URL der gespeicherten Bilddatei.
- */
-async function saveImageForRecipe(recipeId, base64Data) {
-    const imageBuffer = Buffer.from(base64Data, 'base64');
-    const fileName = `${crypto.randomBytes(16).toString('hex')}.jpg`;
-    const filePath = path.join(publicImagesDir, fileName);
-    const fileUrl = `/images/recipes/${fileName}`;
-    
-    fs.writeFileSync(filePath, imageBuffer);
-
-    await pool.query(
-        'UPDATE recipes SET image_url = ? WHERE id = ?',
-        [fileUrl, recipeId]
-    );
-    return fileUrl;
-}
-
-
-/**
- * Erstellt eine teilbare HTML-Datei für einen Plan und speichert den Link in der Datenbank.
- * @param {object} plan - Das vollständige, rekonstruierte Plan-Objekt.
- * @returns {Promise<string>} Die URL der teilbaren Datei.
- */
-async function createShareLink(plan) {
-    const shareId = plan.shareId || crypto.randomBytes(12).toString('hex');
-    const htmlContent = await generateShareableHtml(plan);
-    const fileName = `${shareId}.html`;
-    const filePath = path.join(publicSharesDir, fileName);
-
-    fs.writeFileSync(filePath, htmlContent, 'utf-8');
-
-    if (!plan.shareId) {
-        await pool.query('UPDATE plans SET shareId = ? WHERE id = ?', [shareId, plan.id]);
-    }
-    
-    return `/shares/${fileName}`;
-}
-
-
-/**
- * Verarbeitet einen Job zur Vorbereitung des Teilens eines Plans asynchron.
- * @param {string} jobId - Die ID des Jobs.
- */
-async function processShareJob(jobId) {
-    let plan;
+const updateJobStatus = async (jobId, status, progressText = '', errorMessage = null, resultJson = null) => {
     try {
-        const [jobRows] = await pool.query('SELECT relatedPlanId FROM app_jobs WHERE jobId = ?', [jobId]);
-        if (jobRows.length === 0) throw new Error(`Job ${jobId} nicht gefunden.`);
+        await pool.query(
+            'UPDATE app_jobs SET status = ?, progressText = ?, errorMessage = ?, resultJson = ? WHERE jobId = ?',
+            [status, progressText, errorMessage, resultJson ? JSON.stringify(resultJson) : null, jobId]
+        );
+    } catch (error) {
+        console.error(`[Job ${jobId}] Failed to update status to ${status}:`, error);
+    }
+};
+
+const processPlanGenerationJob = async (jobId) => {
+    console.log(`[Job ${jobId}] Starting plan generation process.`);
+    let planData;
+
+    try {
+        await updateJobStatus(jobId, 'in_progress', 'Schritt 1/2: Wochenplan & Rezepte werden erstellt...');
+        const [jobRows] = await pool.query('SELECT settings, previousPlanRecipes FROM app_jobs WHERE jobId = ?', [jobId]);
+        if (jobRows.length === 0) throw new Error("Job not found in database.");
+
+        const settings = JSON.parse(jobRows[0].settings);
+        const previousPlanRecipes = JSON.parse(jobRows[0].previousPlanRecipes || '[]');
         
-        const planId = jobRows[0].relatedPlanId;
-        
-        // BEHOBEN: Lade Plandaten aus den neuen, normalisierten Tabellen
-        const [planRows] = await pool.query(`
-            SELECT 
-                p.id, p.name, p.createdAt, p.settings, p.shareId,
-                pr.day_of_week, pr.meal_type,
-                r.id as recipe_id, r.title, r.ingredients, r.instructions, r.totalCalories, r.protein, r.carbs, r.fat, r.category, r.image_url
-            FROM plans p
-            LEFT JOIN plan_recipes pr ON p.id = pr.plan_id
-            LEFT JOIN recipes r ON pr.recipe_id = r.id
-            WHERE p.id = ?
-            ORDER BY FIELD(pr.day_of_week, 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag');
-        `, [planId]);
-
-        if (planRows.length === 0) throw new Error(`Zugehöriger Plan ${planId} für Job ${jobId} nicht gefunden.`);
-
-        // Rekonstruiere das Plan-Objekt
-        plan = {
-            id: planRows[0].id,
-            name: planRows[0].name,
-            settings: typeof planRows[0].settings === 'string' ? JSON.parse(planRows[0].settings) : planRows[0].settings,
-            shareId: planRows[0].shareId,
-            weeklyPlan: [],
-            recipes: [],
-            shoppingList: []
-        };
-        const recipeMap = new Map();
-        planRows.forEach(row => {
-            if (row.recipe_id && !recipeMap.has(row.recipe_id)) {
-                const recipe = {
-                    id: row.recipe_id, title: row.title,
-                    ingredients: typeof row.ingredients === 'string' ? JSON.parse(row.ingredients) : row.ingredients,
-                    instructions: typeof row.instructions === 'string' ? JSON.parse(row.instructions) : row.instructions,
-                    totalCalories: row.totalCalories, protein: row.protein, carbs: row.carbs, fat: row.fat,
-                    category: row.category, image_url: row.image_url
-                };
-                recipeMap.set(recipe.id, recipe);
-                plan.recipes.push(recipe);
-            }
-            let dayPlan = plan.weeklyPlan.find(dp => dp.day === row.day_of_week);
-            if (!dayPlan) {
-                dayPlan = { day: row.day_of_week, meals: [], totalCalories: 0 };
-                plan.weeklyPlan.push(dayPlan);
-            }
-            if (row.recipe_id) {
-                dayPlan.meals.push({ mealType: row.meal_type, recipe: recipeMap.get(row.recipe_id) });
-                dayPlan.totalCalories += (row.totalCalories || 0);
-            }
-        });
-        plan.weeklyPlan.sort((a, b) => WEEKDAYS.indexOf(a.day) - WEEKDAYS.indexOf(b.day));
-        plan.shoppingList = await generateShoppingListForRecipes(plan.recipes, plan.settings.persons);
-
-
-        if (plan.shareId) {
-            const existingFile = path.join(publicSharesDir, `${plan.shareId}.html`);
-            if (fs.existsSync(existingFile)) {
-                const shareUrl = `/shares/${plan.shareId}.html`;
-                await pool.query('UPDATE app_jobs SET status = "complete", resultJson = ? WHERE jobId = ?', [JSON.stringify({ shareUrl }), jobId]);
-                return;
-            }
-        }
-
-        const recipesToGenerate = plan.recipes.filter(r => !r.image_url);
-        if (recipesToGenerate.length > 0) {
-            for (let i = 0; i < recipesToGenerate.length; i++) {
-                const recipe = recipesToGenerate[i];
-                const progressText = `Generiere Bild ${i + 1}/${recipesToGenerate.length}: ${recipe.title}`;
-                await pool.query('UPDATE app_jobs SET status = "processing", progressText = ? WHERE jobId = ?', [progressText, jobId]);
-
-                const imageResult = await generateImageForRecipe(recipe, 1);
-                const response = imageResult.apiResponse;
-
-                if (response.promptFeedback?.blockReason) { continue; }
-                const candidate = response?.candidates?.[0];
-                if (!candidate || (candidate.finishReason && candidate.finishReason !== 'STOP')) { continue; }
-                
-                const imagePart = candidate.content?.parts?.find(p => p.inlineData);
-                
-                if (imagePart?.inlineData?.data) {
-                    // BEHOBEN: Rufe die korrigierte Funktion mit recipe.id auf
-                    const fileUrl = await saveImageForRecipe(recipe.id, imagePart.inlineData.data);
-                    recipe.image_url = fileUrl; // Aktualisiere das In-Memory-Objekt für die HTML-Generierung
-                }
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
+        planData = await generatePlanAndShoppingList(settings, previousPlanRecipes);
+        if (!planData || !planData.recipes || !planData.weeklyPlan) {
+            throw new Error("Invalid data structure received from AI model.");
         }
         
-        await pool.query('UPDATE app_jobs SET status = "processing", progressText = "Link wird erstellt..." WHERE jobId = ?', [jobId]);
-        const finalShareUrl = await createShareLink(plan);
-        
-        await pool.query('UPDATE app_jobs SET status = "complete", resultJson = ? WHERE jobId = ?', [JSON.stringify({ shareUrl: finalShareUrl }), jobId]);
-        console.log(`[Job ${jobId}] Share-Job erfolgreich abgeschlossen.`);
+        await updateJobStatus(jobId, 'in_progress', 'Schritt 2/2: Plan wird in der Datenbank gespeichert...');
+        const newPlan = await savePlanToDatabase(planData, settings);
+
+        await updateJobStatus(jobId, 'complete', 'Plan erfolgreich erstellt!', null, { newPlanId: newPlan.id });
+        console.log(`[Job ${jobId}] Plan generation complete. New plan ID: ${newPlan.id}`);
 
     } catch (error) {
-        console.error(`[Job ${jobId}] Kritischer Fehler bei der Job-Verarbeitung:`, error);
-        await pool.query('UPDATE app_jobs SET status = "error", errorMessage = ? WHERE jobId = ?', [error.message, jobId]);
+        console.error(`[Job ${jobId}] CRITICAL ERROR during plan generation:`, error);
+        await updateJobStatus(jobId, 'error', 'Fehler', error.message || 'An unknown error occurred.');
+    }
+};
+
+async function savePlanToDatabase(planData, settings) {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const [planResult] = await connection.query(
+            `INSERT INTO plans (name, settings, shoppingList) VALUES (?, ?, ?)`,
+            [planData.name, JSON.stringify(settings), JSON.stringify(planData.shoppingList || [])]
+        );
+        const newPlanId = planResult.insertId;
+
+        const recipeIdMap = new Map();
+        for (const recipe of planData.recipes) {
+            const [recipeResult] = await connection.query(
+                `INSERT INTO recipes (title, ingredients, instructions, totalCalories, protein, carbs, fat, category) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id), ingredients=VALUES(ingredients), instructions=VALUES(instructions)`,
+                [
+                    recipe.title, JSON.stringify(recipe.ingredients), JSON.stringify(recipe.instructions),
+                    recipe.totalCalories, recipe.protein, recipe.carbs, recipe.fat, recipe.category
+                ]
+            );
+            
+            const [[{ recipe_id }]] = await connection.query('SELECT LAST_INSERT_ID() as recipe_id');
+            const finalRecipeId = recipeResult.insertId > 0 ? recipeResult.insertId : recipe_id;
+            
+            recipeIdMap.set(recipe.id, finalRecipeId);
+        }
+
+        for (const day of planData.weeklyPlan) {
+            for (const meal of day.meals) {
+                const dbRecipeId = recipeIdMap.get(meal.recipeId);
+                if (!dbRecipeId) {
+                    throw new Error(`Recipe with temp ID ${meal.recipeId} was not found in the recipe map.`);
+                }
+                await connection.query(
+                    `INSERT INTO plan_recipes (plan_id, recipe_id, day_of_week, meal_type) VALUES (?, ?, ?, ?)`,
+                    [newPlanId, dbRecipeId, day.day, meal.mealType]
+                );
+            }
+        }
+        
+        await connection.commit();
+        
+        return { id: newPlanId, name: planData.name };
+
+    } catch (error) {
+        await connection.rollback();
+        console.error("Database transaction failed for saving plan:", error);
+        throw error;
+    } finally {
+        connection.release();
     }
 }
 
-module.exports = {
+
+const processShareJob = async (jobId) => {
+    console.log(`[Job ${jobId}] Starting share process.`);
+    try {
+        await updateJobStatus(jobId, 'in_progress', 'Lade Plandaten...');
+        const [jobRows] = await pool.query('SELECT relatedPlanId FROM app_jobs WHERE jobId = ?', [jobId]);
+        if (!jobRows.length) throw new Error("Job not found.");
+        
+        const planId = jobRows[0].relatedPlanId;
+        const plan = await getFullPlanById(planId);
+        if (!plan) throw new Error(`Plan with ID ${planId} not found.`);
+
+        await updateJobStatus(jobId, 'in_progress', 'Generiere HTML-Datei...');
+        const htmlContent = await generateShareableHtml(plan);
+        
+        const shareId = crypto.randomBytes(8).toString('hex');
+        const fileName = `${shareId}.html`;
+        const filePath = path.join(__dirname, '..', '..', 'public', 'shares', fileName);
+
+        await fs.writeFile(filePath, htmlContent);
+        
+        await updateJobStatus(jobId, 'in_progress', 'Speichere Link...');
+        await pool.query('UPDATE plans SET shareId = ? WHERE id = ?', [shareId, planId]);
+
+        await updateJobStatus(jobId, 'complete', 'Fertig!', null, { shareUrl: `/shares/${fileName}` });
+        console.log(`[Job ${jobId}] Share process complete. URL: /shares/${fileName}`);
+
+    } catch (error) {
+        console.error(`[Job ${jobId}] CRITICAL ERROR during share process:`, error);
+        await updateJobStatus(jobId, 'error', 'Fehler', error.message || 'An unknown error occurred.');
+    }
+};
+
+async function getFullPlanById(planId) {
+    const [planRows] = await pool.query('SELECT * FROM plans WHERE id = ?', [planId]);
+    if (planRows.length === 0) return null;
+
+    const plan = planRows[0];
+    plan.settings = JSON.parse(plan.settings || '{}');
+    plan.shoppingList = JSON.parse(plan.shoppingList || '[]');
+
+    const [recipeLinks] = await pool.query(
+        `SELECT pr.day_of_week, pr.meal_type, r.* FROM plan_recipes pr
+         JOIN recipes r ON pr.recipe_id = r.id
+         WHERE pr.plan_id = ?`,
+        [planId]
+    );
+    
+    plan.recipes = recipeLinks.map(r => ({
+        ...r,
+        ingredients: JSON.parse(r.ingredients || '[]'),
+        instructions: JSON.parse(r.instructions || '[]')
+    }));
+
+    const weeklyPlanMap = new Map();
+    recipeLinks.forEach(link => {
+        if (!weeklyPlanMap.has(link.day_of_week)) {
+            weeklyPlanMap.set(link.day_of_week, { day: link.day_of_week, meals: [], totalCalories: 0 });
+        }
+        const dayPlan = weeklyPlanMap.get(link.day_of_week);
+        const recipe = plan.recipes.find(r => r.id === link.id);
+        if(recipe){
+          dayPlan.meals.push({ mealType: link.meal_type, recipe });
+          dayPlan.totalCalories += recipe.totalCalories || 0;
+        }
+    });
+
+    plan.weeklyPlan = Array.from(weeklyPlanMap.values());
+    
+    return plan;
+}
+
+module.exports = { 
+    processPlanGenerationJob,
     processShareJob,
-    saveImageForRecipe
+    getFullPlanById
 };

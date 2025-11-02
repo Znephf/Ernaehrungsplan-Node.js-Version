@@ -1,19 +1,20 @@
-import React, { useState, useCallback, useEffect } from 'react';
+// Fix: Implemented the main App component to manage state, authentication, and orchestrate different views.
+import React, { useState, useEffect, useCallback } from 'react';
+import type { View, PlanSettings, ArchiveEntry, WeeklyPlan, Recipe } from './types';
+import * as apiService from './services/apiService';
+
 import Header from './components/Header';
 import MainContent from './components/MainContent';
-import SettingsPanel from './components/SettingsPanel';
-import LoadingOverlay from './components/LoadingOverlay';
 import LoginComponent from './components/Login';
+import LoadingOverlay from './components/LoadingOverlay';
 import ShareModal from './components/ShareModal';
-import { ChevronUpIcon, ChevronDownIcon } from './components/IconComponents';
-import type { View, PlanSettings, ArchiveEntry } from './types';
+
 import { useArchive } from './hooks/useArchive';
 import { useMealPlanGenerator } from './hooks/useMealPlanGenerator';
 import { useImageGenerator } from './hooks/useImageGenerator';
 import { useShareProcessor } from './hooks/useShareProcessor';
-import * as apiService from './services/apiService';
 
-const defaultSettings: PlanSettings = {
+const initialSettings: PlanSettings = {
     persons: 2,
     kcal: 2000,
     dietaryPreference: 'omnivore',
@@ -23,243 +24,193 @@ const defaultSettings: PlanSettings = {
     desiredIngredients: '',
     isGlutenFree: false,
     isLactoseFree: false,
-    // Fix: Removed deprecated breakfastOption and customBreakfast, and added includedMeals to align with the PlanSettings type.
-    includedMeals: ['breakfast', 'lunch', 'dinner', 'snack', 'coffee'],
+    includedMeals: ['breakfast', 'dinner']
 };
 
 const App: React.FC = () => {
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [isAuthLoading, setIsAuthLoading] = useState(true);
+    const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
     const [currentView, setCurrentView] = useState<View>('plan');
-    const [selectedRecipeDay, setSelectedRecipeDay] = useState<string | null>(null);
-    const [isSettingsVisible, setIsSettingsVisible] = useState(true);
-    const [panelSettings, setPanelSettings] = useState<PlanSettings>(defaultSettings);
     
-
+    // Hooks for different functionalities
     const { archive, loadPlanFromArchive, fetchArchive, updatePlanInArchive } = useArchive();
     const { 
-        plan, 
-        setPlan, 
-        isLoading: isGeneratingPlan, 
-        error: planError, 
+        plan: generatedPlan, 
+        setPlan: setCurrentPlan, 
+        isLoading: isGenerating, 
+        error: generationError, 
         generateNewPlan, 
         generationStatus,
-        cancelGeneration 
+        cancelGeneration
     } = useMealPlanGenerator();
-
-    const handleShareComplete = useCallback(async () => {
-        // Nach Abschluss des Share-Prozesses das Archiv neu laden,
-        // um den aktualisierten Plan mit shareId und neuen Bild-URLs zu erhalten.
-        await fetchArchive();
-    }, [fetchArchive]);
     
     const { 
-        isProcessing: isSharing, 
-        status: shareStatus, 
-        shareUrl, 
-        setShareUrl,
-        error: shareError,
-        startSharingProcess, 
-        cancelProcessing: cancelSharing 
-    } = useShareProcessor(handleShareComplete);
+        imageUrls, 
+        loadingImages, 
+        imageErrors, 
+        generateImage, 
+        generateMissingImages, 
+        resetImageState, 
+        setImageUrlsFromArchive 
+    } = useImageGenerator(fetchArchive);
+    
+    const onShareComplete = (updatedPlan: ArchiveEntry | null) => {
+        if (updatedPlan) {
+            updatePlanInArchive(updatedPlan);
+        }
+    };
+    const { isProcessing: isSharing, status: shareStatus, shareUrl, setShareUrl, error: shareError, startSharingProcess } = useShareProcessor(onShareComplete);
 
-    // Fix: Destructured imageUrls and setImageUrlsFromArchive to manage image state correctly.
-    const { imageUrls, setImageUrlsFromArchive, loadingImages, imageErrors, generateImage, generateMissingImages } = useImageGenerator(fetchArchive);
+    const [settings, setSettings] = useState<PlanSettings>(initialSettings);
     
+    // This is the currently displayed plan, which could be from generation, archive, or default.
+    const [activePlan, setActivePlan] = useState<ArchiveEntry | null>(null);
+
+
+    // --- Authentication ---
     useEffect(() => {
-        const initializeApp = async () => {
-            setIsAuthLoading(true);
-            try {
-                await apiService.checkAuth();
-                setIsAuthenticated(true);
-                await fetchArchive();
-            } catch (error) {
-                console.error("Nicht authentifiziert oder Initialisierungsfehler.");
-                setIsAuthenticated(false);
-            } finally {
-                setIsAuthLoading(false);
-            }
-        };
-        initializeApp();
-    }, [fetchArchive]);
+        apiService.checkAuth()
+            .then(() => setIsLoggedIn(true))
+            .catch(() => setIsLoggedIn(false));
+    }, []);
+
+    const handleLoginSuccess = () => {
+        setIsLoggedIn(true);
+    };
     
-    const handleLoginSuccess = useCallback(() => {
-        setIsAuthenticated(true);
-        fetchArchive();
-    }, [fetchArchive]);
+    const handleLogout = async () => {
+        await apiService.logout();
+        setIsLoggedIn(false);
+    };
+
+    // --- Data Loading and Plan Management ---
+    useEffect(() => {
+        if (isLoggedIn) {
+            fetchArchive();
+        }
+    }, [isLoggedIn, fetchArchive]);
+
+    useEffect(() => {
+        if (generatedPlan) {
+            setActivePlan(generatedPlan);
+            setSettings(generatedPlan.settings);
+            setCurrentView('plan');
+            // After generation, refetch archive to include the new plan
+            fetchArchive();
+            // set image urls from new plan
+            const newImageUrls: { [id: number]: string } = {};
+            generatedPlan.recipes.forEach(r => {
+                if (r.image_url) {
+                    newImageUrls[r.id] = r.image_url;
+                }
+            });
+            setImageUrlsFromArchive(newImageUrls);
+        }
+    }, [generatedPlan, fetchArchive, setImageUrlsFromArchive]);
+    
+    const handleGeneratePlan = () => {
+        generateNewPlan(settings, (newPlan) => {
+            if (newPlan) {
+                setActivePlan(newPlan);
+                setSettings(newPlan.settings);
+                fetchArchive(); // Update archive list
+            }
+        });
+    };
 
     const handleLoadPlan = useCallback((id: number) => {
         const planToLoad = loadPlanFromArchive(id);
         if (planToLoad) {
-            // BEHOBEN: Bild-URLs werden jetzt korrekt über die Rezept-ID als Schlüssel zugeordnet,
-            // um mehrere Bilder pro Tag zu unterstützen.
-            const urls: { [id: number]: string } = {};
-            planToLoad.weeklyPlan.forEach(dayPlan => {
-                dayPlan.meals.forEach(meal => {
-                    if (meal.recipe.image_url && meal.recipe.id) {
-                        urls[meal.recipe.id] = meal.recipe.image_url;
-                    }
-                })
-            });
-            setImageUrlsFromArchive(urls);
-            setPlan(planToLoad);
-            setCurrentView('plan');
-            window.scrollTo(0, 0);
-        }
-    }, [loadPlanFromArchive, setPlan, setImageUrlsFromArchive]);
+            resetImageState();
+            setActivePlan(planToLoad);
+            setCurrentPlan(planToLoad);
+            setSettings(planToLoad.settings);
 
-    const handleGenerateRequest = async () => {
-        generateNewPlan(panelSettings, (newPlan) => {
-            if (newPlan) {
-                setPlan(newPlan);
-                setCurrentView('plan');
-                window.scrollTo(0, 0);
-                fetchArchive(); 
-            } else {
-                 console.warn("Ein neuer Plan wurde generiert, aber die Daten konnten nicht direkt geladen werden. Ein erneutes Laden aus dem Archiv ist erforderlich.");
-                 fetchArchive().then(() => {
-                    // Hier könnte man versuchen, den neuesten Plan zu laden
-                 });
-            }
-        });
-    };
-    
-    const handleCustomPlanSaved = useCallback(() => {
-        fetchArchive().then(() => {
-            setCurrentView('archive');
-        });
-    }, [fetchArchive]);
-
-    const handleSelectRecipe = (day: string) => {
-        setSelectedRecipeDay(day);
-        setCurrentView('recipes');
-    };
-    
-    const handleSetView = useCallback((view: View) => {
-        if (view === 'archive' || view === 'planner' || view === 'recipe-archive') {
-            fetchArchive();
-        }
-        setCurrentView(view);
-    }, [fetchArchive]);
-
-    useEffect(() => {
-        if (currentView === 'recipes' && selectedRecipeDay) {
-            const timer = setTimeout(() => {
-                const element = document.getElementById(`recipe-${selectedRecipeDay}`);
-                if (element) {
-                    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const loadedImageUrls: { [id: number]: string } = {};
+            planToLoad.recipes.forEach(recipe => {
+                if (recipe.image_url) {
+                    loadedImageUrls[recipe.id] = recipe.image_url;
                 }
-                setSelectedRecipeDay(null);
-            }, 100);
-            return () => clearTimeout(timer);
-        }
-    }, [currentView, selectedRecipeDay]);
+            });
+            setImageUrlsFromArchive(loadedImageUrls);
 
+            setCurrentView('plan');
+        }
+    }, [loadPlanFromArchive, resetImageState, setCurrentPlan, setImageUrlsFromArchive]);
+    
+    const handlePlanSaved = () => {
+        fetchArchive();
+        setCurrentView('archive');
+    };
+
+    // --- UI Navigation ---
+    const handleSelectRecipe = (day: string) => {
+        setCurrentView('recipes');
+        // Logic to scroll to the recipe can be added in RecipesComponent
+        setTimeout(() => {
+            const element = document.getElementById(`recipe-${day}`);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth' });
+            }
+        }, 100);
+    };
+    
+    // --- Sharing ---
     const handleShare = () => {
-        if (plan && !isSharing) {
-            startSharingProcess(plan);
+        if (activePlan) {
+            if (activePlan.shareId) {
+                setShareUrl(`${window.location.origin}/shares/${activePlan.shareId}.html`);
+            } else {
+                startSharingProcess(activePlan);
+            }
         }
     };
 
-    const handleLogout = async () => {
-        try {
-            await apiService.logout();
-            window.location.reload();
-        } catch (error) {
-            console.error('Fehler beim Abmelden:', error);
-            alert('Abmeldung fehlgeschlagen.');
-        }
-    };
 
-    if (isAuthLoading) {
-        return (
-            <div className="flex items-center justify-center h-screen bg-slate-100">
-                <div className="text-center">
-                    <svg className="animate-spin h-8 w-8 text-emerald-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <p className="text-slate-600 font-semibold mt-2">Lade Anwendung...</p>
-                </div>
-            </div>
-        );
+    if (isLoggedIn === null) {
+        return <div className="flex h-screen items-center justify-center">Lade...</div>;
     }
-
-    if (!isAuthenticated) {
+    if (!isLoggedIn) {
         return <LoginComponent onLoginSuccess={handleLoginSuccess} />;
     }
 
-    const appError = planError || shareError;
-    // Fix: Removed currentImageUrls which was based on the incorrect `plan.imageUrls`.
-    // The `imageUrls` from the useImageGenerator hook will be passed directly.
-
     return (
-        <div className="bg-slate-100 min-h-screen font-sans">
-            {isGeneratingPlan && <LoadingOverlay status={generationStatus} onCancel={cancelGeneration} />}
-            {isSharing && !shareUrl && <LoadingOverlay status={shareStatus} onCancel={cancelSharing} />}
-            {shareUrl && <ShareModal url={shareUrl} onClose={() => setShareUrl(null)} />}
-            
+        <div className="bg-slate-100 min-h-screen">
             <Header
                 currentView={currentView}
-                onSetView={handleSetView}
-                planExists={!!plan}
+                onSetView={setCurrentView}
+                planExists={!!activePlan}
                 isSharing={isSharing}
                 shareStatus={shareStatus}
                 onShare={handleShare}
                 onLogout={handleLogout}
             />
+            
+            {(isGenerating) && (
+                <LoadingOverlay status={generationStatus} onCancel={cancelGeneration} />
+            )}
 
-            <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {currentView === 'plan' && (
-                    <div className="bg-white rounded-lg shadow-lg mb-8">
-                        <button
-                            onClick={() => setIsSettingsVisible(!isSettingsVisible)}
-                            className="w-full flex justify-between items-center p-6 text-left focus:outline-none focus:ring-2 focus:ring-inset focus:ring-emerald-500 rounded-lg"
-                            aria-expanded={isSettingsVisible}
-                            aria-controls="settings-panel"
-                        >
-                            <h2 className="text-2xl font-bold text-slate-700">Neuen Ernährungsplan erstellen</h2>
-                            {isSettingsVisible ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                        </button>
-                        <div
-                            id="settings-panel"
-                            className={`grid transition-[grid-template-rows] duration-500 ease-in-out ${isSettingsVisible ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
-                        >
-                            <div className="overflow-hidden">
-                                <div className="p-6 pt-0">
-                                    <SettingsPanel 
-                                        settings={panelSettings}
-                                        onSettingsChange={setPanelSettings}
-                                        onGeneratePlan={handleGenerateRequest} 
-                                        isLoading={isGeneratingPlan} 
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
+            {shareUrl && <ShareModal url={shareUrl} onClose={() => setShareUrl(null)} />}
+            
+            {generationError && <div className="container mx-auto p-4"><div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert"><p>{generationError}</p></div></div>}
+            {shareError && <div className="container mx-auto p-4"><div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert"><p>{shareError}</p></div></div>}
 
-                {appError && (
-                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-6" role="alert">
-                        <strong className="font-bold">Fehler!</strong>
-                        <span className="block sm:inline ml-2">{appError}</span>
-                    </div>
-                )}
-                
-                <MainContent
-                    view={currentView}
-                    plan={plan}
-                    archive={archive}
-                    imageUrls={imageUrls}
-                    loadingImages={loadingImages}
-                    imageErrors={imageErrors}
-                    onSelectRecipe={handleSelectRecipe}
-                    onLoadPlan={handleLoadPlan}
-                    onGenerateImage={generateImage}
-                    onGenerateMissingImages={generateMissingImages}
-                    onCustomPlanSaved={handleCustomPlanSaved}
-                />
-            </main>
+            <MainContent
+                currentView={currentView}
+                plan={activePlan}
+                settings={settings}
+                archive={archive}
+                imageUrls={imageUrls}
+                loadingImages={loadingImages}
+                imageErrors={imageErrors}
+                isLoading={isGenerating}
+                onSettingsChange={setSettings}
+                onGeneratePlan={handleGeneratePlan}
+                onLoadPlan={handleLoadPlan}
+                onSelectRecipe={handleSelectRecipe}
+                onPlanSaved={handlePlanSaved}
+                generateImage={generateImage}
+                generateMissingImages={(weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void): Promise<{ [key: string]: string; }> => generateMissingImages(weeklyPlan, activePlan?.id || null, onProgress)}
+            />
         </div>
     );
 };

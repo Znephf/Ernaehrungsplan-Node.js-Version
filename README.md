@@ -1,155 +1,94 @@
-# KI Ernährungsplaner - Deployment auf Plesk VPS
+# KI Ernährungsplaner
 
-Diese Anleitung beschreibt, wie Sie die KI-Ernährungsplaner-Anwendung auf einem Virtual Private Server (VPS) mit Plesk als Verwaltungsoberfläche bereitstellen.
+Dies ist eine Webanwendung zur Erstellung, Verwaltung und zum Teilen von wöchentlichen Ernährungsplänen mithilfe von KI.
 
-## Architektur-Übersicht
+## Features
 
-Die Anwendung besteht aus zwei Hauptteilen:
+- **Individuelle Plangenerierung:** Erstellen Sie Pläne basierend auf Kalorien, Ernährungsweise, Diät-Typ und mehr.
+- **Wochenplaner:** Stellen Sie per Drag-and-Drop oder Klick Ihre eigene Woche aus bestehenden Rezepten zusammen.
+- **Archiv:** Speichern und verwalten Sie alle Ihre generierten und erstellten Pläne.
+- **Rezept-Bibliothek:** Durchsuchen Sie alle Rezepte, die jemals in Ihren Plänen generiert wurden.
+- **KI-Bildgenerierung:** Erstellen Sie ansprechende Bilder für Ihre Rezepte.
+- **Teilen:** Teilen Sie Ihre Pläne als eigenständige, interaktive HTML-Datei mit anderen.
+- **Einkaufsliste:** Automatisch generierte und kategorisierte Einkaufsliste für Ihren Wochenplan.
 
-1.  **Frontend:** Eine in React und TypeScript geschriebene Single-Page-Application (SPA), die mit Vite gebaut wird.
-2.  **Backend:** Ein modularisierter Node.js-Server mit Express, der als sicherer Proxy für die Google Gemini API dient und die Archiv-Daten in einer MariaDB-Datenbank verwaltet. Das Backend ist in Routen und Services aufgeteilt, um die Wartbarkeit zu verbessern.
+## Setup
 
-Dieses Setup stellt sicher, dass Ihr API-Schlüssel niemals im Browser offengelegt wird. Ein serverseitiger Passwortschutz sichert die gesamte Anwendung ab.
+### 1. Voraussetzungen
 
-**Bildspeicherung:** Generierte Bilder werden als `.jpg`-Dateien im Verzeichnis `public/images/recipes/` auf dem Server gespeichert. In der Datenbank wird nur der Pfad zur Bilddatei hinterlegt, was die Datenbank schlank und performant hält.
+- Node.js (v18 oder neuer empfohlen)
+- Eine MySQL-kompatible Datenbank
 
-### Verwendete KI-Modelle
+### 2. Installation
 
--   **Textgenerierung (Pläne, Rezepte, Einkaufslisten):** `gemini-2.5-flash`
--   **Bildgenerierung (Rezeptbilder):** `gemini-2.5-flash-image`
-
-Die Anwendung verwendet die aktuell empfohlenen Modelle, um eine langfristige Kompatibilität zu gewährleisten.
-
-## Voraussetzungen
-
-Stellen Sie sicher, dass auf Ihrem Server die folgenden Komponenten installiert sind:
-
--   **MariaDB oder MySQL-Server**
--   **Node.js:** Version 18.x oder höher.
--   **NPM (Node Package Manager):** Wird normalerweise mit Node.js installiert.
--   **Git:** Zum Klonen des Quellcodes.
--   Ein in Plesk eingerichteter Domain- oder Subdomain-Name.
--   Ein gültiger **Google Gemini API Key**.
-
-## Schritt 1: Datenbank einrichten
-
-1.  Loggen Sie sich in Ihre Datenbankverwaltung ein (z.B. phpMyAdmin in Plesk oder über die Kommandozeile).
-2.  Erstellen Sie eine neue Datenbank. Es wird empfohlen, den Namen `ernaehrungsplan` zu verwenden, da dieser in den Umgebungsvariablen standardmäßig vorgeschlagen wird.
-3.  Erstellen Sie einen neuen Datenbankbenutzer.
-4.  Geben Sie diesem Benutzer alle Berechtigungen (`ALL PRIVILEGES`) für die neu erstellte Datenbank.
-5.  Notieren Sie sich den Datenbanknamen, den Benutzernamen und das Passwort.
-
-Der Node.js-Server wird die benötigten Tabellen (`plans`, `recipes`, `plan_recipes`, `generation_jobs`, `app_jobs`) beim ersten Start automatisch erstellen.
-
-## Schritt 2: Code auf den Server laden
-
-1.  Verbinden Sie sich per SSH mit Ihrem Server.
-2.  Navigieren Sie zum Hauptverzeichnis für Ihre Web-Anwendungen, üblicherweise `/var/www/vhosts/ihredomain.de/`.
-3.  Erstellen Sie ein Verzeichnis für die App und klonen Sie den Code hinein:
+1.  Klonen Sie das Repository:
     ```bash
-    mkdir ernaehrungsplaner
-    cd ernaehrungsplaner
-    git clone [URL_IHRES_GIT_REPOSITORIES] . 
-    # Wenn Sie den Code manuell hochladen, entpacken Sie ihn in diesem Verzeichnis.
+    git clone <repository-url>
+    cd ki-ernaehrungsplaner
     ```
 
-## Schritt 3: Abhängigkeiten installieren und die App bauen
-
-1.  Installieren Sie alle notwendigen Node.js-Pakete für das Backend und Frontend:
+2.  Installieren Sie die Abhängigkeiten:
     ```bash
     npm install
     ```
-2.  Erstellen Sie die optimierte Frontend-Version. Dieser Befehl kompiliert den React-Code und legt die statischen Dateien im `dist`-Verzeichnis ab.
+
+### 3. Konfiguration
+
+1.  Erstellen Sie eine `.env`-Datei im Stammverzeichnis des Projekts, indem Sie die `.env.example`-Datei (falls vorhanden) kopieren.
+
+2.  Füllen Sie die `.env`-Datei mit den erforderlichen Werten:
+    ```
+    # Server & Auth
+    PORT=3001
+    APP_PASSWORD=IhrGeheimesPasswort
+    COOKIE_SECRET=EinSehrLangerGeheimerStringFürCookies
+
+    # Google Gemini API Key
+    # Sie können entweder API_KEY oder API_KEY_FALLBACK verwenden
+    API_KEY=IhrGoogleApiKey
+
+    # Datenbankverbindung
+    DB_HOST=localhost
+    DB_PORT=3306
+    DB_USER=IhrDbBenutzer
+    DB_PASSWORD=IhrDbPasswort
+    DB_NAME=IhreDb
+    ```
+
+## Verwendung
+
+### Entwicklung
+
+Um den Frontend-Vite-Server und den Backend-Node.js-Server gleichzeitig zu starten:
+
+1.  Starten Sie den Backend-Server in einem Terminal:
+    ```bash
+    npm start
+    ```
+    Der Server läuft auf `http://localhost:3001`.
+
+2.  Starten Sie den Frontend-Entwicklungsserver in einem anderen Terminal:
+    ```bash
+    npm run dev
+    ```
+    Die Anwendung ist unter `http://localhost:5173` (oder einem anderen von Vite zugewiesenen Port) verfügbar. Der Vite-Server leitet API-Anfragen an das Backend weiter.
+
+### Produktion
+
+1.  Bauen Sie die React-Anwendung:
     ```bash
     npm run build
     ```
 
-## Schritt 4: Datenmigration (Wichtig!)
-
-Wenn Sie von einer älteren Version der App aktualisieren, müssen Ihre Daten in die neue, effizientere Datenbankstruktur überführt werden.
-
-1.  **Erst-Migration (falls noch nicht geschehen):** Führen Sie dieses Skript aus, um die alte `archived_plans`-Tabelle in die neuen Tabellen aufzuteilen. Es benennt die alte Tabelle zur Sicherheit um.
+2.  Starten Sie den Node.js-Server, der die gebauten statischen Dateien bereitstellt:
     ```bash
-    npm run migrate:normalize-db
-    ```
-2.  **Korrektur-Migration (wichtig für Altdaten):** Dieses Skript liest die gesicherten Altdaten aus `legacy_archived_plans`, korrigiert sie und fügt sie korrekt in die neuen Tabellen ein. **Führen Sie dies aus, um sicherzustellen, dass alle alten Pläne wieder sichtbar sind.**
-    ```bash
-    npm run migrate:fix-legacy
+    npm start
     ```
 
-## Schritt 5: Plesk für die Node.js-Anwendung konfigurieren
+## Datenbank-Migrationen
 
-1.  Loggen Sie sich in Ihr Plesk-Panel ein.
-2.  Gehen Sie zu **Websites & Domains** und wählen Sie die Domain aus, auf der die App laufen soll.
-3.  Klicken Sie auf **Node.js**.
-4.  Klicken Sie auf **Node.js aktivieren**.
-5.  Konfigurieren Sie die Anwendung wie folgt:
-    -   **Node.js Version:** Wählen Sie eine installierte Version (z.B. 18.x oder höher).
-    -   **Paket-Manager:** `npm`
-    -   **Dokumentenstamm:** `/httpdocs` (Plesk leitet Anfragen korrekt an den Node-Server weiter).
-    -   **Anwendungsmodus:** `production`
-    -   **Anwendungs-URL:** Wird automatisch angezeigt.
-    -   **Anwendungsstamm:** `/var/www/vhosts/ihredomain.de/ernaehrungsplaner` (passen Sie den Pfad an).
-    -   **Anwendungsstartdatei:** `server/index.js`
+Die Anwendung enthält Skripte zur Migration von Daten aus älteren Versionen. Diese befinden sich im `scripts/`-Verzeichnis.
 
-6.  Klicken Sie auf **OK** oder **Speichern**. 
+**Wichtig:** Führen Sie diese Skripte nur aus, wenn Sie von einer älteren Version der App aktualisieren. Erstellen Sie vorher immer ein Backup Ihrer Datenbank.
 
-## Schritt 6: Umgebungsvariablen in Plesk konfigurieren (WICHTIG)
-
-Ihre geheimen Schlüssel und Datenbank-Zugangsdaten müssen sicher als Umgebungsvariablen gespeichert werden.
-
-1.  Gehen Sie in Plesk zur **Node.js**-Verwaltungsseite Ihrer App.
-2.  Klicken Sie auf **Umgebungsvariablen**.
-3.  Fügen Sie die folgenden Variablen hinzu:
-    -   `API_KEY` = `Ihr_Google_Gemini_API_Schlüssel`
-    -   `API_KEY_FALLBACK` = `Ihr_ZWEITER_Google_Gemini_API_Schlüssel` (Optional: Wird verwendet, wenn der erste Schlüssel sein Kontingent erreicht hat oder einen Fehler zurückgibt.)
-    -   `COOKIE_SECRET` = `Eine_sehr_lange_und_komplexe_zufällige_Zeichenfolge`
-    -   `APP_PASSWORD` = `Ein_sicheres_Passwort_für_den_Login`
-    -   `DB_HOST` = `localhost` (oder die IP Ihres DB-Servers)
-    -   `DB_USER` = `Ihr_Datenbank_Benutzername`
-    -   `DB_PASSWORD` = `Ihr_Datenbank_Passwort`
-    -   `DB_NAME` = `Der_Name_Ihrer_Datenbank`
-    -   `DB_PORT` = `3306` (Optional: Nur ändern, wenn Ihr DB-Server nicht den Standard-Port verwendet)
-4.  **WICHTIG:** Ersetzen Sie die Platzhalter durch Ihre echten, sicheren Werte.
-5.  Speichern Sie die Variablen.
-
-**Hinweis: Wenn die erforderlichen Variablen fehlen oder falsch sind, wird der Server absichtlich nicht starten! Dies ist die häufigste Ursache für Fehler nach dem Deployment.**
-
-## Schritt 7: Anwendung starten
-
-1.  Auf der Node.js-Verwaltungsseite in Plesk, klicken Sie auf **App neu starten**. Dies ist nach jeder Änderung der Umgebungsvariablen zwingend erforderlich.
-2.  Besuchen Sie Ihre Domain. Sie sollten nun von der Login-Seite begrüßt werden.
-
-## Backup-Strategie
-
-Denken Sie daran, regelmäßige Backups zu erstellen. Sichern Sie dabei:
-1.  **Die MariaDB-Datenbank**, die alle Pläne und Einstellungen enthält.
-2.  **Das Verzeichnis `public/images/recipes/`**, da es alle generierten Bilder enthält.
-
-## Fehlerbehebung
-
--   **502/503 Fehler oder keine Passwort-Abfrage:** Die Node.js-Anwendung konnte nicht starten.
-    -   **Prüfen Sie als Erstes die Umgebungsvariablen!** Sind alle sieben erforderlichen Variablen vorhanden und korrekt?
-    -   **Überprüfen Sie die Log-Dateien (`stderr`)** auf der Node.js-Verwaltungsseite in Plesk. Der Server gibt dort klare Fehlermeldungen aus, wenn Variablen fehlen oder die Datenbankverbindung fehlschlägt.
-    -   **Haben Sie die App nach Änderungen neu gestartet?**
-    -   **Ist der Pfad zur Startdatei korrekt?** Er muss jetzt `server/index.js` lauten.
-
--   **Bilder werden nicht angezeigt (404-Fehler):**
-    -   Prüfen Sie die Dateiberechtigungen für das Verzeichnis `public/images/recipes/`. Der Webserver-Benutzer (z.B. `nginx`, `apache`) muss Leserechte haben.
-
--   **Fehler "413 Content Too Large" beim Teilen:**
-    -   **Problem:** Die generierten Bilder sind zu groß für die Standard-Upload-Limits des Webservers (Nginx/Apache), der vor der Node.js-Anwendung läuft.
-    -   **Lösung:** Sie müssen das Limit in Plesk manuell erhöhen.
-        1.  Gehen Sie in Plesk zu **Websites & Domains** > **Ihre Domain** > **Einstellungen für Apache & nginx**.
-        2.  Scrollen Sie nach unten zum Feld **Zusätzliche nginx-Anweisungen**.
-        3.  Fügen Sie die folgende Zeile hinzu, um das Limit auf 50 Megabyte zu erhöhen:
-            ```nginx
-            client_max_body_size 50m;
-            ```
-        4.  Klicken Sie auf **OK** oder **Anwenden**. Dies behebt das Problem in den meisten Fällen.
-
--   **API-Fehler bei Plangenerierung:**
-    -   Ist der `API_KEY` korrekt?
-    -   Ist die Gemini API für Ihren Schlüssel aktiviert?
--   **Fehler bei der Bildgenerierung (Quota Exceeded):**
-    -   **Lösung:** Verknüpfen Sie Ihr Projekt mit einem Google Cloud-Projekt, für das die Abrechnung (Billing) aktiviert ist.
+-   `npm run migrate:fix-legacy`: Sucht in alten, archivierten Plänen nach Rezepten, die möglicherweise bei früheren Migrationen übersehen wurden, und fügt sie zur neuen Rezept-Datenbank hinzu. Dieses Skript kann sicher mehrfach ausgeführt werden.

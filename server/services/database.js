@@ -1,4 +1,5 @@
 const mysql = require('mysql2/promise');
+
 const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT } = process.env;
 
 const pool = mysql.createPool({
@@ -9,99 +10,94 @@ const pool = mysql.createPool({
     port: DB_PORT || 3306,
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
+    queueLimit: 0,
+    timezone: '+00:00'
 });
 
-async function initializeDatabase() {
+const initializeDatabase = async () => {
+    console.log('Initializing database schema...');
+    let connection;
     try {
-        const connection = await pool.getConnection();
-        console.log('Erfolgreich mit der MariaDB-Datenbank verbunden.');
+        connection = await pool.getConnection();
+        
+        // Recipes Table
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS recipes (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                title VARCHAR(255) NOT NULL,
+                ingredients JSON,
+                instructions JSON,
+                totalCalories INT,
+                protein FLOAT,
+                carbs FLOAT,
+                fat FLOAT,
+                category ENUM('breakfast', 'lunch', 'coffee', 'dinner', 'snack') NOT NULL,
+                image_url VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY (title)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+        console.log('Table "recipes" is ready.');
 
-        // Tabelle für Pläne (Metadaten)
+        // Plans Table
         await connection.query(`
             CREATE TABLE IF NOT EXISTS plans (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
                 createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                settings JSON NOT NULL,
-                shareId VARCHAR(255) NULL UNIQUE,
-                legacy_id INT NULL
-            );
+                settings JSON,
+                shoppingList JSON,
+                shareId VARCHAR(255) UNIQUE,
+                legacy_id INT
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
-        console.log('Tabelle "plans" ist bereit.');
+        console.log('Table "plans" is ready.');
 
-        // Tabelle für Rezepte (einzigartig)
-        await connection.query(`
-            CREATE TABLE IF NOT EXISTS recipes (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                title VARCHAR(255) NOT NULL UNIQUE,
-                ingredients JSON NOT NULL,
-                instructions JSON NOT NULL,
-                totalCalories INT NOT NULL DEFAULT 0,
-                protein FLOAT NULL,
-                carbs FLOAT NULL,
-                fat FLOAT NULL,
-                category ENUM('breakfast', 'lunch', 'coffee', 'dinner', 'snack') NOT NULL,
-                image_url VARCHAR(1024) NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            );
-        `);
-        console.log('Tabelle "recipes" ist bereit.');
-
-        // Verknüpfungstabelle (Junction Table)
+        // Plan_Recipes Junction Table
         await connection.query(`
             CREATE TABLE IF NOT EXISTS plan_recipes (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 plan_id INT NOT NULL,
                 recipe_id INT NOT NULL,
-                day_of_week VARCHAR(20) NOT NULL,
+                day_of_week VARCHAR(50) NOT NULL,
                 meal_type ENUM('breakfast', 'lunch', 'coffee', 'dinner', 'snack') NOT NULL,
                 FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE,
                 FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
-            );
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
-        console.log('Tabelle "plan_recipes" ist bereit.');
-
-
-        await connection.query(`
-            CREATE TABLE IF NOT EXISTS generation_jobs (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                jobId VARCHAR(36) NOT NULL UNIQUE,
-                status VARCHAR(50) NOT NULL DEFAULT 'pending',
-                payload JSON,
-                planId INT NULL,
-                errorMessage TEXT NULL,
-                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (planId) REFERENCES plans(id) ON DELETE SET NULL
-            );
-        `);
-        console.log('Tabelle "generation_jobs" ist bereit.');
+        console.log('Table "plan_recipes" is ready.');
         
-        // BEHOBEN: Fügt die fehlende `app_jobs`-Tabelle hinzu, die für Share-Jobs benötigt wird.
+        // App_Jobs Table
         await connection.query(`
-            CREATE TABLE IF NOT EXISTS app_jobs (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                jobId VARCHAR(36) NOT NULL UNIQUE,
-                jobType VARCHAR(50) NOT NULL,
-                relatedPlanId INT,
-                status VARCHAR(50) NOT NULL DEFAULT 'pending',
-                progressText VARCHAR(255),
-                resultJson JSON,
-                errorMessage TEXT,
-                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (relatedPlanId) REFERENCES plans(id) ON DELETE SET NULL
-            );
+          CREATE TABLE IF NOT EXISTS app_jobs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            jobId VARCHAR(255) NOT NULL UNIQUE,
+            jobType VARCHAR(50) NOT NULL,
+            relatedPlanId INT,
+            settings JSON,
+            previousPlanRecipes JSON,
+            status VARCHAR(50) DEFAULT 'pending',
+            progressText VARCHAR(255),
+            resultJson JSON,
+            errorMessage TEXT,
+            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
-        console.log('Tabelle "app_jobs" ist bereit.');
+        console.log('Table "app_jobs" is ready.');
 
+        const [rows] = await connection.query("SHOW TABLES LIKE 'legacy_archived_plans'");
+        if (rows.length > 0) {
+            console.log('Table "legacy_archived_plans" exists (backup from migration).');
+        }
 
-        connection.release();
+        console.log('Database schema initialization complete.');
     } catch (error) {
-        console.error('FATAL ERROR: Konnte die Datenbankverbindung nicht herstellen oder Tabellen nicht erstellen/aktualisieren.', error);
-        process.exit(1);
+        console.error('DATABASE INITIALIZATION FAILED:', error);
+        throw error;
+    } finally {
+        if (connection) connection.release();
     }
-}
+};
 
 module.exports = { pool, initializeDatabase };

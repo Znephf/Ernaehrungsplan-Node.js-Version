@@ -1,185 +1,109 @@
 const express = require('express');
 const router = express.Router();
-const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
 const { pool } = require('../services/database');
-const { generateShoppingListForRecipes } = require('../services/geminiService');
 
-const publicImagesDir = path.join(__dirname, '..', '..', 'public', 'images', 'recipes');
-
-const WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
-
-// Alle Pläne aus dem Archiv abrufen
+// GET all archived plans in the format the frontend expects
 router.get('/archive', async (req, res) => {
     try {
-        const [plans] = await pool.query(`
-            SELECT 
-                p.id, p.name, p.createdAt, p.settings, p.shareId,
-                pr.day_of_week, pr.meal_type,
-                r.id as recipe_id, r.title, r.ingredients, r.instructions, r.totalCalories, r.protein, r.carbs, r.fat, r.category, r.image_url
-            FROM plans p
-            LEFT JOIN plan_recipes pr ON p.id = pr.plan_id
-            LEFT JOIN recipes r ON pr.recipe_id = r.id
-            ORDER BY p.createdAt DESC, FIELD(pr.day_of_week, 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag');
-        `);
+        const [plans] = await pool.query('SELECT * FROM plans ORDER BY createdAt DESC');
         
-        if (plans.length === 0) {
-            return res.json([]);
-        }
+        const archiveEntries = [];
+        for (const plan of plans) {
+            // Reconstruct each plan into an ArchiveEntry object
+            const entry = {
+                id: plan.id,
+                name: plan.name,
+                createdAt: new Date(plan.createdAt).toLocaleString('de-DE'),
+                settings: JSON.parse(plan.settings || '{}'),
+                shoppingList: JSON.parse(plan.shoppingList || '[]'),
+                shareId: plan.shareId,
+                weeklyPlan: [],
+                recipes: [],
+            };
 
-        // Manuelles Gruppieren der Ergebnisse in JavaScript
-        const groupedPlans = plans.reduce((acc, row) => {
-            if (!acc[row.id]) {
-                acc[row.id] = {
-                    id: row.id,
-                    name: row.name,
-                    createdAt: new Date(row.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                    settings: (row.settings && typeof row.settings === 'string') ? JSON.parse(row.settings) : (row.settings || {}),
-                    shareId: row.shareId,
-                    weeklyPlan: [], // Wird unten befüllt
-                    recipes: [], // Wird unten befüllt
-                    shoppingList: [] // Wird später generiert oder müsste separat geladen werden
-                };
-            }
+            const [recipeLinks] = await pool.query(
+                `SELECT pr.day_of_week, pr.meal_type, r.* FROM plan_recipes pr
+                 JOIN recipes r ON pr.recipe_id = r.id
+                 WHERE pr.plan_id = ?`,
+                [plan.id]
+            );
             
-            // Verarbeite Rezept- und Tagesplandaten nur, wenn sie existieren (wichtig für LEFT JOIN)
-            if (row.recipe_id) {
-                const recipe = {
-                    id: row.recipe_id,
-                    title: row.title,
-                    ingredients: typeof row.ingredients === 'string' ? JSON.parse(row.ingredients) : row.ingredients,
-                    instructions: typeof row.instructions === 'string' ? JSON.parse(row.instructions) : row.instructions,
-                    totalCalories: row.totalCalories,
-                    protein: row.protein,
-                    carbs: row.carbs,
-                    fat: row.fat,
-                    category: row.category,
-                    image_url: row.image_url
-                };
+            entry.recipes = recipeLinks.map(r => ({
+                ...r,
+                ingredients: JSON.parse(r.ingredients || '[]'),
+                instructions: JSON.parse(r.instructions || '[]')
+            }));
 
-                // Doppeltes Hinzufügen von Rezepten vermeiden
-                if (!acc[row.id].recipes.some(r => r.id === recipe.id)) {
-                     acc[row.id].recipes.push(recipe);
+            const weeklyPlanMap = new Map();
+            recipeLinks.forEach(link => {
+                const day = link.day_of_week;
+                if (!weeklyPlanMap.has(day)) {
+                    weeklyPlanMap.set(day, { day, meals: [], totalCalories: 0 });
                 }
-               
-                let dayPlan = acc[row.id].weeklyPlan.find(dp => dp.day === row.day_of_week);
-                if (!dayPlan) {
-                    dayPlan = { day: row.day_of_week, meals: [], totalCalories: 0 };
-                    acc[row.id].weeklyPlan.push(dayPlan);
+                const dayPlan = weeklyPlanMap.get(day);
+                const recipe = entry.recipes.find(r => r.id === link.id);
+                if(recipe){
+                    dayPlan.meals.push({ mealType: link.meal_type, recipe });
+                    // Sum up calories for the day
+                    dayPlan.totalCalories += recipe.totalCalories || 0;
                 }
-                
-                dayPlan.meals.push({ mealType: row.meal_type, recipe });
-                dayPlan.totalCalories += (recipe.totalCalories || 0);
-            }
+            });
 
-            return acc;
-        }, {});
-
-        // Wochenpläne sortieren und Einkaufslisten generieren
-        const finalArchive = await Promise.all(Object.values(groupedPlans).map(async (plan) => {
-            plan.weeklyPlan.sort((a, b) => WEEKDAYS.indexOf(a.day) - WEEKDAYS.indexOf(b.day));
-            // Generiere die Einkaufsliste on-the-fly für die Anzeige im Archiv
-            plan.shoppingList = await generateShoppingListForRecipes(plan.recipes, plan.settings.persons);
-            return plan;
-        }));
-
-        res.json(finalArchive);
-    } catch (error) {
-        console.error('Fehler beim Abrufen des Archivs:', error);
-        res.status(500).json({ error: 'Archiv konnte nicht geladen werden.' });
-    }
-});
-
-
-// Bild-URL für ein Rezept zentral speichern
-router.post('/recipe-image', async (req, res) => {
-    const { recipeId, base64Data } = req.body;
-    if (!recipeId || !base64Data) {
-        return res.status(400).json({ error: 'Fehlende Daten zum Speichern des Bildes.' });
-    }
-
-    try {
-        const imageBuffer = Buffer.from(base64Data, 'base64');
-        const fileName = `${crypto.randomBytes(16).toString('hex')}.jpg`;
-        const filePath = path.join(publicImagesDir, fileName);
-        const fileUrl = `/images/recipes/${fileName}`;
+            entry.weeklyPlan = Array.from(weeklyPlanMap.values());
+            archiveEntries.push(entry);
+        }
         
-        fs.writeFileSync(filePath, imageBuffer);
+        res.json(archiveEntries);
 
-        await pool.query(
-            'UPDATE recipes SET image_url = ? WHERE id = ?',
-            [fileUrl, recipeId]
-        );
-
-        res.status(200).json({ message: 'Bild erfolgreich gespeichert.', imageUrl: fileUrl });
     } catch (error) {
-        console.error(`Fehler beim Speichern des Bildes für Rezept-ID "${recipeId}":`, error);
-        res.status(500).json({ error: 'Bild konnte nicht verarbeitet oder in der DB gespeichert werden.' });
+        console.error('Failed to fetch archive:', error);
+        res.status(500).json({ error: 'Could not fetch the plan archive.' });
     }
 });
 
-
-// Neuen individuellen Plan speichern
-router.post('/archive/custom-plan', async (req, res) => {
+// Save a custom plan from the planner
+router.post('/plan', async (req, res) => {
     const { name, persons, mealsByDay } = req.body;
-    if (!name || !persons || typeof mealsByDay !== 'object') {
-        return res.status(400).json({ error: 'Unvollständige Plandaten erhalten.' });
+    if (!name || !persons || !mealsByDay) {
+        return res.status(400).json({ error: 'Missing required fields: name, persons, mealsByDay.' });
     }
 
-    let connection;
+    const connection = await pool.getConnection();
     try {
-        connection = await pool.getConnection();
         await connection.beginTransaction();
 
-        // 1. Settings-Objekt für den neuen Plan erstellen
-        const settings = {
-            persons: parseInt(persons, 10),
-            kcal: 0, // Wird später berechnet
-            dietaryPreference: 'omnivore',
-            dietType: 'balanced',
-            dishComplexity: 'simple',
-            isGlutenFree: false,
-            isLactoseFree: false,
-            includedMeals: Object.values(mealsByDay).flatMap(dayMeals => dayMeals.map(m => m.mealType)),
-        };
+        const settings = { persons }; // Simplified settings for now
+        
+        // A real implementation would generate a shopping list here.
+        // For now, we'll save an empty one.
+        const shoppingList = [];
 
-        // 2. Plan in `plans` Tabelle einfügen
         const [planResult] = await connection.query(
-            'INSERT INTO plans (name, settings) VALUES (?, ?)',
-            [name, JSON.stringify(settings)]
+            'INSERT INTO plans (name, settings, shoppingList) VALUES (?, ?, ?)',
+            [name, JSON.stringify(settings), JSON.stringify(shoppingList)]
         );
         const newPlanId = planResult.insertId;
 
-        // 3. Alle Rezepte sammeln und in `plan_recipes` eintragen
-        const allRecipesInPlan = [];
         for (const day in mealsByDay) {
-            const dayMeals = mealsByDay[day];
-            for (const meal of dayMeals) {
-                 allRecipesInPlan.push(meal.recipe);
-                 await connection.query(
-                    'INSERT INTO plan_recipes (plan_id, recipe_id, day_of_week, meal_type) VALUES (?, ?, ?, ?)',
-                    [newPlanId, meal.recipe.id, day, meal.mealType]
-                );
+            for (const slot of mealsByDay[day]) {
+                if (slot.recipe && slot.recipe.id) {
+                     await connection.query(
+                        'INSERT INTO plan_recipes (plan_id, recipe_id, day_of_week, meal_type) VALUES (?, ?, ?, ?)',
+                        [newPlanId, slot.recipe.id, day, slot.mealType]
+                    );
+                }
             }
         }
-        
-        // 4. Gesamt-Kalorien berechnen und Plan aktualisieren
-        const totalCalories = allRecipesInPlan.reduce((sum, recipe) => sum + recipe.totalCalories, 0);
-        const avgCalories = totalCalories / 7;
-        settings.kcal = Math.round(avgCalories);
-        await connection.query('UPDATE plans SET settings = ? WHERE id = ?', [JSON.stringify(settings), newPlanId]);
 
         await connection.commit();
-        
-        res.status(201).json({ message: "Plan erfolgreich erstellt", planId: newPlanId });
+        res.status(201).json({ message: 'Plan saved successfully.', planId: newPlanId });
 
     } catch (error) {
-        if (connection) await connection.rollback();
-        console.error('Fehler beim Speichern des individuellen Plans:', error);
-        res.status(500).json({ error: 'Der individuelle Plan konnte nicht gespeichert werden.' });
+        await connection.rollback();
+        console.error('Failed to save custom plan:', error);
+        res.status(500).json({ error: 'Could not save the custom plan.' });
     } finally {
-        if (connection) connection.release();
+        connection.release();
     }
 });
 
