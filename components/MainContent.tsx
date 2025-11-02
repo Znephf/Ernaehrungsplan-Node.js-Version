@@ -11,6 +11,7 @@ import PlannerComponent from './Planner';
 
 interface MainContentProps {
   currentView: View;
+  onSetView: (view: View) => void;
   plan: PlanData | null;
   settings: PlanSettings;
   archive: ArchiveEntry[];
@@ -30,6 +31,7 @@ interface MainContentProps {
 const MainContent: React.FC<MainContentProps> = (props) => {
   const {
     currentView,
+    onSetView,
     plan,
     settings,
     archive,
@@ -58,7 +60,18 @@ const MainContent: React.FC<MainContentProps> = (props) => {
             isLactoseFree={plan.settings.isLactoseFree}
           />
         ) : (
-          <SettingsPanel settings={settings} onSettingsChange={onSettingsChange} onGeneratePlan={onGeneratePlan} isLoading={isLoading} />
+          <div className="bg-white/50 p-6 rounded-lg shadow-sm space-y-6">
+            <div className="text-center">
+                <h2 className="text-2xl font-bold text-slate-700">Neuen Ernährungsplan erstellen</h2>
+                <p className="text-slate-500 mt-2 max-w-2xl mx-auto">
+                    Passe die Einstellungen an und lass die KI einen individuellen Plan für dich erstellen. 
+                    Alternativ kannst du einen bestehenden Plan aus deinem <button onClick={() => onSetView('archive')} className="text-emerald-600 font-semibold hover:underline">Archiv laden</button>.
+                </p>
+            </div>
+            <div className="border-t border-slate-200 pt-6">
+                <SettingsPanel settings={settings} onSettingsChange={onSettingsChange} onGeneratePlan={onGeneratePlan} isLoading={isLoading} />
+            </div>
+          </div>
         );
       case 'shopping':
         return plan ? <ShoppingListComponent shoppingList={plan.shoppingList} /> : <p>Kein Plan zum Anzeigen der Einkaufsliste vorhanden.</p>;
@@ -82,7 +95,20 @@ const MainContent: React.FC<MainContentProps> = (props) => {
       case 'planner':
         return <PlannerComponent onPlanSaved={onPlanSaved} />;
       default:
-        return <SettingsPanel settings={settings} onSettingsChange={onSettingsChange} onGeneratePlan={onGeneratePlan} isLoading={isLoading} />;
+        return (
+             <div className="bg-white/50 p-6 rounded-lg shadow-sm space-y-6">
+                <div className="text-center">
+                    <h2 className="text-2xl font-bold text-slate-700">Neuen Ernährungsplan erstellen</h2>
+                    <p className="text-slate-500 mt-2 max-w-2xl mx-auto">
+                        Passe die Einstellungen an und lass die KI einen individuellen Plan für dich erstellen. 
+                        Alternativ kannst du einen bestehenden Plan aus deinem <button onClick={() => onSetView('archive')} className="text-emerald-600 font-semibold hover:underline">Archiv laden</button>.
+                    </p>
+                </div>
+                <div className="border-t border-slate-200 pt-6">
+                    <SettingsPanel settings={settings} onSettingsChange={onSettingsChange} onGeneratePlan={onGeneratePlan} isLoading={isLoading} />
+                </div>
+            </div>
+        );
     }
   };
 

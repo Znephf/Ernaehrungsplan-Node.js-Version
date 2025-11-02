@@ -146,6 +146,12 @@ const App: React.FC = () => {
             }
         }, 100);
     };
+
+    const handleShowPlanner = () => {
+        setActivePlan(null);
+        setSettings(initialSettings);
+        setCurrentView('plan');
+    };
     
     // --- Sharing ---
     const handleShare = () => {
@@ -176,6 +182,7 @@ const App: React.FC = () => {
                 shareStatus={shareStatus}
                 onShare={handleShare}
                 onLogout={handleLogout}
+                onShowPlanner={handleShowPlanner}
             />
             
             {(isGenerating) && (
@@ -189,6 +196,7 @@ const App: React.FC = () => {
 
             <MainContent
                 currentView={currentView}
+                onSetView={setCurrentView}
                 plan={activePlan}
                 settings={settings}
                 archive={archive}

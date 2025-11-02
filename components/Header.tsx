@@ -1,6 +1,6 @@
 import React from 'react';
 import type { View } from '../types';
-import { LogoutIcon, ShareIcon } from './IconComponents';
+import { LogoutIcon, ShareIcon, PlusIcon } from './IconComponents';
  
 interface HeaderProps {
     currentView: View;
@@ -10,6 +10,7 @@ interface HeaderProps {
     shareStatus: string;
     onShare: () => void;
     onLogout: () => void;
+    onShowPlanner: () => void;
 }
 
 const NavButton: React.FC<{ view: View; label: string; currentView: View; onClick: (view: View) => void; disabled?: boolean }> = ({ view, label, currentView, onClick, disabled = false }) => (
@@ -33,7 +34,8 @@ const Header: React.FC<HeaderProps> = ({
     isSharing,
     shareStatus,
     onShare,
-    onLogout
+    onLogout,
+    onShowPlanner
 }) => {
     return (
         <header className="bg-white shadow-md sticky top-0 z-10">
@@ -51,6 +53,14 @@ const Header: React.FC<HeaderProps> = ({
                         <NavButton view="planner" label="Woche Planen" currentView={currentView} onClick={onSetView} />
                     </nav>
                     <div className="hidden sm:block h-8 border-l border-slate-300 mx-2"></div>
+                     <button
+                        onClick={onShowPlanner}
+                        className="flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-md shadow-sm transition-colors"
+                        title="Einen neuen Plan erstellen"
+                    >
+                        <PlusIcon />
+                        <span>Neuer Plan</span>
+                    </button>
                      <button
                         onClick={onShare}
                         disabled={isSharing || !planExists}
