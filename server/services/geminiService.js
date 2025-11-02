@@ -1,7 +1,16 @@
 const { GoogleGenAI, Modality, Type } = require('@google/genai');
 const { pool } = require('./database');
 const { API_KEY, API_KEY_FALLBACK } = process.env;
-const { MealCategoryLabels } = require('../../types');
+
+// BEHOBEN: Das Laden von 'types.ts' wurde entfernt, da dies den Server zum Absturz bringt.
+// Das benötigte Objekt wird stattdessen direkt hier definiert.
+const MealCategoryLabels = {
+    breakfast: 'Frühstück',
+    lunch: 'Mittagessen',
+    coffee: 'Kaffee & Kuchen',
+    dinner: 'Abendessen',
+    snack: 'Snack'
+};
 
 
 const TEXT_MODEL_NAME = 'gemini-2.5-flash';
