@@ -1,21 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import type { Recipes, Recipe } from '../types';
+// Fix: Added WeeklyPlan to the import
+import type { Recipes, Recipe, WeeklyPlan } from '../types';
 import { FireIcon, PrintIcon, LoadingSpinnerIcon, ProteinIcon, CarbsIcon, FatIcon } from './IconComponents';
 import GeneratedRecipeImage from './GeneratedRecipeImage';
 
 interface RecipesComponentProps {
+  // Fix: Added weeklyPlan to props to correctly associate recipes with days.
+  weeklyPlan: WeeklyPlan;
   recipes: Recipes;
   persons: number;
   imageUrls: { [key: string]: string };
   loadingImages: Set<string>;
   imageErrors: { [key: string]: string | null };
-  generateImage: (recipe: Recipe) => Promise<void>;
-  generateMissingImages: (recipes: Recipe[], planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
+  generateImage: (recipe: Recipe, day: string) => Promise<void>;
+  generateMissingImages: (weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
 }
 
-const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, persons, imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages }) => {
+const RecipesComponent: React.FC<RecipesComponentProps> = ({ weeklyPlan, recipes, persons, imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages }) => {
   const [isCreatingPdf, setIsCreatingPdf] = useState(false);
   const [pdfStatus, setPdfStatus] = useState('');
   const [isPdfGenerationQueued, setIsPdfGenerationQueued] = useState(false);
@@ -26,7 +29,8 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, persons, i
     
     // planId is currently required by generateMissingImages for PDF generation, may need refactor later.
     // For now, we'll pass null if no plan context is available, though it shouldn't be called without a plan.
-    await generateMissingImages(recipes || [], null, setPdfStatus);
+    // Fix: Pass weeklyPlan instead of recipes to generateMissingImages.
+    await generateMissingImages(weeklyPlan || [], null, setPdfStatus);
     
     setIsPdfGenerationQueued(true);
   };
@@ -136,7 +140,7 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, persons, i
     const timer = setTimeout(createPdfFromElements, 500);
     return () => clearTimeout(timer);
 
-  }, [isPdfGenerationQueued, recipes, imageUrls, generateMissingImages]);
+  }, [isPdfGenerationQueued, weeklyPlan, recipes, imageUrls, generateMissingImages]);
 
   return (
     <div className="space-y-8">
@@ -156,74 +160,82 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ recipes, persons, i
       </div>
 
       <div className="space-y-12">
-        {(recipes || []).map((recipe) => (
-          <div key={recipe.day} id={`recipe-${recipe.day}`} className="bg-white rounded-lg shadow-lg hover:shadow-xl overflow-hidden recipe-card-for-pdf">
-            <div>
-              <GeneratedRecipeImage 
-                recipeTitle={recipe.title}
-                imageUrl={imageUrls[recipe.day] || null}
-                isLoading={loadingImages.has(recipe.day)}
-                error={imageErrors[recipe.day] || null}
-                onGenerate={() => generateImage(recipe)}
-              />
-            </div>
-            <div className="p-6">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-sm font-semibold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">{recipe.day}</span>
-                <div className="flex items-center gap-1 text-sm text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
-                  <FireIcon />
-                  <span>ca. {recipe.totalCalories} kcal pro Portion</span>
-                </div>
-              </div>
-              <h3 className="text-2xl font-bold text-slate-800 mt-3">{recipe.title}</h3>
+        {/* Fix: Iterate over weeklyPlan to get recipes and their associated day. */}
+        {(weeklyPlan || []).map((dayPlan) => {
+          const dinnerMeal = dayPlan.meals.find(m => m.mealType === 'dinner');
+          if (!dinnerMeal) return null;
+          const recipe = dinnerMeal.recipe;
+          const day = dayPlan.day;
 
-              {recipe.protein !== undefined && recipe.carbs !== undefined && recipe.fat !== undefined && (
-                <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-slate-600 p-3 bg-slate-50 rounded-lg">
-                    <span className="flex items-center gap-1.5 text-sm">
-                        <ProteinIcon /> 
-                        <div>
-                            <span className="font-bold">{recipe.protein}g</span>
-                            <span className="text-slate-500 text-xs block">Protein</span>
-                        </div>
-                    </span>
-                     <span className="flex items-center gap-1.5 text-sm">
-                        <CarbsIcon /> 
-                        <div>
-                            <span className="font-bold">{recipe.carbs}g</span>
-                            <span className="text-slate-500 text-xs block">Kohlenh.</span>
-                        </div>
-                    </span>
-                     <span className="flex items-center gap-1.5 text-sm">
-                        <FatIcon /> 
-                        <div>
-                            <span className="font-bold">{recipe.fat}g</span>
-                            <span className="text-slate-500 text-xs block">Fett</span>
-                        </div>
-                    </span>
+          return (
+            <div key={day} id={`recipe-${day}`} className="bg-white rounded-lg shadow-lg hover:shadow-xl overflow-hidden recipe-card-for-pdf">
+              <div>
+                <GeneratedRecipeImage 
+                  recipeTitle={recipe.title}
+                  imageUrl={imageUrls[day] || null}
+                  isLoading={loadingImages.has(day)}
+                  error={imageErrors[day] || null}
+                  onGenerate={() => generateImage(recipe, day)}
+                />
+              </div>
+              <div className="p-6">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">{day}</span>
+                  <div className="flex items-center gap-1 text-sm text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
+                    <FireIcon />
+                    <span>ca. {recipe.totalCalories} kcal pro Portion</span>
+                  </div>
                 </div>
-              )}
-              
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-5 gap-x-8 gap-y-6">
-                <div className="md:col-span-2">
-                  <h4 className="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Zutaten:</h4>
-                  <ul className="space-y-2 list-disc list-inside text-slate-600">
-                    {(recipe.ingredients || []).map((ingredient, index) => (
-                      <li key={index}>{ingredient}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="md:col-span-3 md:border-l md:border-slate-200 md:pl-8">
-                  <h4 className="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Anleitung:</h4>
-                  <ol className="space-y-3 list-decimal list-inside text-slate-600">
-                    {(recipe.instructions || []).map((step, index) => (
-                      <li key={index}>{step}</li>
-                    ))}
-                  </ol>
+                <h3 className="text-2xl font-bold text-slate-800 mt-3">{recipe.title}</h3>
+
+                {recipe.protein !== undefined && recipe.carbs !== undefined && recipe.fat !== undefined && (
+                  <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-slate-600 p-3 bg-slate-50 rounded-lg">
+                      <span className="flex items-center gap-1.5 text-sm">
+                          <ProteinIcon /> 
+                          <div>
+                              <span className="font-bold">{recipe.protein}g</span>
+                              <span className="text-slate-500 text-xs block">Protein</span>
+                          </div>
+                      </span>
+                       <span className="flex items-center gap-1.5 text-sm">
+                          <CarbsIcon /> 
+                          <div>
+                              <span className="font-bold">{recipe.carbs}g</span>
+                              <span className="text-slate-500 text-xs block">Kohlenh.</span>
+                          </div>
+                      </span>
+                       <span className="flex items-center gap-1.5 text-sm">
+                          <FatIcon /> 
+                          <div>
+                              <span className="font-bold">{recipe.fat}g</span>
+                              <span className="text-slate-500 text-xs block">Fett</span>
+                          </div>
+                      </span>
+                  </div>
+                )}
+                
+                <div className="mt-6 grid grid-cols-1 md:grid-cols-5 gap-x-8 gap-y-6">
+                  <div className="md:col-span-2">
+                    <h4 className="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Zutaten:</h4>
+                    <ul className="space-y-2 list-disc list-inside text-slate-600">
+                      {(recipe.ingredients || []).map((ingredient, index) => (
+                        <li key={index}>{ingredient}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="md:col-span-3 md:border-l md:border-slate-200 md:pl-8">
+                    <h4 className="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Anleitung:</h4>
+                    <ol className="space-y-3 list-decimal list-inside text-slate-600">
+                      {(recipe.instructions || []).map((step, index) => (
+                        <li key={index}>{step}</li>
+                      ))}
+                    </ol>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   );

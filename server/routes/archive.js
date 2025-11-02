@@ -8,60 +8,91 @@ const { generateShoppingListForRecipes } = require('../services/geminiService');
 
 const publicImagesDir = path.join(__dirname, '..', '..', 'public', 'images', 'recipes');
 
+const WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 
 // Alle Pläne aus dem Archiv abrufen
 router.get('/archive', async (req, res) => {
     try {
-        const [plans] = await pool.query('SELECT * FROM archived_plans ORDER BY createdAt DESC');
-        const [imageRows] = await pool.query('SELECT recipe_title, image_url FROM recipe_images');
+        const [plans] = await pool.query(`
+            SELECT 
+                p.id, p.name, p.createdAt, p.settings, p.shareId,
+                pr.day_of_week, pr.meal_type,
+                r.id as recipe_id, r.title, r.ingredients, r.instructions, r.totalCalories, r.protein, r.carbs, r.fat, r.category, r.image_url
+            FROM plans p
+            JOIN plan_recipes pr ON p.id = pr.plan_id
+            JOIN recipes r ON pr.recipe_id = r.id
+            ORDER BY p.createdAt DESC, FIELD(pr.day_of_week, 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag');
+        `);
         
-        const imageMap = new Map(imageRows.map(row => [row.recipe_title, row.image_url]));
-        
-        const archive = plans.map(row => {
-            try {
-                const settings = typeof row.settings === 'string' ? JSON.parse(row.settings) : row.settings;
-                const planData = typeof row.planData === 'string' ? JSON.parse(row.planData) : row.planData;
-                
-                if (!planData || typeof planData !== 'object' || !Array.isArray(planData.weeklyPlan) || !Array.isArray(planData.recipes) || !Array.isArray(planData.shoppingList)) {
-                    console.warn(`[Archiv] Plan mit ID ${row.id} wird übersprungen, da Plandaten korrupt sind.`);
-                    return null;
-                }
-                
-                // Dynamisch Bild-URLs aus der zentralen Tabelle zuweisen
-                const newImageUrls = {};
-                for (const recipe of planData.recipes) {
-                    if (imageMap.has(recipe.title)) {
-                        newImageUrls[recipe.day] = imageMap.get(recipe.title);
-                    }
-                }
-                planData.imageUrls = newImageUrls;
+        if (plans.length === 0) {
+            return res.json([]);
+        }
 
-
-                return {
+        // Manuelles Gruppieren der Ergebnisse in JavaScript
+        const groupedPlans = plans.reduce((acc, row) => {
+            if (!acc[row.id]) {
+                acc[row.id] = {
                     id: row.id,
+                    name: row.name,
                     createdAt: new Date(row.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                    shareId: row.shareId || null,
-                    name: row.name, // Wichtig: Name aus der dedizierten Spalte verwenden
-                    ...settings,
-                    ...planData
+                    settings: typeof row.settings === 'string' ? JSON.parse(row.settings) : row.settings,
+                    shareId: row.shareId,
+                    weeklyPlan: [], // Wird unten befüllt
+                    recipes: [], // Wird unten befüllt
+                    shoppingList: [] // Wird später generiert oder müsste separat geladen werden
                 };
-            } catch(e) {
-                console.error(`[Archiv] Fehler beim Verarbeiten von Plan mit ID ${row.id}:`, e);
-                return null;
             }
-        }).filter(entry => entry !== null);
-        
-        res.json(archive);
+            
+            const recipe = {
+                id: row.recipe_id,
+                title: row.title,
+                ingredients: typeof row.ingredients === 'string' ? JSON.parse(row.ingredients) : row.ingredients,
+                instructions: typeof row.instructions === 'string' ? JSON.parse(row.instructions) : row.instructions,
+                totalCalories: row.totalCalories,
+                protein: row.protein,
+                carbs: row.carbs,
+                fat: row.fat,
+                category: row.category,
+                image_url: row.image_url
+            };
+
+            // Doppeltes Hinzufügen von Rezepten vermeiden
+            if (!acc[row.id].recipes.some(r => r.id === recipe.id)) {
+                 acc[row.id].recipes.push(recipe);
+            }
+           
+            let dayPlan = acc[row.id].weeklyPlan.find(dp => dp.day === row.day_of_week);
+            if (!dayPlan) {
+                dayPlan = { day: row.day_of_week, meals: [], totalCalories: 0 };
+                acc[row.id].weeklyPlan.push(dayPlan);
+            }
+            
+            dayPlan.meals.push({ mealType: row.meal_type, recipe });
+            dayPlan.totalCalories += recipe.totalCalories;
+
+            return acc;
+        }, {});
+
+        // Wochenpläne sortieren und Einkaufslisten generieren
+        const finalArchive = await Promise.all(Object.values(groupedPlans).map(async (plan) => {
+            plan.weeklyPlan.sort((a, b) => WEEKDAYS.indexOf(a.day) - WEEKDAYS.indexOf(b.day));
+            // Generiere die Einkaufsliste on-the-fly für die Anzeige im Archiv
+            plan.shoppingList = await generateShoppingListForRecipes(plan.recipes, plan.settings.persons);
+            return plan;
+        }));
+
+        res.json(finalArchive);
     } catch (error) {
         console.error('Fehler beim Abrufen des Archivs:', error);
         res.status(500).json({ error: 'Archiv konnte nicht geladen werden.' });
     }
 });
 
+
 // Bild-URL für ein Rezept zentral speichern
 router.post('/recipe-image', async (req, res) => {
-    const { recipeTitle, base64Data } = req.body;
-    if (!recipeTitle || !base64Data) {
+    const { recipeId, base64Data } = req.body;
+    if (!recipeId || !base64Data) {
         return res.status(400).json({ error: 'Fehlende Daten zum Speichern des Bildes.' });
     }
 
@@ -74,13 +105,13 @@ router.post('/recipe-image', async (req, res) => {
         fs.writeFileSync(filePath, imageBuffer);
 
         await pool.query(
-            'INSERT INTO recipe_images (recipe_title, image_url) VALUES (?, ?) ON DUPLICATE KEY UPDATE image_url = VALUES(image_url)',
-            [recipeTitle, fileUrl]
+            'UPDATE recipes SET image_url = ? WHERE id = ?',
+            [fileUrl, recipeId]
         );
 
         res.status(200).json({ message: 'Bild erfolgreich gespeichert.', imageUrl: fileUrl });
     } catch (error) {
-        console.error(`Fehler beim Speichern des Bildes für Rezept "${recipeTitle}":`, error);
+        console.error(`Fehler beim Speichern des Bildes für Rezept-ID "${recipeId}":`, error);
         res.status(500).json({ error: 'Bild konnte nicht verarbeitet oder in der DB gespeichert werden.' });
     }
 });
@@ -88,8 +119,8 @@ router.post('/recipe-image', async (req, res) => {
 
 // Neuen individuellen Plan speichern
 router.post('/archive/custom-plan', async (req, res) => {
-    const { name, persons, dinners } = req.body;
-    if (!name || !persons || !Array.isArray(dinners) || dinners.length === 0) {
+    const { name, persons, mealsByDay } = req.body;
+    if (!name || !persons || typeof mealsByDay !== 'object') {
         return res.status(400).json({ error: 'Unvollständige Plandaten erhalten.' });
     }
 
@@ -98,72 +129,47 @@ router.post('/archive/custom-plan', async (req, res) => {
         connection = await pool.getConnection();
         await connection.beginTransaction();
 
-        // 1. Wochenplan erstellen
-        const weeklyPlan = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"].map(day => {
-            const dinnerEntry = dinners.find(d => d.day === day);
-            return {
-                day,
-                breakfast: "Individuelles Frühstück",
-                breakfastCalories: 0,
-                dinner: dinnerEntry ? dinnerEntry.recipe.title : "Kein Abendessen geplant",
-                dinnerCalories: dinnerEntry ? dinnerEntry.recipe.totalCalories : 0
-            };
-        });
-
-        // 2. Rezeptliste erstellen (nur die tatsächlich verwendeten)
-        const usedRecipes = dinners.map(d => ({ ...d.recipe, day: d.day }));
-        
-        // 3. Einkaufsliste generieren
-        const shoppingList = await generateShoppingListForRecipes(usedRecipes, persons);
-
-        // 4. Plan-Daten (ohne redundanten Namen) und Einstellungen zusammenstellen
-        const planData = {
-            weeklyPlan,
-            recipes: usedRecipes,
-            shoppingList,
-        };
-
+        // 1. Settings-Objekt für den neuen Plan erstellen
         const settings = {
             persons: parseInt(persons, 10),
-            kcal: Math.round(weeklyPlan.reduce((sum, day) => sum + day.dinnerCalories, 0) / 7) || 0,
+            kcal: 0, // Wird später berechnet
             dietaryPreference: 'omnivore',
             dietType: 'balanced',
             dishComplexity: 'simple',
             isGlutenFree: false,
             isLactoseFree: false,
-            excludedIngredients: 'Individuell',
-            desiredIngredients: 'Individuell',
-            breakfastOption: 'custom',
-            customBreakfast: 'Individuell',
+            includedMeals: Object.values(mealsByDay).flatMap(dayMeals => dayMeals.map(m => m.mealType)),
         };
 
-        // 5. In Datenbank speichern
-        const [result] = await connection.query(
-            'INSERT INTO archived_plans (name, settings, planData) VALUES (?, ?, ?)',
-            [name, JSON.stringify(settings), JSON.stringify(planData)]
+        // 2. Plan in `plans` Tabelle einfügen
+        const [planResult] = await connection.query(
+            'INSERT INTO plans (name, settings) VALUES (?, ?)',
+            [name, JSON.stringify(settings)]
         );
-        const newPlanId = result.insertId;
+        const newPlanId = planResult.insertId;
+
+        // 3. Alle Rezepte sammeln und in `plan_recipes` eintragen
+        const allRecipesInPlan = [];
+        for (const day in mealsByDay) {
+            const dayMeals = mealsByDay[day];
+            for (const meal of dayMeals) {
+                 allRecipesInPlan.push(meal.recipe);
+                 await connection.query(
+                    'INSERT INTO plan_recipes (plan_id, recipe_id, day_of_week, meal_type) VALUES (?, ?, ?, ?)',
+                    [newPlanId, meal.recipe.id, day, meal.mealType]
+                );
+            }
+        }
+        
+        // 4. Gesamt-Kalorien berechnen und Plan aktualisieren
+        const totalCalories = allRecipesInPlan.reduce((sum, recipe) => sum + recipe.totalCalories, 0);
+        const avgCalories = totalCalories / 7;
+        settings.kcal = Math.round(avgCalories);
+        await connection.query('UPDATE plans SET settings = ? WHERE id = ?', [JSON.stringify(settings), newPlanId]);
 
         await connection.commit();
         
-        // 6. Neuen Plan abrufen und zurückgeben, um die UI zu aktualisieren
-        const [rows] = await connection.query('SELECT * FROM archived_plans WHERE id = ?', [newPlanId]);
-        
-        if (rows.length === 0) {
-            throw new Error('Der neu erstellte Plan konnte nicht sofort wiedergefunden werden.');
-        }
-
-        const newPlanRow = rows[0];
-        const newPlan = {
-            id: newPlanRow.id,
-            createdAt: new Date(newPlanRow.createdAt).toLocaleString('de-DE'),
-            shareId: newPlanRow.shareId,
-            name: newPlanRow.name, // Explizit den Namen aus der DB-Spalte verwenden
-            ...JSON.parse(newPlanRow.settings),
-            ...JSON.parse(newPlanRow.planData)
-        };
-        
-        res.status(201).json(newPlan);
+        res.status(201).json({ message: "Plan erfolgreich erstellt", planId: newPlanId });
 
     } catch (error) {
         if (connection) await connection.rollback();

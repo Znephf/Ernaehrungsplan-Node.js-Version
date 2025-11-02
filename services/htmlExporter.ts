@@ -1,5 +1,3 @@
-
-
 import type { PlanData, ShoppingList, WeeklyPlan, Recipes, Recipe, ArchiveEntry } from '../types';
 
 // Helper function to escape HTML special characters
@@ -73,39 +71,46 @@ function renderShoppingList(shoppingList: ShoppingList): string {
   `;
 }
 
+// Fix: Updated function to work with the normalized WeeklyPlan structure (using `meals` array).
 function renderWeeklyPlan(weeklyPlan: WeeklyPlan, planName: string): string {
   return `
     <div class="space-y-8">
         <h2 class="text-3xl font-bold text-center text-slate-700">${escapeHtml(planName)}</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            ${weeklyPlan.map(plan => {
-                const totalCalories = plan.breakfastCalories + plan.dinnerCalories;
+            ${weeklyPlan.map(dayPlan => {
+                const breakfast = dayPlan.meals.find(m => m.mealType === 'breakfast');
+                const dinner = dayPlan.meals.find(m => m.mealType === 'dinner');
+                
                 return `
                     <div class="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
                         <div class="bg-emerald-600 text-white p-4 flex justify-between items-center">
-                            <h3 class="text-xl font-bold">${escapeHtml(plan.day)}</h3>
+                            <h3 class="text-xl font-bold">${escapeHtml(dayPlan.day)}</h3>
                             <div class="flex items-center gap-1 text-sm bg-emerald-700 px-2 py-1 rounded-full">
                                 ${Icons.fire}
-                                <span>${totalCalories} kcal</span>
+                                <span>${dayPlan.totalCalories} kcal</span>
                             </div>
                         </div>
                         <div class="p-6 space-y-4 flex-grow">
+                            ${breakfast ? `
                             <div>
                                 <p class="font-semibold text-emerald-800 flex justify-between">
                                     <span>Frühstück:</span>
-                                    <span class="font-normal text-slate-500">${plan.breakfastCalories} kcal</span>
+                                    <span class="font-normal text-slate-500">${breakfast.recipe.totalCalories} kcal</span>
                                 </p>
-                                <p class="text-slate-600">${escapeHtml(plan.breakfast)}</p>
+                                <p class="text-slate-600">${escapeHtml(breakfast.recipe.title)}</p>
                             </div>
+                            ` : ''}
+                             ${dinner ? `
                             <div>
                                 <p class="font-semibold text-emerald-800 flex justify-between">
                                     <span>Abendessen:</span>
-                                     <span class="font-normal text-slate-500">${plan.dinnerCalories} kcal</span>
+                                     <span class="font-normal text-slate-500">${dinner.recipe.totalCalories} kcal</span>
                                 </p>
-                                <a href="#recipe-${escapeHtml(plan.day)}" class="recipe-link text-left text-slate-600 hover:text-emerald-600 font-semibold transition-colors w-full">
-                                    ${escapeHtml(plan.dinner)}
+                                <a href="#recipe-${escapeHtml(dayPlan.day)}" class="recipe-link text-left text-slate-600 hover:text-emerald-600 font-semibold transition-colors w-full">
+                                    ${escapeHtml(dinner.recipe.title)}
                                 </a>
                             </div>
+                             ` : ''}
                         </div>
                     </div>
                 `;
@@ -115,7 +120,8 @@ function renderWeeklyPlan(weeklyPlan: WeeklyPlan, planName: string): string {
   `;
 }
 
-function renderRecipes(recipes: Recipes, imageUrls: { [key: string]: string }): string {
+// Fix: Updated function to get recipe and day from weeklyPlan structure.
+function renderRecipes(weeklyPlan: WeeklyPlan, recipes: Recipes, imageUrls: { [key: string]: string }): string {
   return `
     <div class="space-y-8">
       <div class="text-center sm:text-left">
@@ -123,15 +129,21 @@ function renderRecipes(recipes: Recipes, imageUrls: { [key: string]: string }): 
           <p class="text-slate-500">Alle Rezepte sind für 2 Personen ausgelegt.</p>
       </div>
       <div class="space-y-12">
-        ${recipes.map(recipe => `
-          <div id="recipe-${escapeHtml(recipe.day)}" class="bg-white rounded-lg shadow-lg overflow-hidden">
-            ${imageUrls[recipe.day] 
-              ? `<div class="bg-slate-200"><img src="${imageUrls[recipe.day]}" alt="${escapeHtml(recipe.title)}" class="w-full h-auto"/></div>` 
+        ${weeklyPlan.map(dayPlan => {
+          const dinnerMeal = dayPlan.meals.find(m => m.mealType === 'dinner');
+          if (!dinnerMeal) return '';
+          const recipe = dinnerMeal.recipe;
+          const day = dayPlan.day;
+          
+          return `
+          <div id="recipe-${escapeHtml(day)}" class="bg-white rounded-lg shadow-lg overflow-hidden">
+            ${imageUrls[day] 
+              ? `<div class="bg-slate-200"><img src="${imageUrls[day]}" alt="${escapeHtml(recipe.title)}" class="w-full h-auto"/></div>` 
               : `<div class="aspect-video bg-slate-200 flex items-center justify-center"><p class="text-slate-500">Kein Bild generiert</p></div>`
             }
             <div class="p-6">
               <div class="flex flex-wrap items-center justify-between gap-2">
-                <span class="text-sm font-semibold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">${escapeHtml(recipe.day)}</span>
+                <span class="text-sm font-semibold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">${escapeHtml(day)}</span>
                 <div class="flex items-center gap-1 text-sm text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
                   ${Icons.fire}
                   <span>ca. ${recipe.totalCalories} kcal pro Portion</span>
@@ -161,7 +173,7 @@ function renderRecipes(recipes: Recipes, imageUrls: { [key: string]: string }): 
               </div>
             </div>
           </div>
-        `).join('')}
+        `}).join('')}
       </div>
     </div>
   `;
@@ -186,7 +198,7 @@ export const generateAndDownloadHtml = async (plan: PlanData | ArchiveEntry, ima
 
     const weeklyPlanHtml = renderWeeklyPlan(plan.weeklyPlan, plan.name);
     const shoppingListHtml = renderShoppingList(plan.shoppingList);
-    const recipesHtml = renderRecipes(plan.recipes, compressedImageUrls);
+    const recipesHtml = renderRecipes(plan.weeklyPlan, plan.recipes, compressedImageUrls);
 
     const fullHtml = `
       <!DOCTYPE html>

@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "migrate:images": "node scripts/migrate_images.js",
     "migrate:complexity": "node scripts/migrate_complexity.js",
-    "migrate:recipe-images": "node scripts/migrate_to_recipe_images.js"
+    "migrate:recipe-images": "node scripts/migrate_to_recipe_images.js",
+    "migrate:normalize-db": "node scripts/migrate_to_normalized_db.js"
   },
   "dependencies": {
     "@google/genai": "latest",

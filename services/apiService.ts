@@ -1,4 +1,4 @@
-import type { ArchiveEntry, PlanSettings, Recipe } from '../types';
+import type { ArchiveEntry, MealCategory, PlanSettings, Recipe, WeeklyPlan } from '../types';
 
 // --- Auth Service ---
 
@@ -42,7 +42,8 @@ export const getArchive = async (): Promise<ArchiveEntry[]> => {
     return response.json();
 };
 
-export const saveCustomPlan = async (payload: { name: string, persons: number, dinners: { day: string, recipe: Recipe }[] }): Promise<ArchiveEntry> => {
+// Fix: Updated the payload type to correctly reflect the `mealsByDay` structure.
+export const saveCustomPlan = async (payload: { name: string, persons: number, mealsByDay: { [day: string]: { recipe: Recipe; mealType: MealCategory }[] } }): Promise<ArchiveEntry> => {
     const response = await fetch('/api/archive/custom-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -56,11 +57,11 @@ export const saveCustomPlan = async (payload: { name: string, persons: number, d
 };
 
 // Sends base64, expects back the new file URL
-export const saveRecipeImage = async (recipeTitle: string, base64Data: string): Promise<{ message: string, imageUrl: string }> => {
+export const saveRecipeImage = async (recipeId: number, base64Data: string): Promise<{ message: string, imageUrl: string }> => {
     const response = await fetch('/api/recipe-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipeTitle, base64Data }),
+        body: JSON.stringify({ recipeId, base64Data }),
     });
     if (!response.ok) {
         const errorData = await response.json();

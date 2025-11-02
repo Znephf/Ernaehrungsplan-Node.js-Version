@@ -93,11 +93,12 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
           recipe.title.toLowerCase().includes(lowercasedTerm)
         );
       
-      const matchesPreference = selectedPreferences.size === 0 || selectedPreferences.has(entry.dietaryPreference);
-      const matchesDietType = selectedDietTypes.size === 0 || selectedDietTypes.has(entry.dietType);
-      const matchesComplexity = selectedComplexities.size === 0 || selectedComplexities.has(entry.dishComplexity);
-      const matchesGlutenFree = !filterGlutenFree || entry.isGlutenFree;
-      const matchesLactoseFree = !filterLactoseFree || entry.isLactoseFree;
+      // Fix: All property accesses now correctly use the `entry.settings` object.
+      const matchesPreference = selectedPreferences.size === 0 || selectedPreferences.has(entry.settings.dietaryPreference);
+      const matchesDietType = selectedDietTypes.size === 0 || selectedDietTypes.has(entry.settings.dietType);
+      const matchesComplexity = selectedComplexities.size === 0 || selectedComplexities.has(entry.settings.dishComplexity);
+      const matchesGlutenFree = !filterGlutenFree || entry.settings.isGlutenFree;
+      const matchesLactoseFree = !filterLactoseFree || entry.settings.isLactoseFree;
 
       return matchesSearch && matchesPreference && matchesDietType && matchesComplexity && matchesGlutenFree && matchesLactoseFree;
     });
@@ -228,41 +229,42 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
                 <h3 className="text-xl font-bold text-slate-800 mt-2">
                   {entry.name}
                 </h3>
+                {/* Fix: Corrected all property accesses to use entry.settings */}
                 <div className="text-sm text-slate-500 mt-2 flex flex-wrap gap-x-3 items-center">
-                      <span>{entry.persons} Pers.</span>
+                      <span>{entry.settings.persons} Pers.</span>
                       <span className="text-slate-300">&bull;</span>
-                      <span>{entry.kcal} kcal</span>
+                      <span>{entry.settings.kcal} kcal</span>
                       <span className="text-slate-300">&bull;</span>
-                      <span className="capitalize">{entry.dietaryPreference === 'omnivore' ? 'Alles' : entry.dietaryPreference}</span>
+                      <span className="capitalize">{entry.settings.dietaryPreference === 'omnivore' ? 'Alles' : entry.settings.dietaryPreference}</span>
                   </div>
                   <div className="text-xs text-emerald-700 font-semibold mt-2 flex flex-wrap gap-x-2">
-                    {entry.isGlutenFree && <span className="bg-emerald-50 px-2 py-0.5 rounded-full">Glutenfrei</span>}
-                    {entry.isLactoseFree && <span className="bg-emerald-50 px-2 py-0.5 rounded-full">Laktosefrei</span>}
+                    {entry.settings.isGlutenFree && <span className="bg-emerald-50 px-2 py-0.5 rounded-full">Glutenfrei</span>}
+                    {entry.settings.isLactoseFree && <span className="bg-emerald-50 px-2 py-0.5 rounded-full">Laktosefrei</span>}
                   </div>
                   <div className="mt-3 space-y-1 text-sm text-slate-600">
                       <p>
-                          <span className="font-semibold">Diät-Typ:</span> {dietTypeLabels[entry.dietType] || 'Standard'}
+                          <span className="font-semibold">Diät-Typ:</span> {dietTypeLabels[entry.settings.dietType] || 'Standard'}
                       </p>
                        <p>
-                          <span className="font-semibold">Niveau:</span> {dishComplexityLabels[entry.dishComplexity] || 'Einfach'}
+                          <span className="font-semibold">Niveau:</span> {dishComplexityLabels[entry.settings.dishComplexity] || 'Einfach'}
                       </p>
-                      <p>
-                          <span className="font-semibold">Frühstück:</span> <span className="capitalize">{entry.breakfastOption === 'custom' ? 'Eigene Angabe' : entry.breakfastOption}</span>
-                      </p>
+                      {entry.settings.breakfastOption && <p>
+                          <span className="font-semibold">Frühstück:</span> <span className="capitalize">{entry.settings.breakfastOption === 'custom' ? 'Eigene Angabe' : entry.settings.breakfastOption}</span>
+                      </p>}
                   </div>
-                  {entry.breakfastOption === 'custom' && entry.customBreakfast && (
-                      <p className="text-xs text-slate-400 mt-1 italic" title={entry.customBreakfast}>
-                          "{entry.customBreakfast.length > 40 ? `${entry.customBreakfast.substring(0, 40)}...` : entry.customBreakfast}"
+                  {entry.settings.breakfastOption === 'custom' && entry.settings.customBreakfast && (
+                      <p className="text-xs text-slate-400 mt-1 italic" title={entry.settings.customBreakfast}>
+                          "{entry.settings.customBreakfast.length > 40 ? `${entry.settings.customBreakfast.substring(0, 40)}...` : entry.settings.customBreakfast}"
                       </p>
                   )}
-                  {entry.desiredIngredients && (
-                      <p className="text-xs text-slate-400 mt-2" title={entry.desiredIngredients}>
-                          <span className="font-semibold">Mit:</span> {entry.desiredIngredients.length > 40 ? `${entry.desiredIngredients.substring(0, 40)}...` : entry.desiredIngredients}
+                  {entry.settings.desiredIngredients && (
+                      <p className="text-xs text-slate-400 mt-2" title={entry.settings.desiredIngredients}>
+                          <span className="font-semibold">Mit:</span> {entry.settings.desiredIngredients.length > 40 ? `${entry.settings.desiredIngredients.substring(0, 40)}...` : entry.settings.desiredIngredients}
                       </p>
                   )}
-                  {entry.excludedIngredients && (
-                      <p className="text-xs text-slate-400 mt-2" title={entry.excludedIngredients}>
-                          <span className="font-semibold">Ohne:</span> {entry.excludedIngredients.length > 40 ? `${entry.excludedIngredients.substring(0, 40)}...` : entry.excludedIngredients}
+                  {entry.settings.excludedIngredients && (
+                      <p className="text-xs text-slate-400 mt-2" title={entry.settings.excludedIngredients}>
+                          <span className="font-semibold">Ohne:</span> {entry.settings.excludedIngredients.length > 40 ? `${entry.settings.excludedIngredients.substring(0, 40)}...` : entry.settings.excludedIngredients}
                       </p>
                   )}
               </div>

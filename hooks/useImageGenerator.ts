@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import type { Recipe } from '../types';
+// Fix: Added WeeklyPlan to imports
+import type { Recipe, WeeklyPlan } from '../types';
 import * as apiService from '../services/apiService';
 
 export const useImageGenerator = (onImageSaved?: () => void) => {
@@ -8,7 +9,7 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
     const [imageErrors, setImageErrors] = useState<{ [key: string]: string | null }>({});
     
     // This function now returns the raw base64 data URL
-    const executeImageGeneration = useCallback(async (recipe: Recipe): Promise<string | null> => {
+    const executeImageGeneration = useCallback(async (recipe: Recipe, day: string): Promise<string | null> => {
         const maxAttempts = 10;
         let lastKnownError: Error | null = null;
         
@@ -48,17 +49,19 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
         }
 
         const finalErrorMessage = lastKnownError?.message || "Unbekannter Fehler.";
-        setImageErrors(prev => ({ ...prev, [recipe.day]: `Fehler: ${finalErrorMessage}` }));
+        // Fix: Use `day` as the key for setting errors.
+        setImageErrors(prev => ({ ...prev, [day]: `Fehler: ${finalErrorMessage}` }));
         return null;
     }, []);
 
-    const generateImage = useCallback(async (recipe: Recipe) => {
-        if (loadingImages.has(recipe.day)) return;
+    // Fix: Updated function signature to accept `day` as an argument.
+    const generateImage = useCallback(async (recipe: Recipe, day: string) => {
+        if (loadingImages.has(day)) return;
 
-        setLoadingImages(prev => new Set(prev).add(recipe.day));
-        setImageErrors(prev => ({ ...prev, [recipe.day]: null }));
+        setLoadingImages(prev => new Set(prev).add(day));
+        setImageErrors(prev => ({ ...prev, [day]: null }));
 
-        const base64ImageUrl = await executeImageGeneration(recipe);
+        const base64ImageUrl = await executeImageGeneration(recipe, day);
 
         if (base64ImageUrl) {
             try {
@@ -66,52 +69,56 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
                 if (!base64Data) throw new Error("Konnte Bilddaten nicht extrahieren.");
                 
                 // Send base64 to the backend, which saves it centrally and returns the file URL
-                const { imageUrl: fileUrl } = await apiService.saveRecipeImage(recipe.title, base64Data);
+                const { imageUrl: fileUrl } = await apiService.saveRecipeImage(recipe.id, base64Data);
                 
                 // Optimistic UI update
-                setImageUrls(prev => ({ ...prev, [recipe.day]: fileUrl }));
+                setImageUrls(prev => ({ ...prev, [day]: fileUrl }));
                 
                 // Trigger a full data refresh to ensure consistency across the app
                 if (onImageSaved) onImageSaved();
 
             } catch (e) {
                 console.error("Konnte Bild nicht im Backend speichern:", e);
-                setImageErrors(prev => ({ ...prev, [recipe.day]: `Speicherfehler: ${(e as Error).message}` }));
+                setImageErrors(prev => ({ ...prev, [day]: `Speicherfehler: ${(e as Error).message}` }));
             }
         }
         
-        setLoadingImages(prev => { const newSet = new Set(prev); newSet.delete(recipe.day); return newSet; });
+        setLoadingImages(prev => { const newSet = new Set(prev); newSet.delete(day); return newSet; });
 
     }, [loadingImages, executeImageGeneration, onImageSaved]);
 
-    const generateMissingImages = useCallback(async (recipes: Recipe[], planId: number | null, onProgress?: (status: string) => void): Promise<{[key:string]: string}> => {
-        const recipesToGenerate = recipes.filter(r => !imageUrls[r.day] && !loadingImages.has(r.day));
+    // Fix: Updated function to accept weeklyPlan and derive recipes/days from it.
+    const generateMissingImages = useCallback(async (weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void): Promise<{[key:string]: string}> => {
+        const recipesToGenerate = weeklyPlan
+            .flatMap(dp => dp.meals.map(m => ({ recipe: m.recipe, day: dp.day })))
+            .filter(({ day }) => !imageUrls[day] && !loadingImages.has(day));
+
         const finalUrls = { ...imageUrls };
 
         if (recipesToGenerate.length === 0) return finalUrls;
         
         for (let i = 0; i < recipesToGenerate.length; i++) {
-            const recipe = recipesToGenerate[i];
+            const { recipe, day } = recipesToGenerate[i];
             onProgress?.(`Generiere Bild ${i + 1}/${recipesToGenerate.length}...`);
             
-            setLoadingImages(prev => new Set(prev).add(recipe.day));
-            setImageErrors(prev => ({ ...prev, [recipe.day]: null }));
+            setLoadingImages(prev => new Set(prev).add(day));
+            setImageErrors(prev => ({ ...prev, [day]: null }));
             
-            const base64Url = await executeImageGeneration(recipe);
+            const base64Url = await executeImageGeneration(recipe, day);
             if (base64Url) {
                 try {
                     const base64Data = base64Url.split(';base64,').pop();
                     if (!base64Data) throw new Error("Konnte Bilddaten nicht extrahieren.");
 
-                    const { imageUrl: fileUrl } = await apiService.saveRecipeImage(recipe.title, base64Data);
-                    finalUrls[recipe.day] = fileUrl;
-                    setImageUrls(prev => ({ ...prev, [recipe.day]: fileUrl }));
+                    const { imageUrl: fileUrl } = await apiService.saveRecipeImage(recipe.id, base64Data);
+                    finalUrls[day] = fileUrl;
+                    setImageUrls(prev => ({ ...prev, [day]: fileUrl }));
                 } catch (e) {
-                    console.error(`Konnte Bild für ${recipe.day} nicht speichern:`, e);
+                    console.error(`Konnte Bild für ${day} nicht speichern:`, e);
                 }
             }
 
-             setLoadingImages(prev => { const newSet = new Set(prev); newSet.delete(recipe.day); return newSet; });
+             setLoadingImages(prev => { const newSet = new Set(prev); newSet.delete(day); return newSet; });
 
             if (i < recipesToGenerate.length - 1) {
                 onProgress?.(`Warte 3s...`);

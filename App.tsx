@@ -23,8 +23,8 @@ const defaultSettings: PlanSettings = {
     desiredIngredients: '',
     isGlutenFree: false,
     isLactoseFree: false,
-    breakfastOption: 'quark',
-    customBreakfast: '',
+    // Fix: Removed deprecated breakfastOption and customBreakfast, and added includedMeals to align with the PlanSettings type.
+    includedMeals: ['breakfast', 'lunch', 'dinner', 'snack', 'coffee'],
 };
 
 const App: React.FC = () => {
@@ -63,7 +63,8 @@ const App: React.FC = () => {
         cancelProcessing: cancelSharing 
     } = useShareProcessor(handleShareComplete);
 
-    const { loadingImages, imageErrors, generateImage, generateMissingImages } = useImageGenerator(fetchArchive);
+    // Fix: Destructured imageUrls and setImageUrlsFromArchive to manage image state correctly.
+    const { imageUrls, setImageUrlsFromArchive, loadingImages, imageErrors, generateImage, generateMissingImages } = useImageGenerator(fetchArchive);
     
     useEffect(() => {
         const initializeApp = async () => {
@@ -90,11 +91,21 @@ const App: React.FC = () => {
     const handleLoadPlan = useCallback((id: number) => {
         const planToLoad = loadPlanFromArchive(id);
         if (planToLoad) {
+            // Fix: Populate image URLs from the loaded plan's recipes.
+            const urls: { [key: string]: string } = {};
+            planToLoad.weeklyPlan.forEach(dayPlan => {
+                dayPlan.meals.forEach(meal => {
+                    if (meal.recipe.image_url) {
+                        urls[dayPlan.day] = meal.recipe.image_url;
+                    }
+                })
+            });
+            setImageUrlsFromArchive(urls);
             setPlan(planToLoad);
             setCurrentView('plan');
             window.scrollTo(0, 0);
         }
-    }, [loadPlanFromArchive, setPlan]);
+    }, [loadPlanFromArchive, setPlan, setImageUrlsFromArchive]);
 
     const handleGenerateRequest = async () => {
         generateNewPlan(panelSettings, (newPlan) => {
@@ -178,7 +189,8 @@ const App: React.FC = () => {
     }
 
     const appError = planError || shareError;
-    const currentImageUrls = plan?.imageUrls || {};
+    // Fix: Removed currentImageUrls which was based on the incorrect `plan.imageUrls`.
+    // The `imageUrls` from the useImageGenerator hook will be passed directly.
 
     return (
         <div className="bg-slate-100 min-h-screen font-sans">
@@ -237,7 +249,7 @@ const App: React.FC = () => {
                     view={currentView}
                     plan={plan}
                     archive={archive}
-                    imageUrls={currentImageUrls}
+                    imageUrls={imageUrls}
                     loadingImages={loadingImages}
                     imageErrors={imageErrors}
                     onSelectRecipe={handleSelectRecipe}

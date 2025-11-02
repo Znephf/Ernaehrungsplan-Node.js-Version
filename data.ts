@@ -1,4 +1,4 @@
-import type { ShoppingList, WeeklyPlan, Recipes } from './types';
+import type { ShoppingList, WeeklyPlan, Recipes, MealCategory } from './types';
 
 export const shoppingList: ShoppingList = [
   {
@@ -73,19 +73,13 @@ export const shoppingList: ShoppingList = [
   }
 ];
 
-export const weeklyPlan: WeeklyPlan = [
-  { day: "Montag", breakfast: "500g CremeQuark mit 75g Beerenmix.", breakfastCalories: 450, dinner: "Große Shakshuka mit Feta und Paprika.", dinnerCalories: 950 },
-  { day: "Dienstag", breakfast: "500g CremeQuark mit 25g Walnüssen.", breakfastCalories: 550, dinner: "Tofu-Curry-Pfanne mit Paprika, Zucchini und Konjak-Reis.", dinnerCalories: 900 },
-  { day: "Mittwoch", breakfast: "500g CremeQuark mit 75g Beerenmix.", breakfastCalories: 450, dinner: "Linsen-Bolognese mit Konjak-Nudeln.", dinnerCalories: 850 },
-  { day: "Donnerstag", breakfast: "500g CremeQuark mit 25g Mandeln.", breakfastCalories: 530, dinner: "Gebratener Halloumi auf einem großen bunten Salat.", dinnerCalories: 980 },
-  { day: "Freitag", breakfast: "500g CremeQuark mit 75g Beerenmix.", breakfastCalories: 450, dinner: "Cremige Champignon-Pfanne mit Konjak-Nudeln.", dinnerCalories: 880 },
-  { day: "Samstag", breakfast: "500g CremeQuark mit 25g Walnüssen.", breakfastCalories: 550, dinner: "Gefüllte Paprika mit Linsen und Feta.", dinnerCalories: 920 },
-  { day: "Sonntag", breakfast: "500g CremeQuark mit 75g Beerenmix.", breakfastCalories: 450, dinner: "Großes Gemüse-Omelett aus der Pfanne.", dinnerCalories: 900 }
-];
-
+// Fix: Restructured recipes and weeklyPlan to match the current type definitions.
+// Removed 'day' from recipes and added ids/categories.
+// Rebuilt weeklyPlan to use the `meals` array with full recipe objects.
 export const recipes: Recipes = [
   {
-    day: "Montag",
+    id: 1,
+    category: 'dinner',
     title: "Große Shakshuka mit Feta und Paprika",
     ingredients: [
       "1 EL Olivenöl", "2-3 Knoblauchzehen (gehackt)", "3 Paprika (gemischt, in Streifen)",
@@ -102,7 +96,8 @@ export const recipes: Recipes = [
     totalCalories: 950
   },
   {
-    day: "Dienstag",
+    id: 2,
+    category: 'dinner',
     title: "Tofu-Curry-Pfanne mit Paprika & Zucchini",
     ingredients: [
       "400g Naturtofu", "1 EL Sojasauce", "1 EL Olivenöl", "1-2 Knoblauchzehen (gehackt)",
@@ -120,7 +115,8 @@ export const recipes: Recipes = [
     totalCalories: 900
   },
   {
-    day: "Mittwoch",
+    id: 3,
+    category: 'dinner',
     title: "Linsen-Bolognese mit Konjak-Nudeln",
     ingredients: [
       "2 Packungen Konjak-Nudeln", "1 EL Olivenöl", "1-2 Karotten (fein gewürfelt)",
@@ -137,7 +133,8 @@ export const recipes: Recipes = [
     totalCalories: 850
   },
   {
-    day: "Donnerstag",
+    id: 4,
+    category: 'dinner',
     title: "Gebratener Halloumi auf großem Salat",
     ingredients: [
       "400g Halloumi", "1 EL Olivenöl", "1 Kopf Romanasalat", "1 Gurke",
@@ -153,7 +150,8 @@ export const recipes: Recipes = [
     totalCalories: 980
   },
   {
-    day: "Freitag",
+    id: 5,
+    category: 'dinner',
     title: "Cremige Champignon-Pfanne mit Konjak-Nudeln",
     ingredients: [
       "2 Packungen Konjak-Nudeln", "1 EL Butter oder Olivenöl", "500g Champignons (in Scheiben)",
@@ -169,7 +167,8 @@ export const recipes: Recipes = [
     totalCalories: 880
   },
   {
-    day: "Samstag",
+    id: 6,
+    category: 'dinner',
     title: "Gefüllte Paprika mit Linsen & Feta",
     ingredients: [
       "4 große Paprika", "100g rote Linsen (trocken)", "300ml Gemüsebrühe",
@@ -186,7 +185,8 @@ export const recipes: Recipes = [
     totalCalories: 920
   },
   {
-    day: "Sonntag",
+    id: 7,
+    category: 'dinner',
     title: "Großes Gemüse-Omelett aus der Pfanne",
     ingredients: [
       "6-8 Eier", "100ml Milch oder Sahne", "Salz, Pfeffer, Muskatnuss", "1 EL Olivenöl",
@@ -201,4 +201,20 @@ export const recipes: Recipes = [
     ],
     totalCalories: 900
   }
+];
+
+const breakfastRecipes = {
+  beeren: { id: 101, title: 'CremeQuark mit Beerenmix', ingredients: ['500g CremeQuark', '75g Beerenmix'], instructions: ['Zutaten mischen.'], totalCalories: 450, category: 'breakfast' as MealCategory },
+  walnuss: { id: 102, title: 'CremeQuark mit Walnüssen', ingredients: ['500g CremeQuark', '25g Walnüsse'], instructions: ['Zutaten mischen.'], totalCalories: 550, category: 'breakfast' as MealCategory },
+  mandel: { id: 103, title: 'CremeQuark mit Mandeln', ingredients: ['500g CremeQuark', '25g Mandeln'], instructions: ['Zutaten mischen.'], totalCalories: 530, category: 'breakfast' as MealCategory },
+};
+
+export const weeklyPlan: WeeklyPlan = [
+  { day: "Montag", meals: [{ mealType: 'breakfast', recipe: breakfastRecipes.beeren }, { mealType: 'dinner', recipe: recipes[0] }], totalCalories: 450 + 950 },
+  { day: "Dienstag", meals: [{ mealType: 'breakfast', recipe: breakfastRecipes.walnuss }, { mealType: 'dinner', recipe: recipes[1] }], totalCalories: 550 + 900 },
+  { day: "Mittwoch", meals: [{ mealType: 'breakfast', recipe: breakfastRecipes.beeren }, { mealType: 'dinner', recipe: recipes[2] }], totalCalories: 450 + 850 },
+  { day: "Donnerstag", meals: [{ mealType: 'breakfast', recipe: breakfastRecipes.mandel }, { mealType: 'dinner', recipe: recipes[3] }], totalCalories: 530 + 980 },
+  { day: "Freitag", meals: [{ mealType: 'breakfast', recipe: breakfastRecipes.beeren }, { mealType: 'dinner', recipe: recipes[4] }], totalCalories: 450 + 880 },
+  { day: "Samstag", meals: [{ mealType: 'breakfast', recipe: breakfastRecipes.walnuss }, { mealType: 'dinner', recipe: recipes[5] }], totalCalories: 550 + 920 },
+  { day: "Sonntag", meals: [{ mealType: 'breakfast', recipe: breakfastRecipes.beeren }, { mealType: 'dinner', recipe: recipes[6] }], totalCalories: 450 + 900 }
 ];

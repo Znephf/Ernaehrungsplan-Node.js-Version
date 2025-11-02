@@ -1,5 +1,5 @@
 import React from 'react';
-import type { View, ArchiveEntry, Recipe, Recipes } from '../types';
+import type { View, ArchiveEntry, Recipe, Recipes, WeeklyPlan } from '../types';
 import ShoppingListComponent from './ShoppingList';
 import WeeklyPlanComponent from './WeeklyPlan';
 import RecipesComponent from './Recipes';
@@ -15,8 +15,8 @@ interface MainContentProps {
     imageErrors: { [key: string]: string | null };
     onSelectRecipe: (day: string) => void;
     onLoadPlan: (id: number) => void;
-    onGenerateImage: (recipe: Recipe) => Promise<void>;
-    onGenerateMissingImages: (recipes: Recipe[], planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
+    onGenerateImage: (recipe: Recipe, day: string) => Promise<void>;
+    onGenerateMissingImages: (weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
     onCustomPlanSaved: () => void;
 }
 
@@ -43,13 +43,17 @@ const MainContent: React.FC<MainContentProps> = ({
                                 weeklyPlan={plan.weeklyPlan} 
                                 planName={plan.name} 
                                 onSelectRecipe={onSelectRecipe}
-                                isGlutenFree={plan.isGlutenFree}
-                                isLactoseFree={plan.isLactoseFree}
+                                // Fix: Correctly access properties from the nested `settings` object.
+                                isGlutenFree={plan.settings.isGlutenFree}
+                                isLactoseFree={plan.settings.isLactoseFree}
                              /> : null;
             case 'recipes':
                 return plan ? <RecipesComponent 
+                            // Fix: Pass weeklyPlan to RecipesComponent
+                            weeklyPlan={plan.weeklyPlan}
                             recipes={plan.recipes} 
-                            persons={plan.persons}
+                             // Fix: Correctly access properties from the nested `settings` object.
+                            persons={plan.settings.persons}
                             imageUrls={imageUrls}
                             loadingImages={loadingImages}
                             imageErrors={imageErrors}
