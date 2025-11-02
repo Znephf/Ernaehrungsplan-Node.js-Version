@@ -106,7 +106,7 @@ The JSON must strictly follow this schema:
 - Provide recipes only for the meal types specified by the user.
 - Ensure all recipeIds in weeklyPlan correspond to a recipe in the recipes array.
 - All calorie counts and nutritional values must be calculated for the specified number of people.
-- The average daily calorie intake per person should be close to the user's target.
+- CRITICAL CALORIE INSTRUCTION: The value for "totalCalories" in each day's "weeklyPlan" is the MOST IMPORTANT calculation. It represents the SUM of calories for ALL meals on that day, for ALL people. This daily total must be very close (+/- 100 kcal) to the user's target calories PER PERSON multiplied by the number of people. Do NOT apply the calorie target to individual meals, but to the SUM of all meals for the day.
 - The shopping list must be complete and categorized logically.
 - All text must be in German.
 - Do not use markdown in the JSON response.
