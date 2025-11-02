@@ -1,4 +1,5 @@
 
+
 const mysql = require('mysql2/promise');
 
 const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT } = process.env;
@@ -28,8 +29,6 @@ async function initializeDatabase() {
     try {
         connection = await pool.getConnection();
         console.log('Erfolgreich mit der Datenbank verbunden.');
-
-        // --- Migration zu normalisierter Struktur ---
         
         await connection.query(`
           CREATE TABLE IF NOT EXISTS plans (
@@ -46,7 +45,8 @@ async function initializeDatabase() {
         await connection.query(`
           CREATE TABLE IF NOT EXISTS recipe_images (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            image_url VARCHAR(512) NOT NULL UNIQUE
+            recipe_title VARCHAR(255) NOT NULL UNIQUE,
+            image_url VARCHAR(1024) NOT NULL
           );
         `);
 
@@ -60,9 +60,7 @@ async function initializeDatabase() {
             protein FLOAT,
             carbs FLOAT,
             fat FLOAT,
-            category VARCHAR(50),
-            recipe_image_id INT,
-            FOREIGN KEY (recipe_image_id) REFERENCES recipe_images(id) ON DELETE SET NULL
+            category VARCHAR(50)
           );
         `);
 

@@ -1,4 +1,5 @@
 
+
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../services/database');
@@ -13,7 +14,7 @@ router.get('/', async (req, res) => {
                 r.dietaryPreference, r.dietType, r.dishComplexity, r.isGlutenFree, r.isLactoseFree,
                 ri.image_url
             FROM recipes r
-            LEFT JOIN recipe_images ri ON r.recipe_image_id = ri.id
+            LEFT JOIN recipe_images ri ON r.title = ri.recipe_title
             ORDER BY r.title ASC
         `);
 

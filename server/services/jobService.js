@@ -1,4 +1,5 @@
 
+
 const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
@@ -15,7 +16,7 @@ async function getFullPlanById(planId) {
         `SELECT pr.day_of_week, pr.meal_type, r.*, ri.image_url
          FROM plan_recipes pr
          JOIN recipes r ON pr.recipe_id = r.id
-         LEFT JOIN recipe_images ri ON r.recipe_image_id = ri.id
+         LEFT JOIN recipe_images ri ON r.title = ri.recipe_title
          WHERE pr.plan_id = ?`,
         [planId]
     );

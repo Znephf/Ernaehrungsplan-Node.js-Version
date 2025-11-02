@@ -28,7 +28,7 @@ router.get('/archive', async (req, res) => {
                     ri.image_url
                 FROM plan_recipes pr
                 JOIN recipes r ON pr.recipe_id = r.id
-                LEFT JOIN recipe_images ri ON r.recipe_image_id = ri.id
+                LEFT JOIN recipe_images ri ON r.title = ri.recipe_title
                 WHERE pr.plan_id = ?
             `, [plan.id]);
             

@@ -73,48 +73,35 @@ router.post('/generate-image', async (req, res) => {
 // Speichert ein generiertes Bild
 router.post('/save-image', async (req, res) => {
     const { recipeId, base64Data } = req.body;
-    const connection = await pool.getConnection();
+    
     try {
-        await connection.beginTransaction();
+        // 1. Finde den Titel des Rezepts
+        const [[recipe]] = await pool.query('SELECT title FROM recipes WHERE id = ?', [recipeId]);
+        if (!recipe) {
+            return res.status(404).json({ error: 'Rezept nicht gefunden.' });
+        }
+        const recipeTitle = recipe.title;
 
+        // 2. Speichere die Bilddatei
         const imageBuffer = Buffer.from(base64Data, 'base64');
         const fileName = `${crypto.randomBytes(16).toString('hex')}.jpg`;
         const imagesDir = path.join(__dirname, '..', '..', 'public', 'images', 'recipes');
         const filePath = path.join(imagesDir, fileName);
         const fileUrl = `/images/recipes/${fileName}`;
-
         await fs.writeFile(filePath, imageBuffer);
 
-        // Füge das Bild in die `recipe_images` Tabelle ein oder hole die ID, falls es bereits existiert.
-        const [insertResult] = await connection.query(
-            'INSERT INTO recipe_images (image_url) VALUES (?) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)',
-            [fileUrl]
+        // 3. Füge das Bild in die `recipe_images`-Tabelle ein oder aktualisiere es.
+        // Die Verknüpfung erfolgt über den Titel.
+        await pool.query(
+            'INSERT INTO recipe_images (recipe_title, image_url) VALUES (?, ?) ON DUPLICATE KEY UPDATE image_url = VALUES(image_url)',
+            [recipeTitle, fileUrl]
         );
-        const imageId = insertResult.insertId;
 
-        if (!imageId) {
-            const [[{ id }]] = await connection.query('SELECT id FROM recipe_images WHERE image_url = ?', [fileUrl]);
-            if (!id) throw new Error('Konnte die Bild-ID nicht ermitteln.');
-            
-            await connection.query('UPDATE recipes SET recipe_image_id = ? WHERE id = ?', [id, recipeId]);
-
-        } else {
-            // Verknüpfe das Bild mit dem Rezept
-            await connection.query(
-                'UPDATE recipes SET recipe_image_id = ? WHERE id = ?',
-                [imageId, recipeId]
-            );
-        }
-
-        await connection.commit();
         res.json({ imageUrl: fileUrl });
 
     } catch (error) {
-        await connection.rollback();
         console.error('Fehler beim Speichern des Bildes:', error);
         res.status(500).json({ error: 'Bild konnte nicht gespeichert werden.' });
-    } finally {
-        connection.release();
     }
 });
 

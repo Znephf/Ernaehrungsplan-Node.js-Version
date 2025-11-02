@@ -13,7 +13,7 @@
     "migrate:persons": "node scripts/migrate_persons.js",
     "migrate:to-images-table": "node scripts/migrate_to_recipe_images.js",
     "migrate:to-normalized-db": "node scripts/migrate_to_normalized_db.js",
-    "migrate:images-fk": "node scripts/migrate_recipe_images_foreign_key.js",
+    "migrate:link-images": "node scripts/migrate_link_images.js",
     "migrate:fix-legacy": "node scripts/migrate_from_legacy.js"
   },
   "keywords": [
