@@ -246,13 +246,21 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
         <div>
             {isDesktop ? (
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
-                    <div className="lg:col-span-2 space-y-6">
-                        {filterControls}
-                        <div className="max-h-[65vh] overflow-y-auto pr-2">
-                            {recipeList(() => {})}
+                    {/* ===== LEFT COLUMN: Recipe List ===== */}
+                    <div className="lg:col-span-2 space-y-6 sticky top-24">
+                        <div className="bg-white rounded-lg shadow-lg flex flex-col h-[calc(100vh-8rem)]">
+                           <div className="p-6 border-b flex-shrink-0">
+                               <h2 className="text-2xl font-bold text-slate-700">Verfügbare Gerichte</h2>
+                           </div>
+                           <div className="overflow-y-auto p-6 flex-grow">
+                               {recipeList(() => {})}
+                           </div>
                         </div>
                     </div>
+
+                    {/* ===== RIGHT COLUMN: Filters & Plan ===== */}
                     <div className="lg:col-span-3 space-y-6">
+                        {filterControls}
                         <div className="bg-white p-6 rounded-lg shadow-lg">
                           <h2 className="text-2xl font-bold text-slate-700 mb-4">Mein Wochenplan</h2>
                           <div className="bg-slate-50 p-4 rounded-md mb-6">
