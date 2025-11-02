@@ -1,114 +1,122 @@
+
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
 const { pool } = require('../services/database');
-const { processPlanGenerationJob, getFullPlanById } = require('../services/jobService');
-const { generateImageForRecipe } = require('../services/geminiService');
+const { generatePlanAndShoppingList, generateImageForRecipe } = require('../services/geminiService');
+const { savePlanToDatabase } = require('../services/jobService');
 
-// Start a new plan generation job
+const jobs = {}; // In-memory Job-Speicher
+
+// Startet einen Job zur Plangenerierung
 router.post('/generate-plan-job', async (req, res) => {
     const { settings, previousPlanRecipes } = req.body;
-    if (!settings) {
-        return res.status(400).json({ error: 'Settings are required to generate a plan.' });
-    }
     const jobId = crypto.randomBytes(16).toString('hex');
-    try {
-        // We need to store settings and previous recipes for the background job to use
-        await pool.query(
-            `INSERT INTO app_jobs (jobId, jobType, settings, previousPlanRecipes) VALUES (?, ?, ?, ?)`,
-            [jobId, 'plan_generation', JSON.stringify(settings), JSON.stringify(previousPlanRecipes || [])]
-        );
-        
-        // Start the job in the background, don't wait for it
-        processPlanGenerationJob(jobId);
+    
+    jobs[jobId] = { status: 'pending', plan: null, error: null };
+    
+    res.status(202).json({ jobId });
 
-        res.status(202).json({ jobId });
-    } catch (error) {
-        console.error('Failed to create plan generation job:', error);
-        res.status(500).json({ error: 'Could not start the plan generation job.' });
-    }
+    // Asynchrone Verarbeitung
+    (async () => {
+        try {
+            jobs[jobId].status = 'generating_plan';
+            const generatedPlan = await generatePlanAndShoppingList(settings, previousPlanRecipes);
+            
+            jobs[jobId].status = 'generating_shopping_list'; // Status-Update
+            
+            // Speichere den Plan in der Datenbank. Diese Funktion gibt den vollständigen, gespeicherten Plan zurück.
+            const savedPlan = await savePlanToDatabase(generatedPlan, settings);
+            
+            jobs[jobId].plan = savedPlan;
+            jobs[jobId].status = 'complete';
+
+        } catch (error) {
+            console.error(`Fehler bei Job ${jobId}:`, error);
+            jobs[jobId].status = 'error';
+            jobs[jobId].error = error.message || 'Ein unbekannter Fehler ist aufgetreten.';
+        }
+    })();
 });
 
-// Check the status of a plan generation job
-router.get('/generate-plan-job/status/:jobId', async (req, res) => {
+// Ruft den Status eines Plangenerierungsjobs ab
+router.get('/generate-plan-job/status/:jobId', (req, res) => {
     const { jobId } = req.params;
-    try {
-        const [rows] = await pool.query(
-            'SELECT status, progressText, resultJson, errorMessage FROM app_jobs WHERE jobId = ?',
-            [jobId]
-        );
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'Job not found.' });
-        }
-        
-        const job = rows[0];
-        let responsePayload = {
-            status: job.status,
-            progressText: job.progressText,
-            error: job.errorMessage,
-        };
+    const job = jobs[jobId];
 
-        // If the job is complete, fetch the full plan data and include it
-        if (job.status === 'complete' && job.resultJson) {
-            const result = JSON.parse(job.resultJson);
-            if (result.newPlanId) {
-                const newPlanData = await getFullPlanById(result.newPlanId);
-                responsePayload.plan = newPlanData;
-            }
-        }
+    if (!job) {
+        return res.status(404).json({ error: 'Job nicht gefunden.' });
+    }
 
-        res.json(responsePayload);
-    } catch (error) {
-        console.error(`Failed to get job status for ${jobId}:`, error);
-        res.status(500).json({ error: 'Could not retrieve job status.' });
+    res.json(job);
+
+    // Wenn der Job abgeschlossen ist, wird er nach dem Abrufen gelöscht
+    if (job.status === 'complete' || job.status === 'error') {
+        delete jobs[jobId];
     }
 });
 
-
-// Generate an image for a recipe
+// Generiert ein Bild für ein Rezept
 router.post('/generate-image', async (req, res) => {
     const { recipe, attempt } = req.body;
-    if (!recipe) {
-        return res.status(400).json({ error: 'Recipe data is required.' });
-    }
     try {
-        const result = await generateImageForRecipe(recipe, attempt || 1);
+        const result = await generateImageForRecipe(recipe, attempt);
         res.json(result);
     } catch (error) {
-        console.error('Error generating image:', error);
-        res.status(500).json({ error: error.message || 'Image generation failed.' });
+        console.error('Fehler bei der Bildgenerierung:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 
-
-// Save a generated image and link it to a recipe
+// Speichert ein generiertes Bild
 router.post('/save-image', async (req, res) => {
     const { recipeId, base64Data } = req.body;
-    if (!recipeId || !base64Data) {
-        return res.status(400).json({ error: 'Recipe ID and image data are required.' });
-    }
+    const connection = await pool.getConnection();
     try {
+        await connection.beginTransaction();
+
         const imageBuffer = Buffer.from(base64Data, 'base64');
-        const fileName = `${crypto.randomBytes(16).toString('hex')}.png`;
+        const fileName = `${crypto.randomBytes(16).toString('hex')}.jpg`;
         const imagesDir = path.join(__dirname, '..', '..', 'public', 'images', 'recipes');
         const filePath = path.join(imagesDir, fileName);
-        const imageUrl = `/images/recipes/${fileName}`;
+        const fileUrl = `/images/recipes/${fileName}`;
 
         await fs.writeFile(filePath, imageBuffer);
-        
-        await pool.query(
-            'UPDATE recipes SET image_url = ? WHERE id = ?',
-            [imageUrl, recipeId]
-        );
 
-        res.json({ imageUrl });
+        // Füge das Bild in die `recipe_images` Tabelle ein oder hole die ID, falls es bereits existiert.
+        const [insertResult] = await connection.query(
+            'INSERT INTO recipe_images (image_url) VALUES (?) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)',
+            [fileUrl]
+        );
+        const imageId = insertResult.insertId;
+
+        if (!imageId) {
+            const [[{ id }]] = await connection.query('SELECT id FROM recipe_images WHERE image_url = ?', [fileUrl]);
+            if (!id) throw new Error('Konnte die Bild-ID nicht ermitteln.');
+            
+            await connection.query('UPDATE recipes SET recipe_image_id = ? WHERE id = ?', [id, recipeId]);
+
+        } else {
+            // Verknüpfe das Bild mit dem Rezept
+            await connection.query(
+                'UPDATE recipes SET recipe_image_id = ? WHERE id = ?',
+                [imageId, recipeId]
+            );
+        }
+
+        await connection.commit();
+        res.json({ imageUrl: fileUrl });
 
     } catch (error) {
-        console.error('Failed to save image:', error);
-        res.status(500).json({ error: 'Could not save the image.' });
+        await connection.rollback();
+        console.error('Fehler beim Speichern des Bildes:', error);
+        res.status(500).json({ error: 'Bild konnte nicht gespeichert werden.' });
+    } finally {
+        connection.release();
     }
 });
+
 
 module.exports = router;

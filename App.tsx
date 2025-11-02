@@ -32,10 +32,9 @@ const App: React.FC = () => {
     const [currentView, setCurrentView] = useState<View>('plan');
     
     // Hooks for different functionalities
-    const { archive, loadPlanFromArchive, fetchArchive, updatePlanInArchive } = useArchive();
+    const { archive, loadPlanFromArchive, fetchArchive } = useArchive();
     const { 
         plan: generatedPlan, 
-        setPlan: setCurrentPlan, 
         isLoading: isGenerating, 
         error: generationError, 
         generateNewPlan, 
@@ -53,10 +52,9 @@ const App: React.FC = () => {
         setImageUrlsFromArchive 
     } = useImageGenerator(fetchArchive);
     
-    const onShareComplete = (updatedPlan: ArchiveEntry | null) => {
-        if (updatedPlan) {
-            updatePlanInArchive(updatedPlan);
-        }
+    const onShareComplete = () => {
+        // After sharing, the shareId is updated in the DB. Refetch to get the latest state.
+        fetchArchive();
     };
     const { isProcessing: isSharing, status: shareStatus, shareUrl, setShareUrl, error: shareError, startSharingProcess } = useShareProcessor(onShareComplete);
 
@@ -89,6 +87,7 @@ const App: React.FC = () => {
         }
     }, [isLoggedIn, fetchArchive]);
 
+    // This effect handles the result of a NEWLY generated plan
     useEffect(() => {
         if (generatedPlan) {
             setActivePlan(generatedPlan);
@@ -108,21 +107,15 @@ const App: React.FC = () => {
     }, [generatedPlan, fetchArchive, setImageUrlsFromArchive]);
     
     const handleGeneratePlan = () => {
-        generateNewPlan(settings, (newPlan) => {
-            if (newPlan) {
-                setActivePlan(newPlan);
-                setSettings(newPlan.settings);
-                fetchArchive(); // Update archive list
-            }
-        });
+        generateNewPlan(settings);
     };
 
+    // This handler handles LOADING an EXISTING plan from the archive
     const handleLoadPlan = useCallback((id: number) => {
         const planToLoad = loadPlanFromArchive(id);
         if (planToLoad) {
             resetImageState();
             setActivePlan(planToLoad);
-            setCurrentPlan(planToLoad);
             setSettings(planToLoad.settings);
 
             const loadedImageUrls: { [id: number]: string } = {};
@@ -135,7 +128,7 @@ const App: React.FC = () => {
 
             setCurrentView('plan');
         }
-    }, [loadPlanFromArchive, resetImageState, setCurrentPlan, setImageUrlsFromArchive]);
+    }, [loadPlanFromArchive, resetImageState, setImageUrlsFromArchive]);
     
     const handlePlanSaved = () => {
         fetchArchive();

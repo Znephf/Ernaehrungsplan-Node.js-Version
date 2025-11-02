@@ -1,39 +1,46 @@
 {
-  "name": "ki-ernaehrungsplaner",
-  "private": true,
+  "name": "ernaehrungsplan-app",
   "version": "1.0.0",
+  "description": "Eine App zur Erstellung und Verwaltung von Ernährungsplänen.",
+  "main": "server/index.js",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
     "start": "node server/index.js",
+    "dev": "vite",
+    "build": "vite build",
     "preview": "vite preview",
     "migrate:images": "node scripts/migrate_images.js",
     "migrate:complexity": "node scripts/migrate_complexity.js",
-    "migrate:recipe-images": "node scripts/migrate_to_recipe_images.js",
-    "migrate:normalize-db": "node scripts/migrate_to_normalized_db.js",
+    "migrate:persons": "node scripts/migrate_persons.js",
+    "migrate:to-images-table": "node scripts/migrate_to_recipe_images.js",
+    "migrate:to-normalized-db": "node scripts/migrate_to_normalized_db.js",
+    "migrate:images-fk": "node scripts/migrate_recipe_images_foreign_key.js",
     "migrate:fix-legacy": "node scripts/migrate_from_legacy.js"
   },
+  "keywords": [
+    "ernaehrungsplan",
+    "meal-plan",
+    "gemini",
+    "react",
+    "nodejs"
+  ],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "@google/genai": "latest",
+    "@google/genai": "^0.16.0",
     "cookie-parser": "^1.4.6",
+    "crypto": "^1.0.1",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
-    "mysql2": "^3.10.2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "mysql2": "^3.11.0"
   },
   "devDependencies": {
-    "@types/cookie-parser": "^1.4.7",
-    "@types/express": "^4.17.21",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.39",
-    "tailwindcss": "^3.4.6",
-    "typescript": "^5.5.3",
-    "vite": "^5.3.4"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vite": "^5.3.5"
   }
 }

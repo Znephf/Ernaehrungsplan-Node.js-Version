@@ -13,8 +13,8 @@ router.post('/share', async (req, res) => {
     const jobId = crypto.randomBytes(16).toString('hex');
     try {
         console.log(`[Share Job] Starte Joberstellung für planId: ${planId}`);
-        // Prüfen, ob der Plan existiert
-        const [planRows] = await pool.query('SELECT id FROM archived_plans WHERE id = ?', [planId]);
+        // BEHOBEN: Fragt jetzt die korrekte 'plans'-Tabelle ab, nicht die veraltete 'archived_plans'.
+        const [planRows] = await pool.query('SELECT id FROM plans WHERE id = ?', [planId]);
         if (planRows.length === 0) {
             console.error(`[Share Job] Plan mit ID ${planId} nicht gefunden.`);
             return res.status(404).json({ error: 'Der angegebene Plan wurde nicht gefunden.' });

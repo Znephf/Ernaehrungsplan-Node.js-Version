@@ -27,6 +27,10 @@ export interface Recipe {
     fat?: number;
     category: MealCategory;
     dietaryPreference?: Diet;
+    dietType?: DietType;
+    dishComplexity?: DishComplexity;
+    isGlutenFree?: boolean;
+    isLactoseFree?: boolean;
     image_url?: string | null;
 }
 

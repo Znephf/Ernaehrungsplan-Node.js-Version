@@ -92,11 +92,14 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
         return allRecipes.filter(recipe => {
             const matchesSearch = !searchTerm.trim() || recipe.title.toLowerCase().includes(searchTerm.toLowerCase().trim());
             const matchesPreference = selectedPreferences.size === 0 || (recipe.dietaryPreference && selectedPreferences.has(recipe.dietaryPreference));
-            // Note: dietType, complexity, etc. are not stored per recipe, so filtering is not possible
-            // This could be a future improvement if those properties are added to the recipe model
-            return matchesSearch && matchesPreference;
+            const matchesDietType = selectedDietTypes.size === 0 || (recipe.dietType && selectedDietTypes.has(recipe.dietType));
+            const matchesComplexity = selectedComplexities.size === 0 || (recipe.dishComplexity && selectedComplexities.has(recipe.dishComplexity));
+            const matchesGlutenFree = !filterGlutenFree || !!recipe.isGlutenFree;
+            const matchesLactoseFree = !filterLactoseFree || !!recipe.isLactoseFree;
+            
+            return matchesSearch && matchesPreference && matchesDietType && matchesComplexity && matchesGlutenFree && matchesLactoseFree;
         });
-    }, [allRecipes, searchTerm, selectedPreferences]);
+    }, [allRecipes, searchTerm, selectedPreferences, selectedDietTypes, selectedComplexities, filterGlutenFree, filterLactoseFree]);
     
     const handleFilterToggle = <T extends string>(value: T, currentFilters: Set<T>, setFilters: React.Dispatch<React.SetStateAction<Set<T>>>) => {
         const newFilters = new Set(currentFilters);
@@ -188,13 +191,20 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
         <h2 className="text-2xl font-bold text-slate-700 mb-4">Gerichte-Bibliothek</h2>
         <input type="text" placeholder="Suche..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full rounded-md border-slate-300 mb-4" />
         <div className="space-y-3">
-          {/* FIX: Use Object.keys for type-safe iteration over string literal types. */}
-          <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium">Typ:</span>{(Object.keys(dietPreferenceLabels) as Diet[]).map(key => <FilterToggleButton key={key} label={dietPreferenceLabels[key]} isSelected={selectedPreferences.has(key)} onClick={() => handleFilterToggle(key,selectedPreferences,setSelectedPreferences)} />)}</div>
-          
-          {/* The filters below are commented out as the data is not available on the recipe level yet */}
-          {/* <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium">Diät:</span>{(Object.keys(dietTypeLabels) as DietType[]).map(key => <FilterToggleButton key={key} label={dietTypeLabels[key]} isSelected={selectedDietTypes.has(key)} onClick={() => handleFilterToggle(key,selectedDietTypes,setSelectedDietTypes)} />)}</div> */}
-          {/* <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium">Niveau:</span>{(Object.keys(dishComplexityLabels) as DishComplexity[]).map(key => <FilterToggleButton key={key} label={dishComplexityLabels[key]} isSelected={selectedComplexities.has(key)} onClick={() => handleFilterToggle(key,selectedComplexities,setSelectedComplexities)} />)}</div> */}
-          {/* <div className="flex flex-wrap items-center gap-2 pt-2"><label className="flex items-center"><input type="checkbox" checked={filterGlutenFree} onChange={e => setFilterGlutenFree(e.target.checked)} className="mr-2 rounded" /> Glutenfrei</label><label className="flex items-center"><input type="checkbox" checked={filterLactoseFree} onChange={e => setFilterLactoseFree(e.target.checked)} className="mr-2 rounded" /> Laktosefrei</label></div> */}
+            <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Ernährung:</span>{(Object.keys(dietPreferenceLabels) as Diet[]).map(key => <FilterToggleButton key={key} label={dietPreferenceLabels[key]} isSelected={selectedPreferences.has(key)} onClick={() => handleFilterToggle(key,selectedPreferences,setSelectedPreferences)} />)}</div>
+            <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Diät-Typ:</span>{(Object.keys(dietTypeLabels) as DietType[]).map(key => <FilterToggleButton key={key} label={dietTypeLabels[key]} isSelected={selectedDietTypes.has(key)} onClick={() => handleFilterToggle(key,selectedDietTypes,setSelectedDietTypes)} />)}</div>
+            <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Niveau:</span>{(Object.keys(dishComplexityLabels) as DishComplexity[]).map(key => <FilterToggleButton key={key} label={dishComplexityLabels[key]} isSelected={selectedComplexities.has(key)} onClick={() => handleFilterToggle(key,selectedComplexities,setSelectedComplexities)} />)}</div>
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+                <span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Optionen:</span>
+                <label className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700 bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded-full transition-colors has-[:checked]:bg-emerald-600 has-[:checked]:text-white has-[:checked]:shadow-sm">
+                    <input type="checkbox" checked={filterGlutenFree} onChange={e => setFilterGlutenFree(e.target.checked)} className="h-0 w-0 absolute opacity-0" />
+                    <span>Nur Glutenfrei</span>
+                </label>
+                 <label className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700 bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded-full transition-colors has-[:checked]:bg-emerald-600 has-[:checked]:text-white has-[:checked]:shadow-sm">
+                    <input type="checkbox" checked={filterLactoseFree} onChange={e => setFilterLactoseFree(e.target.checked)} className="h-0 w-0 absolute opacity-0" />
+                    <span>Nur Laktosefrei</span>
+                </label>
+            </div>
         </div>
       </div>
     );
@@ -208,7 +218,7 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
             {recipe.image_url && <img src={recipe.image_url} alt={recipe.title} className="w-12 h-12 rounded-md object-cover flex-shrink-0" />}
             <div className="flex-grow"><p className="font-semibold text-slate-700">{recipe.title}</p><p className="text-xs text-slate-400">{MealCategoryLabels[recipe.category]} &bull; {recipe.totalCalories} kcal</p></div>
           </div>
-        )) : <div className="text-center py-8 text-slate-500">Keine Gerichte für diese Kategorie gefunden.</div>}
+        )) : <div className="text-center py-8 text-slate-500">Keine Gerichte für diese Filter gefunden.</div>}
       </div>
     );
 

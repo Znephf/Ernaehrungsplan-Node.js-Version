@@ -1,3 +1,4 @@
+
 const mysql = require('mysql2/promise');
 
 const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT } = process.env;
@@ -11,101 +12,102 @@ const pool = mysql.createPool({
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    timezone: '+00:00'
 });
 
-const initializeDatabase = async () => {
-    console.log('Initializing database schema...');
+async function checkAndAlterTable(connection, tableName, columnName, alterStatement) {
+    const [columns] = await connection.query(`SHOW COLUMNS FROM \`${tableName}\` LIKE ?`, [columnName]);
+    if (columns.length === 0) {
+        console.log(`Füge Spalte '${columnName}' zu Tabelle '${tableName}' hinzu...`);
+        await connection.query(alterStatement);
+        console.log(`Spalte '${columnName}' erfolgreich hinzugefügt.`);
+    }
+}
+
+async function initializeDatabase() {
     let connection;
     try {
         connection = await pool.getConnection();
+        console.log('Erfolgreich mit der Datenbank verbunden.');
+
+        // --- Migration zu normalisierter Struktur ---
         
-        // Recipes Table - Create if it doesn't exist
         await connection.query(`
-            CREATE TABLE IF NOT EXISTS recipes (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                title VARCHAR(255) NOT NULL,
-                ingredients JSON,
-                instructions JSON,
-                totalCalories INT,
-                protein FLOAT,
-                carbs FLOAT,
-                fat FLOAT,
-                category ENUM('breakfast', 'lunch', 'coffee', 'dinner', 'snack') NOT NULL,
-                image_url VARCHAR(255),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY (title)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+          CREATE TABLE IF NOT EXISTS plans (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            createdAt DATETIME NOT NULL,
+            settings JSON,
+            shoppingList JSON,
+            shareId VARCHAR(255) UNIQUE,
+            legacy_id INT
+          );
         `);
-        console.log('Table "recipes" is ready.');
 
-        // Schema migration: Add dietaryPreference column to recipes if it doesn't exist
-        const [recipeColumns] = await connection.query("SHOW COLUMNS FROM `recipes` LIKE 'dietaryPreference'");
-        if (recipeColumns.length === 0) {
-            console.log('Adding missing column `dietaryPreference` to `recipes` table...');
-            await connection.query("ALTER TABLE `recipes` ADD COLUMN `dietaryPreference` ENUM('omnivore', 'vegetarian', 'vegan') NULL DEFAULT NULL AFTER `category`");
-            console.log('Column `dietaryPreference` added successfully.');
-        }
-
-        // Plans Table
         await connection.query(`
-            CREATE TABLE IF NOT EXISTS plans (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                settings JSON,
-                shoppingList JSON,
-                shareId VARCHAR(255) UNIQUE,
-                legacy_id INT
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+          CREATE TABLE IF NOT EXISTS recipe_images (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            image_url VARCHAR(512) NOT NULL UNIQUE
+          );
         `);
-        console.log('Table "plans" is ready.');
 
-        // Plan_Recipes Junction Table
         await connection.query(`
-            CREATE TABLE IF NOT EXISTS plan_recipes (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                plan_id INT NOT NULL,
-                recipe_id INT NOT NULL,
-                day_of_week VARCHAR(50) NOT NULL,
-                meal_type ENUM('breakfast', 'lunch', 'coffee', 'dinner', 'snack') NOT NULL,
-                FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE,
-                FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+          CREATE TABLE IF NOT EXISTS recipes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255) NOT NULL UNIQUE,
+            ingredients JSON,
+            instructions JSON,
+            totalCalories INT,
+            protein FLOAT,
+            carbs FLOAT,
+            fat FLOAT,
+            category VARCHAR(50),
+            recipe_image_id INT,
+            FOREIGN KEY (recipe_image_id) REFERENCES recipe_images(id) ON DELETE SET NULL
+          );
         `);
-        console.log('Table "plan_recipes" is ready.');
+
+        await connection.query(`
+          CREATE TABLE IF NOT EXISTS plan_recipes (
+            plan_id INT NOT NULL,
+            recipe_id INT NOT NULL,
+            day_of_week VARCHAR(50) NOT NULL,
+            meal_type VARCHAR(50) NOT NULL,
+            PRIMARY KEY (plan_id, recipe_id, day_of_week, meal_type),
+            FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE,
+            FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+          );
+        `);
         
-        // App_Jobs Table
         await connection.query(`
           CREATE TABLE IF NOT EXISTS app_jobs (
             id INT AUTO_INCREMENT PRIMARY KEY,
             jobId VARCHAR(255) NOT NULL UNIQUE,
-            jobType VARCHAR(50) NOT NULL,
+            jobType VARCHAR(100) NOT NULL,
             relatedPlanId INT,
-            settings JSON,
-            previousPlanRecipes JSON,
             status VARCHAR(50) DEFAULT 'pending',
-            progressText VARCHAR(255),
+            progressText TEXT,
             resultJson JSON,
             errorMessage TEXT,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+          );
         `);
-        console.log('Table "app_jobs" is ready.');
+        
+        // --- Schema-Updates für bestehende Tabellen ---
+        await checkAndAlterTable(connection, 'recipes', 'dietaryPreference', 'ALTER TABLE recipes ADD COLUMN dietaryPreference VARCHAR(50)');
+        await checkAndAlterTable(connection, 'recipes', 'dietType', 'ALTER TABLE recipes ADD COLUMN dietType VARCHAR(50)');
+        await checkAndAlterTable(connection, 'recipes', 'dishComplexity', 'ALTER TABLE recipes ADD COLUMN dishComplexity VARCHAR(50)');
+        await checkAndAlterTable(connection, 'recipes', 'isGlutenFree', 'ALTER TABLE recipes ADD COLUMN isGlutenFree BOOLEAN');
+        await checkAndAlterTable(connection, 'recipes', 'isLactoseFree', 'ALTER TABLE recipes ADD COLUMN isLactoseFree BOOLEAN');
+        await checkAndAlterTable(connection, 'plans', 'shoppingList', 'ALTER TABLE plans ADD COLUMN shoppingList JSON');
 
-        const [rows] = await connection.query("SHOW TABLES LIKE 'legacy_archived_plans'");
-        if (rows.length > 0) {
-            console.log('Table "legacy_archived_plans" exists (backup from migration).');
-        }
 
-        console.log('Database schema initialization complete.');
     } catch (error) {
-        console.error('DATABASE INITIALIZATION FAILED:', error);
+        console.error('Fehler bei der Initialisierung der Datenbank:', error);
         throw error;
     } finally {
         if (connection) connection.release();
     }
-};
+}
 
 module.exports = { pool, initializeDatabase };

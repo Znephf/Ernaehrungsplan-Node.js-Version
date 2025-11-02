@@ -60,11 +60,6 @@ export const useMealPlanGenerator = () => {
                 if (status === 'complete') {
                     if (newPlanData) {
                         setPlan(newPlanData);
-                        // Übergibt den neuen Plan an einen Callback in der Haupt-App
-                        const onCompleteCallback = (window as any)._onPlanGenerated;
-                        if (typeof onCompleteCallback === 'function') {
-                            onCompleteCallback(newPlanData);
-                        }
                     } else {
                          setError('Plan generiert, aber Daten konnten nicht geladen werden.');
                     }
@@ -103,20 +98,18 @@ export const useMealPlanGenerator = () => {
         };
     }, [jobId, cleanup]);
 
-    const generateNewPlan = useCallback(async (settings: PlanSettings, onComplete: (newPlan: ArchiveEntry | null) => void) => {
+    const generateNewPlan = useCallback(async (settings: PlanSettings) => {
         if (isLoading) return;
 
         setIsLoading(true);
         setError(null);
+        setPlan(null); // Clear previous plan
         setGenerationStatus('pending');
         
-        // Speichere den Callback für den Fall eines Seiten-Reloads
-        (window as any)._onPlanGenerated = onComplete;
-
         try {
             const response = await apiService.startPlanGenerationJob({
                 settings,
-                previousPlanRecipes: plan ? plan.recipes : [],
+                previousPlanRecipes: [], // Previous recipes logic can be handled in App if needed
             });
             localStorage.setItem(ACTIVE_JOB_ID_KEY, response.jobId);
             setJobId(response.jobId);
@@ -124,7 +117,7 @@ export const useMealPlanGenerator = () => {
             setError(`Job konnte nicht gestartet werden: ${(startJobError as Error).message}`);
             cleanup();
         }
-    }, [isLoading, plan, cleanup]);
+    }, [isLoading, cleanup]);
     
     const cancelGeneration = useCallback(() => {
         console.log("Generierung wird vom Benutzer abgebrochen.");
@@ -132,5 +125,5 @@ export const useMealPlanGenerator = () => {
         cleanup();
     }, [cleanup]);
 
-    return { plan, setPlan, isLoading, error, generateNewPlan, generationStatus, cancelGeneration };
+    return { plan, isLoading, error, generateNewPlan, generationStatus, cancelGeneration };
 };

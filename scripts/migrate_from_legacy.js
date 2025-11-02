@@ -1,4 +1,5 @@
 
+
 const path = require('path');
 const dotenv = require('dotenv');
 
@@ -56,11 +57,17 @@ async function migrateLegacyData() {
         for (const plan of legacyPlans) {
             try {
                 const planData = JSON.parse(plan.planData);
-                const settings = JSON.parse(plan.settings);
+                const settings = JSON.parse(plan.settings) || {};
                 
-                // FIX: Replaced optional chaining (?.) with a compatible syntax for older Node.js versions.
-                const planDietPreference = (settings && settings.dietaryPreference) ? settings.dietaryPreference : 'omnivore';
-                
+                // Extract all relevant settings from the legacy plan
+                const planSettings = {
+                    dietaryPreference: settings.dietaryPreference || 'omnivore',
+                    dietType: settings.dietType || 'balanced',
+                    dishComplexity: settings.dishComplexity || 'simple',
+                    isGlutenFree: !!settings.isGlutenFree,
+                    isLactoseFree: !!settings.isLactoseFree
+                };
+
                 let recipesToProcess = [];
                 if (planData.recipes && Array.isArray(planData.recipes)) {
                     recipesToProcess.push(...planData.recipes);
@@ -91,14 +98,17 @@ async function migrateLegacyData() {
                         category = MealCategoryMap[recipe.mealType];
                     }
 
-                    // This query inserts a new recipe if it doesn't exist.
-                    // If it does exist (ON DUPLICATE KEY), it will ONLY update the `dietaryPreference`
-                    // if the existing value is NULL. This correctly fills in missing data without
-                    // overwriting already-set preferences.
+                    // Insert a new recipe if it doesn't exist.
+                    // On duplicate, update all filterable fields ONLY if their current value is NULL.
                     const [result] = await pool.query(
-                        `INSERT INTO recipes (title, ingredients, instructions, totalCalories, protein, carbs, fat, category, dietaryPreference) 
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                         ON DUPLICATE KEY UPDATE dietaryPreference = IF(dietaryPreference IS NULL, VALUES(dietaryPreference), dietaryPreference)`,
+                        `INSERT INTO recipes (title, ingredients, instructions, totalCalories, protein, carbs, fat, category, dietaryPreference, dietType, dishComplexity, isGlutenFree, isLactoseFree) 
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         ON DUPLICATE KEY UPDATE 
+                            dietaryPreference = IF(dietaryPreference IS NULL, VALUES(dietaryPreference), dietaryPreference),
+                            dietType = IF(dietType IS NULL, VALUES(dietType), dietType),
+                            dishComplexity = IF(dishComplexity IS NULL, VALUES(dishComplexity), dishComplexity),
+                            isGlutenFree = IF(isGlutenFree IS NULL, VALUES(isGlutenFree), isGlutenFree),
+                            isLactoseFree = IF(isLactoseFree IS NULL, VALUES(isLactoseFree), isLactoseFree)`,
                         [
                             recipe.title,
                             JSON.stringify(recipe.ingredients || []),
@@ -108,16 +118,20 @@ async function migrateLegacyData() {
                             recipe.carbs || null,
                             recipe.fat || null,
                             category,
-                            planDietPreference
+                            planSettings.dietaryPreference,
+                            planSettings.dietType,
+                            planSettings.dishComplexity,
+                            planSettings.isGlutenFree,
+                            planSettings.isLactoseFree,
                         ]
                     );
 
                     if (result.insertId > 0) {
                         newRecipesAdded++;
-                        console.log(`  -> Added new recipe: "${recipe.title}" with diet: ${planDietPreference}`);
+                        console.log(`  -> Added new recipe: "${recipe.title}"`);
                     } else if (result.affectedRows > 0) {
                         recipesUpdated++;
-                         console.log(`  -> Updated existing recipe: "${recipe.title}" with diet: ${planDietPreference}`);
+                         console.log(`  -> Updated existing recipe with missing data: "${recipe.title}"`);
                     }
                 }
 
@@ -128,7 +142,7 @@ async function migrateLegacyData() {
 
         console.log(`\n--- Migration Complete ---`);
         console.log(`Total new recipes added: ${newRecipesAdded}`);
-        console.log(`Total existing recipes updated (missing diet filled): ${recipesUpdated}`);
+        console.log(`Total existing recipes updated (missing data filled): ${recipesUpdated}`);
 
     } catch (error) {
         console.error('\n--- A CRITICAL ERROR OCCURRED ---');

@@ -4,7 +4,7 @@ import * as apiService from '../services/apiService';
 
 const ACTIVE_SHARE_JOB_ID_KEY = 'activeShareJobId';
 
-export const useShareProcessor = (onShareComplete: (updatedPlan: ArchiveEntry | null) => void) => {
+export const useShareProcessor = (onShareComplete: () => void) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [status, setStatus] = useState('Teilen');
     const [shareUrl, setShareUrl] = useState<string | null>(null);
@@ -50,7 +50,7 @@ export const useShareProcessor = (onShareComplete: (updatedPlan: ArchiveEntry | 
                     const fullUrl = `${window.location.origin}${resultJson.shareUrl}`;
                     setShareUrl(fullUrl);
                     // Den Haupt-App-Zustand über den Abschluss informieren
-                    onShareComplete(null);
+                    onShareComplete();
                     cleanup();
                     return;
                 }
