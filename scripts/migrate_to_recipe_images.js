@@ -1,0 +1,1 @@
+full contents of scripts/migrate_to_recipe_images.js

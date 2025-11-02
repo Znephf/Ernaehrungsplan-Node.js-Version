@@ -1,136 +1,150 @@
-import type { ArchiveEntry, PlanSettings, Recipe } from '../types';
+import type { PlanSettings, ArchiveEntry, Recipe } from '../types';
 
-// --- Auth Service ---
-
-export const checkAuth = async (): Promise<{ isAuthenticated: boolean }> => {
-    const response = await fetch('/api/check-auth');
-    if (!response.ok) {
-        throw new Error('Not authenticated');
+// Helper function to handle fetch responses
+async function handleResponse<T>(response: Response): Promise<T> {
+    if (response.ok) {
+        // Handle empty responses, e.g., for logout
+        if (response.status === 204 || response.headers.get('content-length') === '0') {
+            return null as T;
+        }
+        return response.json() as Promise<T>;
     }
-    return response.json();
+    
+    // Try to parse the error message from the server
+    const errorBody = await response.json().catch(() => ({ error: 'An unexpected error occurred.' }));
+    const errorMessage = errorBody.error || `Server responded with status: ${response.status}`;
+    throw new Error(errorMessage);
+}
+
+// --- Auth ---
+export const checkAuth = async (): Promise<{ isAuthenticated: boolean }> => {
+    return fetch('/api/check-auth').then(handleResponse);
 };
 
 export const login = async (password: string): Promise<{ message: string }> => {
-    const response = await fetch('/login', {
+    return fetch('/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
-    });
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Login failed');
-    }
-    return response.json();
+    }).then(handleResponse);
 };
 
-export const logout = async (): Promise<{ message: string }> => {
-    const response = await fetch('/logout', { method: 'POST' });
-    if (!response.ok) {
-        throw new Error('Logout failed');
-    }
-    return response.json();
+export const logout = async (): Promise<void> => {
+    await fetch('/logout', { method: 'POST' });
 };
 
-
-// --- Archive Service ---
-
+// --- Archive ---
 export const getArchive = async (): Promise<ArchiveEntry[]> => {
-    const response = await fetch('/api/archive');
-    if (!response.ok) {
-        throw new Error('Failed to fetch archive');
-    }
-    return response.json();
+    return fetch('/api/archive').then(handleResponse);
 };
 
-export const saveCustomPlan = async (payload: { name: string, persons: number, dinners: { day: string, recipe: Recipe }[] }): Promise<ArchiveEntry> => {
-    const response = await fetch('/api/archive/custom-plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    });
-     if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save custom plan');
-    }
-    return response.json();
-};
-
-// Sends base64, expects back the new file URL
-export const saveImageUrl = async (planId: number, day: string, imageUrl: string): Promise<{ message: string, imageUrl: string }> => {
-    const response = await fetch('/api/archive/image', {
+export const updatePlan = async (plan: ArchiveEntry): Promise<ArchiveEntry> => {
+    return fetch(`/api/archive/${plan.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId, day, imageUrl }),
-    });
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save image URL');
-    }
-    return response.json();
+        body: JSON.stringify(plan),
+    }).then(handleResponse);
 };
 
-
-// --- Generation Service ---
-
-interface GenerationPayload {
+// --- Plan Generation ---
+interface JobStartPayload {
     settings: PlanSettings;
     previousPlanRecipes: Recipe[];
 }
 
-export const startPlanGenerationJob = async (payload: GenerationPayload): Promise<{ jobId: string }> => {
-    const response = await fetch('/api/generate-plan-job', {
+interface JobStartResponse {
+    jobId: string;
+}
+
+export const startPlanGenerationJob = async (payload: JobStartPayload): Promise<JobStartResponse> => {
+    return fetch('/api/generate-plan-job', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to start generation job');
-    }
-    return response.json();
+    }).then(handleResponse);
 };
 
-export const getJobStatus = async (jobId: string): Promise<{ status: string; plan?: ArchiveEntry; planId?: string; error?: string }> => {
-    const response = await fetch(`/api/job-status/${jobId}`);
-    if (!response.ok) {
-        throw new Error('Failed to get job status');
-    }
-    return response.json();
+
+interface JobStatusResponse {
+    status: string;
+    plan?: ArchiveEntry;
+    error?: string;
+}
+
+export const getJobStatus = async (jobId: string): Promise<JobStatusResponse> => {
+    return fetch(`/api/job-status/${jobId}`).then(handleResponse);
 };
 
-export const generateImage = async (recipe: Recipe, attempt: number): Promise<{ apiResponse: any, debug: any }> => {
+
+// --- Image Generation ---
+export const generateImage = async (recipe: Recipe, attempt: number): Promise<{ imageUrl: string; apiResponse: any }> => {
     const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ recipe, attempt }),
     });
+
     if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Image generation failed');
+        throw new Error(errorData.error || `Failed to generate image. Status: ${response.status}`);
     }
-    return response.json();
+    
+    const result = await response.json();
+
+    const candidate = result.apiResponse?.candidates?.[0];
+
+    // Handle safety blocks
+    if (result.apiResponse.promptFeedback?.blockReason) {
+        throw new Error(`Image generation blocked: ${result.apiResponse.promptFeedback.blockReason}`);
+    }
+
+    if (!candidate || (candidate.finishReason && candidate.finishReason !== 'STOP')) {
+        throw new Error(`Image generation failed. Reason: ${candidate?.finishReason || 'Unknown'}`);
+    }
+    
+    const imagePart = candidate.content?.parts?.find((p: any) => p.inlineData);
+
+    if (!imagePart || !imagePart.inlineData?.data) {
+        throw new Error("No image data received from the API.");
+    }
+    
+    return {
+        imageUrl: `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`,
+        apiResponse: result.apiResponse
+    };
 };
 
-// --- Job Service (for Sharing etc.) ---
-
+// --- Sharing ---
 export const startShareJob = async (planId: number): Promise<{ jobId: string }> => {
-    const response = await fetch('/api/jobs/share', {
+    return fetch('/api/jobs/share', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId })
-    });
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to start share job');
-    }
-    return response.json();
+        body: JSON.stringify({ planId }),
+    }).then(handleResponse);
 };
 
-export const getShareJobStatus = async (jobId: string): Promise<{ status: string; progressText?: string; resultJson?: { shareUrl: string }; errorMessage?: string }> => {
-    const response = await fetch(`/api/jobs/${jobId}`);
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get share job status');
-    }
-    return response.json();
+
+interface ShareJobStatusResponse {
+    status: string;
+    progressText: string | null;
+    resultJson: { shareUrl: string } | null;
+    errorMessage: string | null;
+}
+
+export const getShareJobStatus = async (jobId: string): Promise<ShareJobStatusResponse> => {
+    return fetch(`/api/jobs/${jobId}`).then(handleResponse);
+};
+
+// --- Custom Planner ---
+interface CustomPlanPayload {
+    name: string;
+    recipes: Recipe[];
+}
+
+export const saveCustomPlan = async (payload: CustomPlanPayload): Promise<ArchiveEntry> => {
+    return fetch('/api/archive/custom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    }).then(handleResponse);
 };

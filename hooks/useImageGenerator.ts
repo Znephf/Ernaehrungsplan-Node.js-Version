@@ -1,127 +1,120 @@
-import { useState, useCallback } from 'react';
-import type { Recipe } from '../types';
+import { useState, useCallback, useEffect } from 'react';
+import type { Recipe, ArchiveEntry } from '../types';
 import * as apiService from '../services/apiService';
 
-export const useImageGenerator = (onImageSaved?: () => void) => {
+export const useImageGenerator = (
+    currentPlan: ArchiveEntry | null,
+    updatePlanInState: (plan: ArchiveEntry) => void
+) => {
     const [imageUrls, setImageUrls] = useState<{ [key: string]: string }>({});
     const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
     const [imageErrors, setImageErrors] = useState<{ [key: string]: string | null }>({});
     
-    // This function now returns the raw base64 data URL
-    const executeImageGeneration = useCallback(async (recipe: Recipe): Promise<string | null> => {
-        const maxAttempts = 10;
-        let lastKnownError: Error | null = null;
-        
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            try {
-                const { apiResponse, debug } = await apiService.generateImage(recipe, attempt);
+    // Effect to update local state when a new plan is loaded
+    useEffect(() => {
+        setImageUrls(currentPlan?.imageUrls || {});
+    }, [currentPlan]);
 
-                console.groupCollapsed(`[DEBUG] Bild-Generierung für: "${recipe.title}" (Versuch ${attempt})`);
-                console.log(debug.imagePrompt);
-                console.groupEnd();
-
-                if (apiResponse.promptFeedback?.blockReason) {
-                    throw new Error(`Anfrage blockiert (${apiResponse.promptFeedback.blockReason})`);
-                }
-
-                const candidate = apiResponse?.candidates?.[0];
-                if (!candidate) throw new Error("Keine Bild-Vorschläge erhalten.");
-                if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-                    if (candidate.finishReason === 'SAFETY') throw new Error("Aus Sicherheitsgründen blockiert.");
-                    throw new Error(`Generierung gestoppt: ${candidate.finishReason}`);
-                }
-
-                const imagePart = candidate.content?.parts?.find((p: any) => p.inlineData);
-                if (imagePart?.inlineData) {
-                    return `data:image/png;base64,${imagePart.inlineData.data}`;
-                } else {
-                    throw new Error("Antwort enthält keine Bilddaten.");
-                }
-            } catch (e) {
-                lastKnownError = e as Error;
-                console.warn(`Bildgenerierungsversuch ${attempt} fehlgeschlagen:`, e);
-                const errorMsg = (lastKnownError.message || '').toLowerCase();
-                if (errorMsg.includes('blockiert') || errorMsg.includes('sicherheit') || errorMsg.includes('quota')) {
-                    break;
-                }
-            }
-        }
-
-        const finalErrorMessage = lastKnownError?.message || "Unbekannter Fehler.";
-        setImageErrors(prev => ({ ...prev, [recipe.day]: `Fehler: ${finalErrorMessage}` }));
-        return null;
-    }, []);
-
-    const generateImage = useCallback(async (recipe: Recipe, planId: number | null) => {
-        if (loadingImages.has(recipe.day) || !planId) return;
+    const generateImage = useCallback(async (recipe: Recipe, planId: number | null, attempt = 1): Promise<void> => {
+        if (!planId || !currentPlan) return;
 
         setLoadingImages(prev => new Set(prev).add(recipe.day));
         setImageErrors(prev => ({ ...prev, [recipe.day]: null }));
 
-        const base64ImageUrl = await executeImageGeneration(recipe);
+        try {
+            const result = await apiService.generateImage(recipe, attempt);
+            const newImageUrl = result.imageUrl;
 
-        if (base64ImageUrl) {
-            try {
-                // Send the base64 to the backend, which saves it as a file and returns the file URL
-                const { imageUrl: fileUrl } = await apiService.saveImageUrl(planId, recipe.day, base64ImageUrl);
-                setImageUrls(prev => ({ ...prev, [recipe.day]: fileUrl }));
-                if (onImageSaved) onImageSaved();
-            } catch (e) {
-                console.error("Konnte Bild nicht im Backend speichern:", e);
-                setImageErrors(prev => ({ ...prev, [recipe.day]: `Speicherfehler: ${(e as Error).message}` }));
+            // Update local state immediately for responsiveness
+            setImageUrls(prev => ({ ...prev, [recipe.day]: newImageUrl }));
+
+            // Create a deep copy of the plan to avoid direct mutation
+            const updatedPlan = JSON.parse(JSON.stringify(currentPlan));
+            if (!updatedPlan.imageUrls) {
+                updatedPlan.imageUrls = {};
             }
+            updatedPlan.imageUrls[recipe.day] = newImageUrl;
+
+            // Update the plan in the parent state
+            updatePlanInState(updatedPlan);
+
+            // Persist the change to the backend
+            await apiService.updatePlan(updatedPlan);
+
+        } catch (error) {
+            console.error(`Error generating image for ${recipe.title}:`, error);
+            setImageErrors(prev => ({ ...prev, [recipe.day]: (error as Error).message }));
+            // Retry logic
+            if (attempt < 3) {
+                console.log(`Retrying image generation for ${recipe.title} (attempt ${attempt + 1})`);
+                setTimeout(() => generateImage(recipe, planId, attempt + 1), 2000);
+            }
+        } finally {
+            setLoadingImages(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(recipe.day);
+                return newSet;
+            });
         }
-        
-        setLoadingImages(prev => { const newSet = new Set(prev); newSet.delete(recipe.day); return newSet; });
+    }, [currentPlan, updatePlanInState]);
 
-    }, [loadingImages, executeImageGeneration, onImageSaved]);
+     const generateMissingImages = useCallback(async (
+        recipes: Recipe[],
+        planId: number | null,
+        onProgress?: (status: string) => void
+    ): Promise<{ [key: string]: string }> => {
+        if (!planId || !currentPlan) return {};
 
-    const generateMissingImages = useCallback(async (recipes: Recipe[], planId: number | null, onProgress?: (status: string) => void): Promise<{[key: string]: string}> => {
-        const recipesToGenerate = recipes.filter(r => !imageUrls[r.day] && !loadingImages.has(r.day));
-        const finalUrls = { ...imageUrls };
+        const recipesToGenerate = recipes.filter(r => !(currentPlan.imageUrls && currentPlan.imageUrls[r.day]));
+        if (recipesToGenerate.length === 0) return currentPlan.imageUrls || {};
 
-        if (recipesToGenerate.length === 0) return finalUrls;
-        
+        const newImageUrls: { [key: string]: string } = { ...(currentPlan.imageUrls || {}) };
+
         for (let i = 0; i < recipesToGenerate.length; i++) {
             const recipe = recipesToGenerate[i];
-            onProgress?.(`Generiere Bild ${i + 1}/${recipesToGenerate.length}...`);
             
-            setLoadingImages(prev => new Set(prev).add(recipe.day));
-            setImageErrors(prev => ({ ...prev, [recipe.day]: null }));
-            
-            const base64Url = await executeImageGeneration(recipe);
-            if (base64Url && planId) {
-                try {
-                    const { imageUrl: fileUrl } = await apiService.saveImageUrl(planId, recipe.day, base64Url);
-                    finalUrls[recipe.day] = fileUrl;
-                    setImageUrls(prev => ({ ...prev, [recipe.day]: fileUrl }));
-                    if (onImageSaved) onImageSaved();
-                } catch (e) {
-                    console.error(`Konnte Bild für ${recipe.day} nicht speichern:`, e);
-                }
+            if (onProgress) {
+                onProgress(`Generiere Bild ${i + 1}/${recipesToGenerate.length}: ${recipe.title}`);
             }
 
-             setLoadingImages(prev => { const newSet = new Set(prev); newSet.delete(recipe.day); return newSet; });
-
-            if (i < recipesToGenerate.length - 1) {
-                onProgress?.(`Warte 3s...`);
-                await new Promise(resolve => setTimeout(resolve, 3000));
+            try {
+                // We don't use the stateful `generateImage` here to avoid multiple separate updates.
+                setLoadingImages(prev => new Set(prev).add(recipe.day));
+                const result = await apiService.generateImage(recipe, 1);
+                newImageUrls[recipe.day] = result.imageUrl;
+                setImageUrls(prev => ({ ...prev, [recipe.day]: result.imageUrl }));
+            } catch (error) {
+                console.error(`Error generating image for ${recipe.title} during batch generation:`, error);
+                setImageErrors(prev => ({ ...prev, [recipe.day]: (error as Error).message }));
+            } finally {
+                setLoadingImages(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(recipe.day);
+                    return newSet;
+                });
             }
         }
-        return finalUrls;
-    }, [imageUrls, loadingImages, executeImageGeneration, onImageSaved]);
-    
-    const resetImageState = useCallback(() => {
-        setImageUrls({});
+        
+        const updatedPlan = { ...currentPlan, imageUrls: newImageUrls };
+        updatePlanInState(updatedPlan);
+        await apiService.updatePlan(updatedPlan);
+
+        return newImageUrls;
+    }, [currentPlan, updatePlanInState]);
+
+    // This function is needed to reset image state when loading a new plan
+    const resetImageStateForNewPlan = (plan: ArchiveEntry | null) => {
+        setImageUrls(plan?.imageUrls || {});
         setLoadingImages(new Set());
         setImageErrors({});
-    }, []);
+    };
 
-    const setImageUrlsFromArchive = useCallback((urls: { [key: string]: string }) => {
-        setImageUrls(urls);
-        setLoadingImages(new Set());
-        setImageErrors({});
-    }, []);
-
-    return { imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, resetImageState, setImageUrlsFromArchive };
+    return { 
+        imageUrls, 
+        loadingImages, 
+        imageErrors, 
+        generateImage, 
+        generateMissingImages, 
+        resetImageStateForNewPlan 
+    };
 };
