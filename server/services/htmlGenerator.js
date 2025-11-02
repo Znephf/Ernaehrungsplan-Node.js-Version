@@ -1,10 +1,17 @@
-
 const fs = require('fs');
 const path = require('path');
 
 const escapeHtml = (unsafe) => {
     if (typeof unsafe !== 'string') return '';
     return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+};
+
+const MealCategoryLabels = {
+    breakfast: 'Frühstück',
+    lunch: 'Mittagessen',
+    coffee: 'Kaffee & Kuchen',
+    dinner: 'Abendessen',
+    snack: 'Snack'
 };
 
 const Icons = {
@@ -14,7 +21,6 @@ const Icons = {
     fat: `<svg class="h-6 w-6 text-emerald-600" stroke-width="1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.002 9.002 0 008.485-6.132l-1.39-1.39a2.25 2.25 0 00-3.182 0l-1.09 1.09a2.25 2.25 0 01-3.182 0l-1.09-1.09a2.25 2.25 0 00-3.182 0L2.514 14.868A9.002 9.002 0 0012 21zM5.334 12.793a9.002 9.002 0 0113.332 0" /></svg>`,
 };
 
-// New helper function to read an image file and convert it to a base64 data URL
 const imageFileToBase64 = (filePath) => {
     try {
         const fullPath = path.join(__dirname, '..', '..', 'public', filePath);
@@ -31,43 +37,40 @@ const imageFileToBase64 = (filePath) => {
     }
 };
 
-async function generateShareableHtml(plan, imageUrls) {
-    // Convert all image file paths to base64 for embedding
+// BEHOBEN: Die gesamte Funktion wurde an die neue, normalisierte Plan-Struktur angepasst.
+async function generateShareableHtml(plan) {
     const embeddedImageUrls = {};
-    for (const day in imageUrls) {
-        const url = imageUrls[day];
-        if (url && url.startsWith('/')) { // Check if it's a file path
-            embeddedImageUrls[day] = imageFileToBase64(url);
-        } else {
-            embeddedImageUrls[day] = url; // Keep it if it's already base64 or external
+    for (const recipe of plan.recipes) {
+        if (recipe.image_url) {
+            const base64 = imageFileToBase64(recipe.image_url);
+            if (base64) {
+                embeddedImageUrls[recipe.id] = base64;
+            }
         }
     }
-
 
     const weeklyPlanHtml = `
     <div class="space-y-8">
         <h2 class="text-3xl font-bold text-center text-slate-700">${escapeHtml(plan.name)}</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            ${plan.weeklyPlan.map(p => {
-                const totalCalories = (p.breakfastCalories || 0) + (p.dinnerCalories || 0);
-                return `
-                    <div class="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
-                        <div class="bg-emerald-600 text-white p-4 flex justify-between items-center">
-                            <h3 class="text-xl font-bold">${escapeHtml(p.day)}</h3>
-                            <div class="flex items-center gap-1 text-sm bg-emerald-700 px-2 py-1 rounded-full">${Icons.fire}<span>${totalCalories} kcal</span></div>
-                        </div>
-                        <div class="p-6 space-y-4 flex-grow">
+            ${plan.weeklyPlan.map(dayPlan => `
+                <div class="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
+                    <div class="bg-emerald-600 text-white p-4 flex justify-between items-center">
+                        <h3 class="text-xl font-bold">${escapeHtml(dayPlan.day)}</h3>
+                        <div class="flex items-center gap-1 text-sm bg-emerald-700 px-2 py-1 rounded-full">${Icons.fire}<span>${dayPlan.totalCalories} kcal</span></div>
+                    </div>
+                    <div class="p-6 space-y-4 flex-grow">
+                        ${dayPlan.meals.map(meal => `
                             <div>
-                                <p class="font-semibold text-emerald-800 flex justify-between"><span>Frühstück:</span><span class="font-normal text-slate-500">${p.breakfastCalories} kcal</span></p>
-                                <p class="text-slate-600">${escapeHtml(p.breakfast)}</p>
+                                <p class="font-semibold text-emerald-800 flex justify-between">
+                                    <span>${MealCategoryLabels[meal.mealType] || meal.mealType}:</span>
+                                    <span class="font-normal text-slate-500">${meal.recipe.totalCalories} kcal</span>
+                                </p>
+                                <a href="#recipe-${meal.recipe.id}" class="recipe-link text-left text-slate-600 hover:text-emerald-600 font-semibold transition-colors w-full">${escapeHtml(meal.recipe.title)}</a>
                             </div>
-                            <div>
-                                <p class="font-semibold text-emerald-800 flex justify-between"><span>Abendessen:</span><span class="font-normal text-slate-500">${p.dinnerCalories} kcal</span></p>
-                                <a href="#recipe-${escapeHtml(p.day)}" class="recipe-link text-left text-slate-600 hover:text-emerald-600 font-semibold transition-colors w-full">${escapeHtml(p.dinner)}</a>
-                            </div>
-                        </div>
-                    </div>`;
-            }).join('')}
+                        `).join('')}
+                    </div>
+                </div>`).join('')}
         </div>
     </div>`;
 
@@ -95,38 +98,46 @@ async function generateShareableHtml(plan, imageUrls) {
     <div class="space-y-8">
       <div class="text-center sm:text-left">
           <h2 class="text-3xl font-bold text-slate-700">Kochanleitungen</h2>
-          <p class="text-slate-500">Alle Rezepte sind für ${plan.persons || 2} Personen ausgelegt.</p>
+          <p class="text-slate-500">Alle Rezepte sind für ${plan.settings.persons || 2} Personen ausgelegt.</p>
       </div>
       <div class="space-y-12">
-        ${plan.recipes.map(recipe => `
-          <div id="recipe-${escapeHtml(recipe.day)}" class="bg-white rounded-lg shadow-lg overflow-hidden">
-            ${embeddedImageUrls[recipe.day] 
-              ? `<div class="bg-slate-200"><img src="${embeddedImageUrls[recipe.day]}" alt="${escapeHtml(recipe.title)}" class="w-full h-auto object-cover aspect-video"/></div>` 
-              : `<div class="aspect-video bg-slate-200 flex items-center justify-center"><p class="text-slate-500">Kein Bild generiert</p></div>`}
-            <div class="p-6">
-              <div class="flex flex-wrap items-center justify-between gap-2">
-                <span class="text-sm font-semibold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">${escapeHtml(recipe.day)}</span>
-                <div class="flex items-center gap-1 text-sm text-slate-600 bg-slate-100 px-3 py-1 rounded-full">${Icons.fire}<span>ca. ${recipe.totalCalories} kcal pro Portion</span></div>
-              </div>
-              <h3 class="text-2xl font-bold text-slate-800 mt-3">${escapeHtml(recipe.title)}</h3>
-              ${recipe.protein !== undefined ? `
-                <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-slate-600 p-3 bg-slate-50 rounded-lg">
-                    <span class="flex items-center gap-1.5 text-sm">${Icons.protein}<div><span class="font-bold">${recipe.protein}g</span><span class="text-slate-500 text-xs block">Protein</span></div></span>
-                    <span class="flex items-center gap-1.5 text-sm">${Icons.carbs}<div><span class="font-bold">${recipe.carbs}g</span><span class="text-slate-500 text-xs block">Kohlenh.</span></div></span>
-                    <span class="flex items-center gap-1.5 text-sm">${Icons.fat}<div><span class="font-bold">${recipe.fat}g</span><span class="text-slate-500 text-xs block">Fett</span></div></span>
-                </div>` : ''}
-              <div class="mt-6 grid grid-cols-1 md:grid-cols-5 gap-x-8 gap-y-6">
-                <div class="md:col-span-2">
-                  <h4 class="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Zutaten:</h4>
-                  <ul class="space-y-2 list-disc list-inside text-slate-600">${(recipe.ingredients || []).map(ing => `<li>${escapeHtml(ing)}</li>`).join('')}</ul>
-                </div>
-                <div class="md:col-span-3 md:border-l md:border-slate-200 md:pl-8">
-                  <h4 class="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Anleitung:</h4>
-                  <ol class="space-y-3 list-decimal list-inside text-slate-600">${(recipe.instructions || []).map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol>
-                </div>
-              </div>
+        ${plan.weeklyPlan.map(dayPlan => `
+            <div class="space-y-8">
+                 <h2 class="text-2xl font-bold text-slate-600 border-b-2 border-slate-200 pb-2">${escapeHtml(dayPlan.day)}</h2>
+                 ${dayPlan.meals.map(meal => {
+                    const recipe = meal.recipe;
+                    return `
+                    <div id="recipe-${recipe.id}" class="bg-white rounded-lg shadow-lg overflow-hidden">
+                        ${embeddedImageUrls[recipe.id] 
+                          ? `<div class="bg-slate-200"><img src="${embeddedImageUrls[recipe.id]}" alt="${escapeHtml(recipe.title)}" class="w-full h-auto object-cover aspect-video"/></div>` 
+                          : `<div class="aspect-video bg-slate-200 flex items-center justify-center"><p class="text-slate-500">Kein Bild generiert</p></div>`}
+                        <div class="p-6">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <span class="text-sm font-semibold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">${MealCategoryLabels[meal.mealType]}</span>
+                            <div class="flex items-center gap-1 text-sm text-slate-600 bg-slate-100 px-3 py-1 rounded-full">${Icons.fire}<span>ca. ${recipe.totalCalories} kcal pro Portion</span></div>
+                        </div>
+                        <h3 class="text-2xl font-bold text-slate-800 mt-3">${escapeHtml(recipe.title)}</h3>
+                        ${recipe.protein !== undefined ? `
+                            <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-slate-600 p-3 bg-slate-50 rounded-lg">
+                                <span class="flex items-center gap-1.5 text-sm">${Icons.protein}<div><span class="font-bold">${recipe.protein}g</span><span class="text-slate-500 text-xs block">Protein</span></div></span>
+                                <span class="flex items-center gap-1.5 text-sm">${Icons.carbs}<div><span class="font-bold">${recipe.carbs}g</span><span class="text-slate-500 text-xs block">Kohlenh.</span></div></span>
+                                <span class="flex items-center gap-1.5 text-sm">${Icons.fat}<div><span class="font-bold">${recipe.fat}g</span><span class="text-slate-500 text-xs block">Fett</span></div></span>
+                            </div>` : ''}
+                        <div class="mt-6 grid grid-cols-1 md:grid-cols-5 gap-x-8 gap-y-6">
+                            <div class="md:col-span-2">
+                            <h4 class="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Zutaten:</h4>
+                            <ul class="space-y-2 list-disc list-inside text-slate-600">${(recipe.ingredients || []).map(ing => `<li>${escapeHtml(ing)}</li>`).join('')}</ul>
+                            </div>
+                            <div class="md:col-span-3 md:border-l md:border-slate-200 md:pl-8">
+                            <h4 class="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Anleitung:</h4>
+                            <ol class="space-y-3 list-decimal list-inside text-slate-600">${(recipe.instructions || []).map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol>
+                            </div>
+                        </div>
+                        </div>
+                    </div>`;
+                 }).join('')}
             </div>
-          </div>`).join('')}
+        `).join('')}
       </div>
     </div>`;
 

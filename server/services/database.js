@@ -78,7 +78,24 @@ async function initializeDatabase() {
         `);
         console.log('Tabelle "generation_jobs" ist bereit.');
         
-        // Alte `recipe_images` Tabelle wird nicht mehr erstellt/benötigt.
+        // BEHOBEN: Fügt die fehlende `app_jobs`-Tabelle hinzu, die für Share-Jobs benötigt wird.
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS app_jobs (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                jobId VARCHAR(36) NOT NULL UNIQUE,
+                jobType VARCHAR(50) NOT NULL,
+                relatedPlanId INT,
+                status VARCHAR(50) NOT NULL DEFAULT 'pending',
+                progressText VARCHAR(255),
+                resultJson JSON,
+                errorMessage TEXT,
+                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (relatedPlanId) REFERENCES plans(id) ON DELETE SET NULL
+            );
+        `);
+        console.log('Tabelle "app_jobs" ist bereit.');
+
 
         connection.release();
     } catch (error) {

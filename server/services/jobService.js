@@ -2,21 +2,20 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { pool } = require('./database');
-const { generateImageForRecipe } = require('./geminiService');
+const { generateImageForRecipe, generateShoppingListForRecipes } = require('./geminiService');
 const { generateShareableHtml } = require('./htmlGenerator');
 
 const publicSharesDir = path.join(__dirname, '..', '..', 'public', 'shares');
 const publicImagesDir = path.join(__dirname, '..', '..', 'public', 'images', 'recipes');
-
+const WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 
 /**
- * Speichert ein Base64-codiertes Bild als Datei und aktualisiert den entsprechenden Plan in der Datenbank.
- * @param {string | number} planId - Die ID des Plans.
- * @param {string} day - Der Wochentag des Rezepts.
+ * Speichert ein Base64-codiertes Bild als Datei und aktualisiert den `image_url` des Rezepts in der Datenbank.
+ * @param {string | number} recipeId - Die ID des Rezepts.
  * @param {string} base64Data - Die Base64-codierten Bilddaten (ohne Data-URI-Präfix).
  * @returns {Promise<string>} Die öffentliche URL der gespeicherten Bilddatei.
  */
-async function saveImageAndUpdatePlan(planId, day, base64Data) {
+async function saveImageForRecipe(recipeId, base64Data) {
     const imageBuffer = Buffer.from(base64Data, 'base64');
     const fileName = `${crypto.randomBytes(16).toString('hex')}.jpg`;
     const filePath = path.join(publicImagesDir, fileName);
@@ -24,52 +23,29 @@ async function saveImageAndUpdatePlan(planId, day, base64Data) {
     
     fs.writeFileSync(filePath, imageBuffer);
 
-    const connection = await pool.getConnection();
-    try {
-        await connection.beginTransaction();
-        
-        const [rows] = await connection.query('SELECT planData FROM archived_plans WHERE id = ? FOR UPDATE', [planId]);
-        if (rows.length === 0) {
-            fs.unlinkSync(filePath); // Rollback: erstelltes Bild löschen
-            throw new Error('Plan nicht gefunden.');
-        }
-
-        const planData = typeof rows[0].planData === 'string' ? JSON.parse(rows[0].planData) : rows[0].planData;
-        if (!planData.imageUrls) planData.imageUrls = {};
-        planData.imageUrls[day] = fileUrl;
-
-        await connection.query('UPDATE archived_plans SET planData = ? WHERE id = ?', [JSON.stringify(planData), planId]);
-        
-        await connection.commit();
-        return fileUrl;
-    } catch (error) {
-        await connection.rollback();
-        // Versuch, das verwaiste Bild zu löschen
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-        }
-        throw error; // Fehler weiterwerfen
-    } finally {
-        connection.release();
-    }
+    await pool.query(
+        'UPDATE recipes SET image_url = ? WHERE id = ?',
+        [fileUrl, recipeId]
+    );
+    return fileUrl;
 }
 
 
 /**
  * Erstellt eine teilbare HTML-Datei für einen Plan und speichert den Link in der Datenbank.
- * @param {object} plan - Das vollständige Plan-Objekt.
+ * @param {object} plan - Das vollständige, rekonstruierte Plan-Objekt.
  * @returns {Promise<string>} Die URL der teilbaren Datei.
  */
 async function createShareLink(plan) {
     const shareId = plan.shareId || crypto.randomBytes(12).toString('hex');
-    const htmlContent = await generateShareableHtml(plan, plan.imageUrls || {});
+    const htmlContent = await generateShareableHtml(plan);
     const fileName = `${shareId}.html`;
     const filePath = path.join(publicSharesDir, fileName);
 
     fs.writeFileSync(filePath, htmlContent, 'utf-8');
 
     if (!plan.shareId) {
-        await pool.query('UPDATE archived_plans SET shareId = ? WHERE id = ?', [shareId, plan.id]);
+        await pool.query('UPDATE plans SET shareId = ? WHERE id = ?', [shareId, plan.id]);
     }
     
     return `/shares/${fileName}`;
@@ -87,28 +63,69 @@ async function processShareJob(jobId) {
         if (jobRows.length === 0) throw new Error(`Job ${jobId} nicht gefunden.`);
         
         const planId = jobRows[0].relatedPlanId;
-        const [planRows] = await pool.query('SELECT * FROM archived_plans WHERE id = ?', [planId]);
+        
+        // BEHOBEN: Lade Plandaten aus den neuen, normalisierten Tabellen
+        const [planRows] = await pool.query(`
+            SELECT 
+                p.id, p.name, p.createdAt, p.settings, p.shareId,
+                pr.day_of_week, pr.meal_type,
+                r.id as recipe_id, r.title, r.ingredients, r.instructions, r.totalCalories, r.protein, r.carbs, r.fat, r.category, r.image_url
+            FROM plans p
+            LEFT JOIN plan_recipes pr ON p.id = pr.plan_id
+            LEFT JOIN recipes r ON pr.recipe_id = r.id
+            WHERE p.id = ?
+            ORDER BY FIELD(pr.day_of_week, 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag');
+        `, [planId]);
+
         if (planRows.length === 0) throw new Error(`Zugehöriger Plan ${planId} für Job ${jobId} nicht gefunden.`);
 
-        const row = planRows[0];
+        // Rekonstruiere das Plan-Objekt
         plan = {
-            id: row.id,
-            shareId: row.shareId,
-            ...(typeof row.settings === 'string' ? JSON.parse(row.settings) : row.settings),
-            ...(typeof row.planData === 'string' ? JSON.parse(row.planData) : row.planData),
+            id: planRows[0].id,
+            name: planRows[0].name,
+            settings: typeof planRows[0].settings === 'string' ? JSON.parse(planRows[0].settings) : planRows[0].settings,
+            shareId: planRows[0].shareId,
+            weeklyPlan: [],
+            recipes: [],
+            shoppingList: []
         };
+        const recipeMap = new Map();
+        planRows.forEach(row => {
+            if (row.recipe_id && !recipeMap.has(row.recipe_id)) {
+                const recipe = {
+                    id: row.recipe_id, title: row.title,
+                    ingredients: typeof row.ingredients === 'string' ? JSON.parse(row.ingredients) : row.ingredients,
+                    instructions: typeof row.instructions === 'string' ? JSON.parse(row.instructions) : row.instructions,
+                    totalCalories: row.totalCalories, protein: row.protein, carbs: row.carbs, fat: row.fat,
+                    category: row.category, image_url: row.image_url
+                };
+                recipeMap.set(recipe.id, recipe);
+                plan.recipes.push(recipe);
+            }
+            let dayPlan = plan.weeklyPlan.find(dp => dp.day === row.day_of_week);
+            if (!dayPlan) {
+                dayPlan = { day: row.day_of_week, meals: [], totalCalories: 0 };
+                plan.weeklyPlan.push(dayPlan);
+            }
+            if (row.recipe_id) {
+                dayPlan.meals.push({ mealType: row.meal_type, recipe: recipeMap.get(row.recipe_id) });
+                dayPlan.totalCalories += (row.totalCalories || 0);
+            }
+        });
+        plan.weeklyPlan.sort((a, b) => WEEKDAYS.indexOf(a.day) - WEEKDAYS.indexOf(b.day));
+        plan.shoppingList = await generateShoppingListForRecipes(plan.recipes, plan.settings.persons);
+
 
         if (plan.shareId) {
             const existingFile = path.join(publicSharesDir, `${plan.shareId}.html`);
             if (fs.existsSync(existingFile)) {
-                console.log(`[Job ${jobId}] Bestehender Share-Link gefunden. Job wird abgeschlossen.`);
                 const shareUrl = `/shares/${plan.shareId}.html`;
                 await pool.query('UPDATE app_jobs SET status = "complete", resultJson = ? WHERE jobId = ?', [JSON.stringify({ shareUrl }), jobId]);
                 return;
             }
         }
 
-        const recipesToGenerate = plan.recipes.filter(r => !(plan.imageUrls && plan.imageUrls[r.day]));
+        const recipesToGenerate = plan.recipes.filter(r => !r.image_url);
         if (recipesToGenerate.length > 0) {
             for (let i = 0; i < recipesToGenerate.length; i++) {
                 const recipe = recipesToGenerate[i];
@@ -118,25 +135,16 @@ async function processShareJob(jobId) {
                 const imageResult = await generateImageForRecipe(recipe, 1);
                 const response = imageResult.apiResponse;
 
-                if (response.promptFeedback?.blockReason) {
-                    console.warn(`[Job ${jobId}] Bild-Generierung für "${recipe.title}" blockiert: ${response.promptFeedback.blockReason}. Überspringe.`);
-                    continue;
-                }
-
+                if (response.promptFeedback?.blockReason) { continue; }
                 const candidate = response?.candidates?.[0];
-                if (!candidate || (candidate.finishReason && candidate.finishReason !== 'STOP')) {
-                    console.warn(`[Job ${jobId}] Ungültiger Kandidat für "${recipe.title}". Grund: ${candidate?.finishReason || 'unbekannt'}. Überspringe.`);
-                    continue;
-                }
+                if (!candidate || (candidate.finishReason && candidate.finishReason !== 'STOP')) { continue; }
                 
                 const imagePart = candidate.content?.parts?.find(p => p.inlineData);
                 
                 if (imagePart?.inlineData?.data) {
-                    const fileUrl = await saveImageAndUpdatePlan(plan.id, recipe.day, imagePart.inlineData.data);
-                    if (!plan.imageUrls) plan.imageUrls = {};
-                    plan.imageUrls[recipe.day] = fileUrl;
-                } else {
-                    console.warn(`[Job ${jobId}] Konnte kein Bild für "${recipe.title}" generieren (keine Bilddaten in Antwort). Überspringe.`);
+                    // BEHOBEN: Rufe die korrigierte Funktion mit recipe.id auf
+                    const fileUrl = await saveImageForRecipe(recipe.id, imagePart.inlineData.data);
+                    recipe.image_url = fileUrl; // Aktualisiere das In-Memory-Objekt für die HTML-Generierung
                 }
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
@@ -156,5 +164,5 @@ async function processShareJob(jobId) {
 
 module.exports = {
     processShareJob,
-    saveImageAndUpdatePlan
+    saveImageForRecipe
 };

@@ -1,4 +1,3 @@
-
 # KI Ernährungsplaner - Deployment auf Plesk VPS
 
 Diese Anleitung beschreibt, wie Sie die KI-Ernährungsplaner-Anwendung auf einem Virtual Private Server (VPS) mit Plesk als Verwaltungsoberfläche bereitstellen.
@@ -40,7 +39,7 @@ Stellen Sie sicher, dass auf Ihrem Server die folgenden Komponenten installiert 
 4.  Geben Sie diesem Benutzer alle Berechtigungen (`ALL PRIVILEGES`) für die neu erstellte Datenbank.
 5.  Notieren Sie sich den Datenbanknamen, den Benutzernamen und das Passwort.
 
-Der Node.js-Server wird die benötigten Tabellen (`archived_plans`, `generation_jobs`) beim ersten Start automatisch erstellen.
+Der Node.js-Server wird die benötigten Tabellen (`plans`, `recipes`, `plan_recipes`, `generation_jobs`, `app_jobs`) beim ersten Start automatisch erstellen.
 
 ## Schritt 2: Code auf den Server laden
 
@@ -65,7 +64,20 @@ Der Node.js-Server wird die benötigten Tabellen (`archived_plans`, `generation_
     npm run build
     ```
 
-## Schritt 4: Plesk für die Node.js-Anwendung konfigurieren
+## Schritt 4: Datenmigration (Wichtig!)
+
+Wenn Sie von einer älteren Version der App aktualisieren, müssen Ihre Daten in die neue, effizientere Datenbankstruktur überführt werden.
+
+1.  **Erst-Migration (falls noch nicht geschehen):** Führen Sie dieses Skript aus, um die alte `archived_plans`-Tabelle in die neuen Tabellen aufzuteilen. Es benennt die alte Tabelle zur Sicherheit um.
+    ```bash
+    npm run migrate:normalize-db
+    ```
+2.  **Korrektur-Migration (wichtig für Altdaten):** Dieses Skript liest die gesicherten Altdaten aus `legacy_archived_plans`, korrigiert sie und fügt sie korrekt in die neuen Tabellen ein. **Führen Sie dies aus, um sicherzustellen, dass alle alten Pläne wieder sichtbar sind.**
+    ```bash
+    npm run migrate:fix-legacy
+    ```
+
+## Schritt 5: Plesk für die Node.js-Anwendung konfigurieren
 
 1.  Loggen Sie sich in Ihr Plesk-Panel ein.
 2.  Gehen Sie zu **Websites & Domains** und wählen Sie die Domain aus, auf der die App laufen soll.
@@ -78,11 +90,11 @@ Der Node.js-Server wird die benötigten Tabellen (`archived_plans`, `generation_
     -   **Anwendungsmodus:** `production`
     -   **Anwendungs-URL:** Wird automatisch angezeigt.
     -   **Anwendungsstamm:** `/var/www/vhosts/ihredomain.de/ernaehrungsplaner` (passen Sie den Pfad an).
-    -   **Anwendungsstartdatei:** `server/index.js` (WICHTIG: Der Pfad hat sich geändert!)
+    -   **Anwendungsstartdatei:** `server/index.js`
 
 6.  Klicken Sie auf **OK** oder **Speichern**. 
 
-## Schritt 5: Umgebungsvariablen in Plesk konfigurieren (WICHTIG)
+## Schritt 6: Umgebungsvariablen in Plesk konfigurieren (WICHTIG)
 
 Ihre geheimen Schlüssel und Datenbank-Zugangsdaten müssen sicher als Umgebungsvariablen gespeichert werden.
 
@@ -103,7 +115,7 @@ Ihre geheimen Schlüssel und Datenbank-Zugangsdaten müssen sicher als Umgebungs
 
 **Hinweis: Wenn die erforderlichen Variablen fehlen oder falsch sind, wird der Server absichtlich nicht starten! Dies ist die häufigste Ursache für Fehler nach dem Deployment.**
 
-## Schritt 6: Anwendung starten
+## Schritt 7: Anwendung starten
 
 1.  Auf der Node.js-Verwaltungsseite in Plesk, klicken Sie auf **App neu starten**. Dies ist nach jeder Änderung der Umgebungsvariablen zwingend erforderlich.
 2.  Besuchen Sie Ihre Domain. Sie sollten nun von der Login-Seite begrüßt werden.
@@ -140,42 +152,4 @@ Denken Sie daran, regelmäßige Backups zu erstellen. Sichern Sie dabei:
     -   Ist der `API_KEY` korrekt?
     -   Ist die Gemini API für Ihren Schlüssel aktiviert?
 -   **Fehler bei der Bildgenerierung (Quota Exceeded):**
-    -   **Lösung:** Verknüpfen Sie Ihr Projekt mit einem Google Cloud-Projekt, für das die Abrechnung (Billing) aktiviert ist.--- START OF FILE package.json ---
-
-
-{
-  "name": "ki-ernaehrungsplaner",
-  "private": true,
-  "version": "1.0.0",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "start": "node server/index.js",
-    "preview": "vite preview",
-    "migrate:images": "node scripts/migrate_images.js",
-    "migrate:complexity": "node scripts/migrate_complexity.js"
-  },
-  "dependencies": {
-    "@google/genai": "latest",
-    "cookie-parser": "^1.4.6",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "html2canvas": "^1.4.1",
-    "jspdf": "^2.5.1",
-    "mysql2": "^3.10.2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
-  "devDependencies": {
-    "@types/cookie-parser": "^1.4.7",
-    "@types/express": "^4.17.21",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.39",
-    "tailwindcss": "^3.4.6",
-    "typescript": "^5.5.3",
-    "vite": "^5.3.4"
-  }
-}
+    -   **Lösung:** Verknüpfen Sie Ihr Projekt mit einem Google Cloud-Projekt, für das die Abrechnung (Billing) aktiviert ist.

@@ -74,6 +74,32 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
     const [modalDay, setModalDay] = useState<string | null>(null);
     const [modalMealType, setModalMealType] = useState<MealCategory | null>(null);
     const [addingMealToDay, setAddingMealToDay] = useState<string | null>(null);
+    
+    const [visibleMeals, setVisibleMeals] = useState<Set<MealCategory>>(new Set(MEAL_ORDER));
+
+    const handleMealVisibilityChange = (mealType: MealCategory, checked: boolean) => {
+        const newVisibleMeals = new Set(visibleMeals);
+        if (checked) {
+            newVisibleMeals.add(mealType);
+        } else {
+            const hasRecipesInSlots = Object.values(weeklySlots).some(daySlots => 
+                daySlots.some(slot => slot.mealType === mealType)
+            );
+            if (hasRecipesInSlots && !window.confirm(`Möchten Sie wirklich alle "${MealCategoryLabels[mealType]}"-Gerichte aus dem Plan entfernen?`)) {
+                return; // User cancelled
+            }
+            // Remove recipes from weeklySlots
+            const newWeeklySlots = { ...weeklySlots };
+            for (const day in newWeeklySlots) {
+                newWeeklySlots[day] = newWeeklySlots[day].filter(slot => slot.mealType !== mealType);
+            }
+            setWeeklySlots(newWeeklySlots);
+            newVisibleMeals.delete(mealType);
+        }
+        setVisibleMeals(newVisibleMeals);
+    };
+
+    const sortedVisibleMeals = useMemo(() => MEAL_ORDER.filter(m => visibleMeals.has(m)), [visibleMeals]);
 
 
     const filteredRecipes = useMemo(() => {
@@ -227,12 +253,23 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
                     <div className="lg:col-span-2 space-y-6">
                         <div className="bg-white p-6 rounded-lg shadow-lg">
                           <h2 className="text-2xl font-bold text-slate-700 mb-4">Mein Wochenplan</h2>
+                          <div className="bg-slate-50 p-4 rounded-md mb-6">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Mahlzeiten-Slots auswählen</label>
+                            <div className="flex flex-wrap gap-4">
+                              {(Object.keys(MealCategoryLabels) as MealCategory[]).map(mealType => (
+                                <label key={mealType} className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700">
+                                    <input type="checkbox" checked={visibleMeals.has(mealType)} onChange={(e) => handleMealVisibilityChange(mealType, e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                                    <span>{MealCategoryLabels[mealType]}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
                           <div className="grid grid-cols-1 gap-6">
                             {WEEKDAYS.map(day => (
                                 <div key={day} className="border border-slate-200 p-4 rounded-lg">
                                     <h3 className="font-bold text-slate-600 mb-3 text-lg">{day}</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {MEAL_ORDER.map(mealType => mealDropZone(day, mealType))}
+                                        {sortedVisibleMeals.map(mealType => mealDropZone(day, mealType))}
                                     </div>
                                 </div>
                             ))}
@@ -245,21 +282,32 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
                 <div className="space-y-6">
                     <div className="bg-white p-6 rounded-lg shadow-lg">
                       <h2 className="text-2xl font-bold text-slate-700 mb-4">Mein Wochenplan</h2>
+                       <div className="bg-slate-50 p-4 rounded-md mb-6">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Mahlzeiten-Slots auswählen</label>
+                            <div className="flex flex-wrap gap-x-4 gap-y-2">
+                              {(Object.keys(MealCategoryLabels) as MealCategory[]).map(mealType => (
+                                <label key={mealType} className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700">
+                                    <input type="checkbox" checked={visibleMeals.has(mealType)} onChange={(e) => handleMealVisibilityChange(mealType, e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                                    <span>{MealCategoryLabels[mealType]}</span>
+                                </label>
+                              ))}
+                            </div>
+                        </div>
                       <div className="space-y-4">
                         {WEEKDAYS.map(day => (
                           <div key={day} className="border border-slate-200 rounded-lg p-4">
                               <h3 className="font-bold text-slate-600 mb-2">{day}</h3>
                               <div className="space-y-2">
-                                {weeklySlots[day].sort((a,b) => MEAL_ORDER.indexOf(a.mealType) - MEAL_ORDER.indexOf(b.mealType)).map(slot => (
+                                {weeklySlots[day].length > 0 ? weeklySlots[day].sort((a,b) => MEAL_ORDER.indexOf(a.mealType) - MEAL_ORDER.indexOf(b.mealType)).map(slot => (
                                   <div key={slot.uniqueId} className="bg-emerald-50 p-2 rounded-md relative"><p className="font-semibold text-emerald-800 text-sm">{slot.recipe.title}</p><p className="text-xs text-emerald-600">{MealCategoryLabels[slot.mealType]} &bull; {slot.recipe.totalCalories} kcal</p><button onClick={() => removeRecipeFromSlot(day, slot.uniqueId)} className="absolute top-1 right-1 h-6 w-6 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-sm">&times;</button></div>
-                                ))}
+                                )) : <p className="text-center text-xs text-slate-400 py-2">Noch keine Mahlzeiten für diesen Tag.</p>}
                                 <div className="relative">
                                     <button onClick={() => setAddingMealToDay(addingMealToDay === day ? null : day)} className="w-full text-center text-sm text-emerald-600 font-semibold p-2 bg-emerald-50 hover:bg-emerald-100 rounded-md">+ Mahlzeit hinzufügen</button>
                                     {addingMealToDay === day && (
                                         <div className="absolute top-full left-0 right-0 mt-1 p-2 bg-white border rounded-md shadow-lg z-10">
                                             <p className="text-xs font-semibold text-slate-600 mb-2 px-1">Welche Mahlzeit?</p>
                                             <div className="flex flex-col items-start gap-1">
-                                                {MEAL_ORDER.map(mealType => (
+                                                {sortedVisibleMeals.map(mealType => (
                                                     <button key={mealType} onClick={() => openRecipeSelector(day, mealType)} className="w-full text-left px-3 py-1.5 text-sm text-slate-700 rounded hover:bg-slate-100">{MealCategoryLabels[mealType]}</button>
                                                 ))}
                                             </div>
