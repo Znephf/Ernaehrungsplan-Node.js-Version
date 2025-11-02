@@ -1,4 +1,5 @@
 
+
 const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
@@ -23,6 +24,9 @@ async function getFullPlanById(planId) {
     const weeklyPlan = [];
     const recipes = [];
     const recipeMap = new Map();
+    const planSettings = JSON.parse(plan.settings || '{}');
+    const persons = planSettings.persons || 1;
+
 
     const daysOrder = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 
@@ -56,9 +60,15 @@ async function getFullPlanById(planId) {
             weeklyPlan.push(dayPlan);
         }
         
-        dayPlan.meals.push({ mealType: link.meal_type, recipe });
-        dayPlan.totalCalories += recipe.totalCalories || 0;
+        dayPlan.meals.push({ mealType: link.meal_type, recipe: recipe });
+        // The daily total is the sum of recipe calories (which are per person) * number of persons
+        dayPlan.totalCalories += (recipe.totalCalories || 0);
     }
+    
+    // Final calculation of daily total calories for all persons
+    weeklyPlan.forEach(dayPlan => {
+        dayPlan.totalCalories = dayPlan.meals.reduce((sum, meal) => sum + (meal.recipe.totalCalories || 0), 0) * persons;
+    });
     
     weeklyPlan.sort((a, b) => daysOrder.indexOf(a.day) - daysOrder.indexOf(b.day));
 
@@ -66,7 +76,7 @@ async function getFullPlanById(planId) {
     return {
         id: plan.id,
         name: plan.name,
-        settings: JSON.parse(plan.settings || '{}'),
+        settings: planSettings,
         shoppingList: JSON.parse(plan.shoppingList || '[]'),
         weeklyPlan,
         recipes,
@@ -77,6 +87,9 @@ async function savePlanToDatabase(planData, settings) {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
+        
+        // The AI now returns recipe calories PER PERSON. We store them PER PERSON in the DB.
+        // The daily total in weeklyPlan from AI is for ALL persons.
 
         const now = new Date();
         const [planResult] = await connection.query(
@@ -92,7 +105,11 @@ async function savePlanToDatabase(planData, settings) {
                  ON DUPLICATE KEY UPDATE title=VALUES(title)`,
                 [
                     recipe.title, JSON.stringify(recipe.ingredients), JSON.stringify(recipe.instructions),
-                    recipe.totalCalories, recipe.protein, recipe.carbs, recipe.fat, recipe.category,
+                    recipe.totalCalories, // Now saving the per-person value directly
+                    recipe.protein, 
+                    recipe.carbs, 
+                    recipe.fat, 
+                    recipe.category,
                     settings.dietaryPreference, settings.dietType, settings.dishComplexity, 
                     settings.isGlutenFree, settings.isLactoseFree
                 ]
