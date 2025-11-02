@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { ArchiveEntry, DietType, Diet, DishComplexity } from '../types';
+import type { ArchiveEntry, DietType, Diet, DishComplexity, PlanSettings } from '../types';
 import { HideIcon } from './IconComponents';
 
 interface ArchiveComponentProps {
@@ -82,23 +82,24 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
   };
 
   const filteredArchive = useMemo(() => {
-    const lowercasedTerm = searchTerm.toLowerCase().trim();
     return archive.filter(entry => {
       if (hiddenIds.has(entry.id)) {
         return false;
       }
+      const lowercasedTerm = searchTerm.toLowerCase().trim();
       const matchesSearch = !lowercasedTerm ||
         (entry.name && entry.name.toLowerCase().includes(lowercasedTerm)) ||
         (entry.recipes || []).some(recipe =>
           recipe.title.toLowerCase().includes(lowercasedTerm)
         );
       
-      // Fix: All property accesses now correctly use the `entry.settings` object.
-      const matchesPreference = selectedPreferences.size === 0 || selectedPreferences.has(entry.settings.dietaryPreference);
-      const matchesDietType = selectedDietTypes.size === 0 || selectedDietTypes.has(entry.settings.dietType);
-      const matchesComplexity = selectedComplexities.size === 0 || selectedComplexities.has(entry.settings.dishComplexity);
-      const matchesGlutenFree = !filterGlutenFree || entry.settings.isGlutenFree;
-      const matchesLactoseFree = !filterLactoseFree || entry.settings.isLactoseFree;
+      // FIX: Cast settings to Partial<PlanSettings> and add checks to handle potentially missing properties on older archive entries.
+      const settings: Partial<PlanSettings> = entry.settings || {};
+      const matchesPreference = selectedPreferences.size === 0 || (settings.dietaryPreference && selectedPreferences.has(settings.dietaryPreference));
+      const matchesDietType = selectedDietTypes.size === 0 || (settings.dietType && selectedDietTypes.has(settings.dietType));
+      const matchesComplexity = selectedComplexities.size === 0 || (settings.dishComplexity && selectedComplexities.has(settings.dishComplexity));
+      const matchesGlutenFree = !filterGlutenFree || !!settings.isGlutenFree;
+      const matchesLactoseFree = !filterLactoseFree || !!settings.isLactoseFree;
 
       return matchesSearch && matchesPreference && matchesDietType && matchesComplexity && matchesGlutenFree && matchesLactoseFree;
     });
@@ -108,7 +109,7 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
   if (archive.length === 0) {
     return (
       <div className="text-center py-16 bg-white rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold text-slate-700 mb-2">Dein Archiv ist leer</h2>
+        <h2 className="text-2xl font-bold text-slate-700 mb-2">Dein Plan-Archiv ist leer</h2>
         <p className="text-slate-500">Generiere einen neuen Ernährungsplan, um ihn hier zu speichern.</p>
       </div>
     );
@@ -137,7 +138,7 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
     <div className="space-y-8">
       <div className="space-y-6 bg-white/50 p-6 rounded-lg shadow-sm">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <h2 className="text-2xl font-bold text-slate-700">Archivierte Ernährungspläne</h2>
+          <h2 className="text-2xl font-bold text-slate-700">Plan Archiv</h2>
           <div className="flex items-center gap-2">
             {hiddenIds.size > 0 && (
                 <button
@@ -163,34 +164,37 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
         <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Ernährungsweise:</span>
-                {Object.entries(dietPreferenceLabels).map(([key, label]) => (
+                {/* FIX: Use Object.keys for type-safe iteration over string literal types. */}
+                {(Object.keys(dietPreferenceLabels) as Diet[]).map(key => (
                     <FilterToggleButton 
                         key={key} 
-                        label={label} 
-                        isSelected={selectedPreferences.has(key as Diet)}
-                        onClick={() => handleFilterToggle(key as Diet, selectedPreferences, setSelectedPreferences)} 
+                        label={dietPreferenceLabels[key]} 
+                        isSelected={selectedPreferences.has(key)}
+                        onClick={() => handleFilterToggle(key, selectedPreferences, setSelectedPreferences)} 
                     />
                 ))}
             </div>
             <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Diät-Typ:</span>
-                {Object.entries(dietTypeLabels).map(([key, label]) => (
+                {/* FIX: Use Object.keys for type-safe iteration over string literal types. */}
+                {(Object.keys(dietTypeLabels) as DietType[]).map(key => (
                      <FilterToggleButton 
                         key={key} 
-                        label={label} 
-                        isSelected={selectedDietTypes.has(key as DietType)}
-                        onClick={() => handleFilterToggle(key as DietType, selectedDietTypes, setSelectedDietTypes)} 
+                        label={dietTypeLabels[key]} 
+                        isSelected={selectedDietTypes.has(key)}
+                        onClick={() => handleFilterToggle(key, selectedDietTypes, setSelectedDietTypes)} 
                     />
                 ))}
             </div>
             <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Koch-Niveau:</span>
-                {Object.entries(dishComplexityLabels).map(([key, label]) => (
+                {/* FIX: Use Object.keys for type-safe iteration over string literal types. */}
+                {(Object.keys(dishComplexityLabels) as DishComplexity[]).map(key => (
                      <FilterToggleButton 
                         key={key} 
-                        label={label} 
-                        isSelected={selectedComplexities.has(key as DishComplexity)}
-                        onClick={() => handleFilterToggle(key as DishComplexity, selectedComplexities, setSelectedComplexities)} 
+                        label={dishComplexityLabels[key]} 
+                        isSelected={selectedComplexities.has(key)}
+                        onClick={() => handleFilterToggle(key, selectedComplexities, setSelectedComplexities)} 
                     />
                 ))}
             </div>
@@ -220,71 +224,79 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
       
       {filteredArchive.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredArchive.map((entry) => (
-            <div key={entry.id} className="bg-white rounded-lg shadow-lg flex flex-col justify-between p-6 transition-shadow hover:shadow-xl">
-              <div>
-                <p className="text-xs text-slate-400">
-                  {entry.createdAt} Uhr
-                </p>
-                <h3 className="text-xl font-bold text-slate-800 mt-2">
-                  {entry.name}
-                </h3>
-                {/* Fix: Corrected all property accesses to use entry.settings */}
-                <div className="text-sm text-slate-500 mt-2 flex flex-wrap gap-x-3 items-center">
-                      <span>{entry.settings.persons} Pers.</span>
-                      <span className="text-slate-300">&bull;</span>
-                      <span>{entry.settings.kcal} kcal</span>
-                      <span className="text-slate-300">&bull;</span>
-                      <span className="capitalize">{entry.settings.dietaryPreference === 'omnivore' ? 'Alles' : entry.settings.dietaryPreference}</span>
-                  </div>
-                  <div className="text-xs text-emerald-700 font-semibold mt-2 flex flex-wrap gap-x-2">
-                    {entry.settings.isGlutenFree && <span className="bg-emerald-50 px-2 py-0.5 rounded-full">Glutenfrei</span>}
-                    {entry.settings.isLactoseFree && <span className="bg-emerald-50 px-2 py-0.5 rounded-full">Laktosefrei</span>}
-                  </div>
-                  <div className="mt-3 space-y-1 text-sm text-slate-600">
-                      <p>
-                          <span className="font-semibold">Diät-Typ:</span> {dietTypeLabels[entry.settings.dietType] || 'Standard'}
-                      </p>
-                       <p>
-                          <span className="font-semibold">Niveau:</span> {dishComplexityLabels[entry.settings.dishComplexity] || 'Einfach'}
-                      </p>
-                      {entry.settings.breakfastOption && <p>
-                          <span className="font-semibold">Frühstück:</span> <span className="capitalize">{entry.settings.breakfastOption === 'custom' ? 'Eigene Angabe' : entry.settings.breakfastOption}</span>
-                      </p>}
-                  </div>
-                  {entry.settings.breakfastOption === 'custom' && entry.settings.customBreakfast && (
-                      <p className="text-xs text-slate-400 mt-1 italic" title={entry.settings.customBreakfast}>
-                          "{entry.settings.customBreakfast.length > 40 ? `${entry.settings.customBreakfast.substring(0, 40)}...` : entry.settings.customBreakfast}"
-                      </p>
-                  )}
-                  {entry.settings.desiredIngredients && (
-                      <p className="text-xs text-slate-400 mt-2" title={entry.settings.desiredIngredients}>
-                          <span className="font-semibold">Mit:</span> {entry.settings.desiredIngredients.length > 40 ? `${entry.settings.desiredIngredients.substring(0, 40)}...` : entry.settings.desiredIngredients}
-                      </p>
-                  )}
-                  {entry.settings.excludedIngredients && (
-                      <p className="text-xs text-slate-400 mt-2" title={entry.settings.excludedIngredients}>
-                          <span className="font-semibold">Ohne:</span> {entry.settings.excludedIngredients.length > 40 ? `${entry.settings.excludedIngredients.substring(0, 40)}...` : entry.settings.excludedIngredients}
-                      </p>
-                  )}
+          {filteredArchive.map((entry) => {
+            // FIX: Cast settings to Partial<PlanSettings> to handle potentially missing properties on older archive entries.
+            const settings: Partial<PlanSettings> = entry.settings || {};
+            return (
+              <div key={entry.id} className="bg-white rounded-lg shadow-lg flex flex-col justify-between p-6 transition-shadow hover:shadow-xl">
+                <div>
+                  <p className="text-xs text-slate-400">
+                    {entry.createdAt} Uhr
+                  </p>
+                  <h3 className="text-xl font-bold text-slate-800 mt-2">
+                    {entry.name}
+                  </h3>
+                  <div className="text-sm text-slate-500 mt-2 flex flex-wrap gap-x-3 items-center">
+                        {/* FIX: Use nullish coalescing to provide defaults for optional settings properties. */}
+                        <span>{settings.persons ?? '?'} Pers.</span>
+                        <span className="text-slate-300">&bull;</span>
+                        <span>{settings.kcal ?? '?'} kcal</span>
+                        <span className="text-slate-300">&bull;</span>
+                        <span className="capitalize">{settings.dietaryPreference === 'omnivore' ? 'Alles' : (settings.dietaryPreference ?? 'Unbekannt')}</span>
+                    </div>
+                    <div className="text-xs text-emerald-700 font-semibold mt-2 flex flex-wrap gap-x-2">
+                      {/* FIX: Check for truthiness is sufficient for optional booleans. */}
+                      {settings.isGlutenFree && <span className="bg-emerald-50 px-2 py-0.5 rounded-full">Glutenfrei</span>}
+                      {settings.isLactoseFree && <span className="bg-emerald-50 px-2 py-0.5 rounded-full">Laktosefrei</span>}
+                    </div>
+                    <div className="mt-3 space-y-1 text-sm text-slate-600">
+                        <p>
+                            {/* FIX: Check for property existence before indexing into label maps. */}
+                            <span className="font-semibold">Diät-Typ:</span> {settings.dietType ? dietTypeLabels[settings.dietType] : 'Standard'}
+                        </p>
+                         <p>
+                            <span className="font-semibold">Niveau:</span> {settings.dishComplexity ? dishComplexityLabels[settings.dishComplexity] : 'Einfach'}
+                        </p>
+                        {/* FIX: Check for truthiness is sufficient for optional properties. */}
+                        {settings.breakfastOption && <p>
+                            <span className="font-semibold">Frühstück:</span> <span className="capitalize">{settings.breakfastOption === 'custom' ? 'Eigene Angabe' : settings.breakfastOption}</span>
+                        </p>}
+                    </div>
+                    {/* FIX: Check for truthiness is sufficient for optional properties. */}
+                    {settings.breakfastOption === 'custom' && settings.customBreakfast && (
+                        <p className="text-xs text-slate-400 mt-1 italic" title={settings.customBreakfast}>
+                            "{settings.customBreakfast.length > 40 ? `${settings.customBreakfast.substring(0, 40)}...` : settings.customBreakfast}"
+                        </p>
+                    )}
+                    {settings.desiredIngredients && (
+                        <p className="text-xs text-slate-400 mt-2" title={settings.desiredIngredients}>
+                            <span className="font-semibold">Mit:</span> {settings.desiredIngredients.length > 40 ? `${settings.desiredIngredients.substring(0, 40)}...` : settings.desiredIngredients}
+                        </p>
+                    )}
+                    {settings.excludedIngredients && (
+                        <p className="text-xs text-slate-400 mt-2" title={settings.excludedIngredients}>
+                            <span className="font-semibold">Ohne:</span> {settings.excludedIngredients.length > 40 ? `${settings.excludedIngredients.substring(0, 40)}...` : settings.excludedIngredients}
+                        </p>
+                    )}
+                </div>
+                <div className="flex items-center justify-end gap-2 mt-6">
+                  <button
+                    onClick={() => handleHidePlan(entry.id)}
+                    aria-label={`Plan vom ${entry.createdAt} ausblenden`}
+                    className="p-2 text-slate-500 hover:bg-amber-100 hover:text-amber-600 rounded-full transition-colors"
+                  >
+                    <HideIcon />
+                  </button>
+                  <button
+                    onClick={() => onLoadPlan(entry.id)}
+                    className="px-4 py-2 bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-700 transition-colors"
+                  >
+                    Laden
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center justify-end gap-2 mt-6">
-                <button
-                  onClick={() => handleHidePlan(entry.id)}
-                  aria-label={`Plan vom ${entry.createdAt} ausblenden`}
-                  className="p-2 text-slate-500 hover:bg-amber-100 hover:text-amber-600 rounded-full transition-colors"
-                >
-                  <HideIcon />
-                </button>
-                <button
-                  onClick={() => onLoadPlan(entry.id)}
-                  className="px-4 py-2 bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-700 transition-colors"
-                >
-                  Laden
-                </button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       ) : (
         <div className="text-center py-16 bg-white rounded-lg shadow-md col-span-1 md:col-span-2 lg:col-span-3">

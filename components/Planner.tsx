@@ -1,6 +1,6 @@
 import React, { useState, useMemo, DragEvent, useEffect } from 'react';
 import type { ArchiveEntry, Recipe, Diet, DietType, DishComplexity, MealCategory } from '../types';
-import { MealCategoryLabels } from '../types';
+import { MealCategoryLabels, MEAL_ORDER } from '../types';
 import * as apiService from '../services/apiService';
 import { LoadingSpinnerIcon, CloseIcon } from './IconComponents';
 
@@ -72,6 +72,9 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
     
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalDay, setModalDay] = useState<string | null>(null);
+    const [modalMealType, setModalMealType] = useState<MealCategory | null>(null);
+    const [addingMealToDay, setAddingMealToDay] = useState<string | null>(null);
+
 
     const filteredRecipes = useMemo(() => {
         return allRecipes.filter(recipe => {
@@ -102,7 +105,6 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
         setError(null);
         
         try {
-            // Fix: Changed property name from `dinners` to `mealsByDay` to match API service expectation.
             await apiService.saveCustomPlan({ name: planName, persons, mealsByDay: weeklySlots });
             alert("Ihr individueller Plan wurde erfolgreich gespeichert!");
             onPlanSaved();
@@ -121,31 +123,44 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
     };
     
     const handleDragStart = (e: DragEvent<HTMLDivElement>, recipe: PlannerRecipe) => { e.dataTransfer.setData('application/json', JSON.stringify(recipe)); e.dataTransfer.effectAllowed = 'copy'; };
-    const handleDrop = (e: DragEvent<HTMLDivElement>, day: string) => {
+    
+    const handleDrop = (e: DragEvent<HTMLDivElement>, day: string, mealType: MealCategory) => {
         e.preventDefault();
+        e.stopPropagation();
         const recipeData = e.dataTransfer.getData('application/json');
         if (recipeData) {
             const recipe = JSON.parse(recipeData) as PlannerRecipe;
-            setWeeklySlots(prev => ({
-                ...prev,
-                [day]: [...prev[day], { recipe, mealType: recipe.category, uniqueId: `${day}-${Date.now()}` }]
-            }));
+            // Nur droppen, wenn die Kategorie passt
+            if (recipe.category === mealType) {
+                 setWeeklySlots(prev => ({
+                    ...prev,
+                    [day]: [...prev[day], { recipe, mealType, uniqueId: `${day}-${Date.now()}` }]
+                }));
+            }
         }
         e.currentTarget.classList.remove('bg-emerald-100', 'border-emerald-400');
     };
+    
     const handleDragOver = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; e.currentTarget.classList.add('bg-emerald-100', 'border-emerald-400'); };
     const handleDragLeave = (e: DragEvent<HTMLDivElement>) => { e.currentTarget.classList.remove('bg-emerald-100', 'border-emerald-400'); };
     
-    const openRecipeSelector = (day: string) => { setModalDay(day); setIsModalOpen(true); };
+    const openRecipeSelector = (day: string, mealType: MealCategory) => { 
+        setModalDay(day); 
+        setModalMealType(mealType);
+        setIsModalOpen(true); 
+        setAddingMealToDay(null);
+    };
+
     const handleSelectRecipeForDay = (recipe: PlannerRecipe) => {
-        if (modalDay) {
+        if (modalDay && modalMealType) {
             setWeeklySlots(prev => ({
                 ...prev,
-                [modalDay]: [...prev[modalDay], { recipe, mealType: recipe.category, uniqueId: `${modalDay}-${Date.now()}` }]
+                [modalDay]: [...prev[modalDay], { recipe, mealType: modalMealType, uniqueId: `${modalDay}-${Date.now()}` }]
             }));
         }
         setIsModalOpen(false);
         setModalDay(null);
+        setModalMealType(null);
     };
 
     const SavePlanUI = (
@@ -165,24 +180,44 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
         <h2 className="text-2xl font-bold text-slate-700 mb-4">Gerichte-Bibliothek</h2>
         <input type="text" placeholder="Suche..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full rounded-md border-slate-300 mb-4" />
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium">Typ:</span>{Object.entries(dietPreferenceLabels).map(([k, l]) => <FilterToggleButton key={k} label={l} isSelected={selectedPreferences.has(k as Diet)} onClick={() => handleFilterToggle(k as Diet,selectedPreferences,setSelectedPreferences)} />)}</div>
-          <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium">Diät:</span>{Object.entries(dietTypeLabels).map(([k, l]) => <FilterToggleButton key={k} label={l} isSelected={selectedDietTypes.has(k as DietType)} onClick={() => handleFilterToggle(k as DietType,selectedDietTypes,setSelectedDietTypes)} />)}</div>
-          <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium">Niveau:</span>{Object.entries(dishComplexityLabels).map(([k, l]) => <FilterToggleButton key={k} label={l} isSelected={selectedComplexities.has(k as DishComplexity)} onClick={() => handleFilterToggle(k as DishComplexity,selectedComplexities,setSelectedComplexities)} />)}</div>
+          {/* FIX: Use Object.keys for type-safe iteration over string literal types. */}
+          <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium">Typ:</span>{(Object.keys(dietPreferenceLabels) as Diet[]).map(key => <FilterToggleButton key={key} label={dietPreferenceLabels[key]} isSelected={selectedPreferences.has(key)} onClick={() => handleFilterToggle(key,selectedPreferences,setSelectedPreferences)} />)}</div>
+          <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium">Diät:</span>{(Object.keys(dietTypeLabels) as DietType[]).map(key => <FilterToggleButton key={key} label={dietTypeLabels[key]} isSelected={selectedDietTypes.has(key)} onClick={() => handleFilterToggle(key,selectedDietTypes,setSelectedDietTypes)} />)}</div>
+          <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium">Niveau:</span>{(Object.keys(dishComplexityLabels) as DishComplexity[]).map(key => <FilterToggleButton key={key} label={dishComplexityLabels[key]} isSelected={selectedComplexities.has(key)} onClick={() => handleFilterToggle(key,selectedComplexities,setSelectedComplexities)} />)}</div>
           <div className="flex flex-wrap items-center gap-2 pt-2"><label className="flex items-center"><input type="checkbox" checked={filterGlutenFree} onChange={e => setFilterGlutenFree(e.target.checked)} className="mr-2 rounded" /> Glutenfrei</label><label className="flex items-center"><input type="checkbox" checked={filterLactoseFree} onChange={e => setFilterLactoseFree(e.target.checked)} className="mr-2 rounded" /> Laktosefrei</label></div>
         </div>
       </div>
     );
 
-    const recipeList = (onSelect: (recipe: PlannerRecipe) => void) => (
+    const recipeList = (onSelect: (recipe: PlannerRecipe) => void, mealTypeFilter?: MealCategory | null) => (
       <div className="space-y-3">
-        {filteredRecipes.length > 0 ? filteredRecipes.map(recipe => (
+        {filteredRecipes.length > 0 ? filteredRecipes
+            .filter(recipe => !mealTypeFilter || recipe.category === mealTypeFilter)
+            .map(recipe => (
           <div key={recipe.id} draggable={isDesktop} onDragStart={e => handleDragStart(e, recipe)} onClick={() => !isDesktop && onSelect(recipe)} className="bg-white p-3 rounded-md shadow hover:shadow-md cursor-grab active:cursor-grabbing flex items-center gap-4">
             {recipe.image_url && <img src={recipe.image_url} alt={recipe.title} className="w-12 h-12 rounded-md object-cover flex-shrink-0" />}
             <div className="flex-grow"><p className="font-semibold text-slate-700">{recipe.title}</p><p className="text-xs text-slate-400">{MealCategoryLabels[recipe.category]} &bull; {recipe.totalCalories} kcal</p></div>
           </div>
-        )) : <div className="text-center py-8 text-slate-500">Keine Gerichte gefunden.</div>}
+        )) : <div className="text-center py-8 text-slate-500">Keine Gerichte für diese Kategorie gefunden.</div>}
       </div>
     );
+
+    const mealDropZone = (day: string, mealType: MealCategory) => {
+        const mealsInSlot = weeklySlots[day].filter(slot => slot.mealType === mealType);
+        return (
+            <div 
+                onDrop={e => handleDrop(e, day, mealType)} 
+                onDragOver={handleDragOver} 
+                onDragLeave={handleDragLeave} 
+                className="border-2 border-dashed border-slate-300 rounded-lg p-3 min-h-[100px] transition-colors space-y-2"
+            >
+                <h4 className="font-bold text-slate-500 text-sm">{MealCategoryLabels[mealType]}</h4>
+                {mealsInSlot.length > 0 ? mealsInSlot.map(slot => (
+                    <div key={slot.uniqueId} className="bg-emerald-50 p-2 rounded-md shadow-sm relative"><p className="font-semibold text-emerald-800 text-sm">{slot.recipe.title}</p><p className="text-xs text-emerald-600">{slot.recipe.totalCalories} kcal</p><button onClick={() => removeRecipeFromSlot(day, slot.uniqueId)} className="absolute top-1 right-1 h-5 w-5 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs hover:bg-red-300">&times;</button></div>
+                )) : <p className="text-xs text-slate-400 text-center pt-4">Rezept hierher ziehen</p>}
+            </div>
+        );
+    };
 
     return (
         <div>
@@ -192,13 +227,13 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
                     <div className="lg:col-span-2 space-y-6">
                         <div className="bg-white p-6 rounded-lg shadow-lg">
                           <h2 className="text-2xl font-bold text-slate-700 mb-4">Mein Wochenplan</h2>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 gap-6">
                             {WEEKDAYS.map(day => (
-                                <div key={day} onDrop={e => handleDrop(e, day)} onDragOver={handleDragOver} onDragLeave={handleDragLeave} className="border-2 border-dashed border-slate-300 rounded-lg p-4 min-h-[120px] transition-colors space-y-2">
-                                    <h3 className="font-bold text-slate-600">{day}</h3>
-                                    {weeklySlots[day].length > 0 ? weeklySlots[day].map(slot => (
-                                      <div key={slot.uniqueId} className="bg-emerald-50 p-2 rounded-md shadow-sm relative"><p className="font-semibold text-emerald-800 text-sm">{slot.recipe.title}</p><p className="text-xs text-emerald-600">{MealCategoryLabels[slot.mealType]} &bull; {slot.recipe.totalCalories} kcal</p><button onClick={() => removeRecipeFromSlot(day, slot.uniqueId)} className="absolute top-1 right-1 h-5 w-5 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs hover:bg-red-300">&times;</button></div>
-                                    )) : <p className="text-sm text-slate-400 text-center pt-4">Rezept hierher ziehen</p>}
+                                <div key={day} className="border border-slate-200 p-4 rounded-lg">
+                                    <h3 className="font-bold text-slate-600 mb-3 text-lg">{day}</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {MEAL_ORDER.map(mealType => mealDropZone(day, mealType))}
+                                    </div>
                                 </div>
                             ))}
                           </div>
@@ -215,10 +250,22 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
                           <div key={day} className="border border-slate-200 rounded-lg p-4">
                               <h3 className="font-bold text-slate-600 mb-2">{day}</h3>
                               <div className="space-y-2">
-                                {weeklySlots[day].map(slot => (
+                                {weeklySlots[day].sort((a,b) => MEAL_ORDER.indexOf(a.mealType) - MEAL_ORDER.indexOf(b.mealType)).map(slot => (
                                   <div key={slot.uniqueId} className="bg-emerald-50 p-2 rounded-md relative"><p className="font-semibold text-emerald-800 text-sm">{slot.recipe.title}</p><p className="text-xs text-emerald-600">{MealCategoryLabels[slot.mealType]} &bull; {slot.recipe.totalCalories} kcal</p><button onClick={() => removeRecipeFromSlot(day, slot.uniqueId)} className="absolute top-1 right-1 h-6 w-6 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-sm">&times;</button></div>
                                 ))}
-                                <button onClick={() => openRecipeSelector(day)} className="w-full text-center text-sm text-emerald-600 font-semibold p-2 bg-emerald-50 hover:bg-emerald-100 rounded-md">+ Mahlzeit hinzufügen</button>
+                                <div className="relative">
+                                    <button onClick={() => setAddingMealToDay(addingMealToDay === day ? null : day)} className="w-full text-center text-sm text-emerald-600 font-semibold p-2 bg-emerald-50 hover:bg-emerald-100 rounded-md">+ Mahlzeit hinzufügen</button>
+                                    {addingMealToDay === day && (
+                                        <div className="absolute top-full left-0 right-0 mt-1 p-2 bg-white border rounded-md shadow-lg z-10">
+                                            <p className="text-xs font-semibold text-slate-600 mb-2 px-1">Welche Mahlzeit?</p>
+                                            <div className="flex flex-col items-start gap-1">
+                                                {MEAL_ORDER.map(mealType => (
+                                                    <button key={mealType} onClick={() => openRecipeSelector(day, mealType)} className="w-full text-left px-3 py-1.5 text-sm text-slate-700 rounded hover:bg-slate-100">{MealCategoryLabels[mealType]}</button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                               </div>
                           </div>
                         ))}
@@ -231,8 +278,16 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
             {!isDesktop && (
                 <div className={`fixed inset-0 bg-black bg-opacity-70 z-50 flex flex-col p-4 ${isModalOpen ? 'block' : 'hidden'}`}>
                     <div className="bg-slate-100 rounded-lg shadow-xl flex flex-col h-full overflow-hidden">
-                        <header className="p-4 border-b bg-white flex justify-between items-center"><h2 className="text-xl font-bold">Gericht für {modalDay}</h2><button onClick={() => setIsModalOpen(false)} className="p-2 rounded-full hover:bg-slate-100"><CloseIcon /></button></header>
-                        <div className="flex-grow overflow-y-auto p-4 space-y-4">{filterControls}<div className="pt-4">{recipeList(handleSelectRecipeForDay)}</div></div>
+                        <header className="p-4 border-b bg-white flex justify-between items-center">
+                            <h2 className="text-xl font-bold">
+                                {modalMealType && MealCategoryLabels[modalMealType]} für {modalDay}
+                            </h2>
+                            <button onClick={() => setIsModalOpen(false)} className="p-2 rounded-full hover:bg-slate-100"><CloseIcon /></button>
+                        </header>
+                        <div className="flex-grow overflow-y-auto p-4 space-y-4">
+                            {filterControls}
+                            <div className="pt-4">{recipeList(handleSelectRecipeForDay, modalMealType)}</div>
+                        </div>
                     </div>
                 </div>
             )}

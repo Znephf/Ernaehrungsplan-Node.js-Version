@@ -1,3 +1,7 @@
+// Basic types for plan settings
+export type Diet = 'omnivore' | 'vegetarian' | 'vegan';
+export type DietType = 'balanced' | 'low-carb' | 'keto' | 'high-protein' | 'mediterranean';
+export type DishComplexity = 'simple' | 'advanced' | 'fancy';
 export type MealCategory = 'breakfast' | 'lunch' | 'coffee' | 'dinner' | 'snack';
 
 export const MealCategoryLabels: Record<MealCategory, string> = {
@@ -8,47 +12,44 @@ export const MealCategoryLabels: Record<MealCategory, string> = {
     snack: 'Snack'
 };
 
-export interface ShoppingListCategory {
-  category: string;
-  items: string[];
-}
+export const MEAL_ORDER: MealCategory[] = ['breakfast', 'lunch', 'coffee', 'dinner', 'snack'];
 
-export type ShoppingList = ShoppingListCategory[];
 
-// Ein einzelnes Gericht innerhalb eines Tagesplans
-export interface Meal {
-  mealType: MealCategory;
-  recipe: Recipe;
-}
-
-// Repräsentiert alle Mahlzeiten für einen einzelnen Tag
-export interface DailyPlan {
-  day: string;
-  meals: Meal[];
-  totalCalories: number;
-}
-
-export type WeeklyPlan = DailyPlan[];
-
+// Main data structures
 export interface Recipe {
-  id: number;
-  title: string;
-  ingredients: string[];
-  instructions: string[];
-  totalCalories: number;
-  protein?: number;
-  carbs?: number;
-  fat?: number;
-  category: MealCategory;
-  image_url?: string | null;
+    id: number;
+    title: string;
+    ingredients: string[];
+    instructions: string[];
+    totalCalories: number;
+    protein?: number;
+    carbs?: number;
+    fat?: number;
+    category: MealCategory;
+    image_url?: string | null;
 }
 
 export type Recipes = Recipe[];
 
-export type Diet = 'vegetarian' | 'vegan' | 'omnivore';
-export type DietType = 'balanced' | 'low-carb' | 'keto' | 'high-protein' | 'mediterranean';
-export type DishComplexity = 'simple' | 'advanced' | 'fancy';
-export type View = 'shopping' | 'plan' | 'recipes' | 'archive' | 'planner';
+export interface Meal {
+    mealType: MealCategory;
+    recipe: Recipe;
+}
+
+export interface DayPlan {
+    day: string;
+    meals: Meal[];
+    totalCalories: number;
+}
+
+export type WeeklyPlan = DayPlan[];
+
+export interface ShoppingListItem {
+    category: string;
+    items: string[];
+}
+
+export type ShoppingList = ShoppingListItem[];
 
 export interface PlanSettings {
     persons: number;
@@ -61,22 +62,24 @@ export interface PlanSettings {
     isGlutenFree: boolean;
     isLactoseFree: boolean;
     includedMeals: MealCategory[];
-    // Fix: Added optional properties for backward compatibility with older archived data.
-    breakfastOption?: string;
+    // Deprecated fields, kept for backward compatibility with old archive data
+    breakfastOption?: 'beeren' | 'walnuss' | 'mandel' | 'custom';
     customBreakfast?: string;
 }
 
-// Das Hauptobjekt, das einen vollständigen, zusammengestellten Plan darstellt
-export interface PlanData {
+export interface ArchiveEntry {
     id: number;
     name: string;
     createdAt: string;
-    shareId?: string | null;
     settings: PlanSettings;
+    shareId: string | null;
+    weeklyPlan: WeeklyPlan;
+    recipes: Recipes;
     shoppingList: ShoppingList;
-    weeklyPlan: WeeklyPlan; // Der neu strukturierte Wochenplan
-    recipes: Recipes; // Eine flache Liste aller im Plan verwendeten Rezepte
+    imageUrls?: { [key: string]: string }; // Deprecated, but might exist on old data
 }
 
-// Alias für die Abwärtskompatibilität, da die App jetzt nur noch mit PlanData arbeitet
-export type ArchiveEntry = PlanData;
+export type PlanData = ArchiveEntry;
+
+// UI-related types
+export type View = 'plan' | 'shopping' | 'recipes' | 'archive' | 'planner' | 'recipe-archive';

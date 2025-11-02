@@ -19,8 +19,8 @@ router.get('/archive', async (req, res) => {
                 pr.day_of_week, pr.meal_type,
                 r.id as recipe_id, r.title, r.ingredients, r.instructions, r.totalCalories, r.protein, r.carbs, r.fat, r.category, r.image_url
             FROM plans p
-            JOIN plan_recipes pr ON p.id = pr.plan_id
-            JOIN recipes r ON pr.recipe_id = r.id
+            LEFT JOIN plan_recipes pr ON p.id = pr.plan_id
+            LEFT JOIN recipes r ON pr.recipe_id = r.id
             ORDER BY p.createdAt DESC, FIELD(pr.day_of_week, 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag');
         `);
         
@@ -35,7 +35,7 @@ router.get('/archive', async (req, res) => {
                     id: row.id,
                     name: row.name,
                     createdAt: new Date(row.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                    settings: typeof row.settings === 'string' ? JSON.parse(row.settings) : row.settings,
+                    settings: (row.settings && typeof row.settings === 'string') ? JSON.parse(row.settings) : (row.settings || {}),
                     shareId: row.shareId,
                     weeklyPlan: [], // Wird unten befüllt
                     recipes: [], // Wird unten befüllt
@@ -43,32 +43,35 @@ router.get('/archive', async (req, res) => {
                 };
             }
             
-            const recipe = {
-                id: row.recipe_id,
-                title: row.title,
-                ingredients: typeof row.ingredients === 'string' ? JSON.parse(row.ingredients) : row.ingredients,
-                instructions: typeof row.instructions === 'string' ? JSON.parse(row.instructions) : row.instructions,
-                totalCalories: row.totalCalories,
-                protein: row.protein,
-                carbs: row.carbs,
-                fat: row.fat,
-                category: row.category,
-                image_url: row.image_url
-            };
+            // Verarbeite Rezept- und Tagesplandaten nur, wenn sie existieren (wichtig für LEFT JOIN)
+            if (row.recipe_id) {
+                const recipe = {
+                    id: row.recipe_id,
+                    title: row.title,
+                    ingredients: typeof row.ingredients === 'string' ? JSON.parse(row.ingredients) : row.ingredients,
+                    instructions: typeof row.instructions === 'string' ? JSON.parse(row.instructions) : row.instructions,
+                    totalCalories: row.totalCalories,
+                    protein: row.protein,
+                    carbs: row.carbs,
+                    fat: row.fat,
+                    category: row.category,
+                    image_url: row.image_url
+                };
 
-            // Doppeltes Hinzufügen von Rezepten vermeiden
-            if (!acc[row.id].recipes.some(r => r.id === recipe.id)) {
-                 acc[row.id].recipes.push(recipe);
+                // Doppeltes Hinzufügen von Rezepten vermeiden
+                if (!acc[row.id].recipes.some(r => r.id === recipe.id)) {
+                     acc[row.id].recipes.push(recipe);
+                }
+               
+                let dayPlan = acc[row.id].weeklyPlan.find(dp => dp.day === row.day_of_week);
+                if (!dayPlan) {
+                    dayPlan = { day: row.day_of_week, meals: [], totalCalories: 0 };
+                    acc[row.id].weeklyPlan.push(dayPlan);
+                }
+                
+                dayPlan.meals.push({ mealType: row.meal_type, recipe });
+                dayPlan.totalCalories += (recipe.totalCalories || 0);
             }
-           
-            let dayPlan = acc[row.id].weeklyPlan.find(dp => dp.day === row.day_of_week);
-            if (!dayPlan) {
-                dayPlan = { day: row.day_of_week, meals: [], totalCalories: 0 };
-                acc[row.id].weeklyPlan.push(dayPlan);
-            }
-            
-            dayPlan.meals.push({ mealType: row.meal_type, recipe });
-            dayPlan.totalCalories += recipe.totalCalories;
 
             return acc;
         }, {});

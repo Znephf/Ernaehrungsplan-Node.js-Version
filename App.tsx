@@ -91,12 +91,13 @@ const App: React.FC = () => {
     const handleLoadPlan = useCallback((id: number) => {
         const planToLoad = loadPlanFromArchive(id);
         if (planToLoad) {
-            // Fix: Populate image URLs from the loaded plan's recipes.
-            const urls: { [key: string]: string } = {};
+            // BEHOBEN: Bild-URLs werden jetzt korrekt über die Rezept-ID als Schlüssel zugeordnet,
+            // um mehrere Bilder pro Tag zu unterstützen.
+            const urls: { [id: number]: string } = {};
             planToLoad.weeklyPlan.forEach(dayPlan => {
                 dayPlan.meals.forEach(meal => {
-                    if (meal.recipe.image_url) {
-                        urls[dayPlan.day] = meal.recipe.image_url;
+                    if (meal.recipe.image_url && meal.recipe.id) {
+                        urls[meal.recipe.id] = meal.recipe.image_url;
                     }
                 })
             });
@@ -135,7 +136,7 @@ const App: React.FC = () => {
     };
     
     const handleSetView = useCallback((view: View) => {
-        if (view === 'archive' || view === 'planner') {
+        if (view === 'archive' || view === 'planner' || view === 'recipe-archive') {
             fetchArchive();
         }
         setCurrentView(view);
