@@ -6,20 +6,10 @@ const cookieParser = require('cookie-parser');
 const fs = require('fs');
 const { initializeDatabase } = require('./services/database');
 
-// Lade Umgebungsvariablen aus der .env-Datei.
-// In der Produktion wird dies nur getan, wenn es explizit über eine Umgebungsvariable erzwungen wird.
-// Dies ist eine Sicherheitsmaßnahme. Die bevorzugte Methode für die Produktion sind die Plesk-Umgebungsvariablen.
-if (process.env.NODE_ENV !== 'production' || process.env.FORCE_DOTENV_IN_PROD === 'true') {
-  const envPath = path.resolve(__dirname, '../.env');
-  if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
-    if (process.env.NODE_ENV === 'production') {
-      console.warn('\n!!! SICHERHEITSWARNUNG !!!');
-      console.warn('Die .env-Datei wird in der Produktionsumgebung geladen, da FORCE_DOTENV_IN_PROD=true gesetzt ist.');
-      console.warn('Dies wird nicht empfohlen. Bitte verwenden Sie stattdessen die Plesk-Umgebungsvariablen für maximale Sicherheit.\n');
-    }
-  }
-}
+// Lade Umgebungsvariablen IMMER aus der .env-Datei im Projekt-Stammverzeichnis.
+// HINWEIS: In einer Produktionsumgebung wird empfohlen, stattdessen
+// die systemeigenen Umgebungsvariablen des Hosters (z.B. in Plesk) zu verwenden.
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 
 // --- Starup-Diagnose ---
