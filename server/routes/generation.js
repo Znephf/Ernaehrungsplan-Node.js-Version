@@ -2,7 +2,9 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const { pool } = require('../services/database');
-const { processGenerationJob, generateImageForRecipe } = require('../services/geminiService');
+const { processGenerationJob, generateImageForRecipe, generateShoppingListForRecipes } = require('../services/geminiService');
+
+const WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 
 // Startet einen neuen asynchronen Job zur Erstellung eines Ernährungsplans
 router.post('/generate-plan-job', async (req, res) => {
@@ -35,30 +37,75 @@ router.get('/job-status/:jobId', async (req, res) => {
         const { status, planId, errorMessage } = jobRows[0];
 
         if (status === 'complete' && planId) {
-            const [planRows] = await pool.query('SELECT * FROM archived_plans WHERE id = ?', [planId]);
-            if (planRows.length > 0) {
-                const row = planRows[0];
-                const settings = typeof row.settings === 'string' ? JSON.parse(row.settings) : row.settings;
-                const planData = typeof row.planData === 'string' ? JSON.parse(row.planData) : row.planData;
+            // BEHOBEN: Die Abfrage wurde an die neue, normalisierte Datenbankstruktur angepasst.
+            const [planRows] = await pool.query(`
+                SELECT 
+                    p.id, p.name, p.createdAt, p.settings, p.shareId,
+                    pr.day_of_week, pr.meal_type,
+                    r.id as recipe_id, r.title, r.ingredients, r.instructions, r.totalCalories, r.protein, r.carbs, r.fat, r.category, r.image_url
+                FROM plans p
+                LEFT JOIN plan_recipes pr ON p.id = pr.plan_id
+                LEFT JOIN recipes r ON pr.recipe_id = r.id
+                WHERE p.id = ?
+                ORDER BY FIELD(pr.day_of_week, 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag');
+            `, [planId]);
 
-                if (!planData || typeof planData !== 'object' || !planData.name || !Array.isArray(planData.weeklyPlan) || !Array.isArray(planData.recipes) || !Array.isArray(planData.shoppingList)) {
-                    console.error(`[Job-Status] Plan mit ID ${planId} hat korrupte Daten und wird nicht gesendet.`);
-                    return res.json({ status: 'error', error: 'Der generierte Plan hat ein ungültiges Format und kann nicht geladen werden.' });
-                }
-
-                const newPlanEntry = {
-                    id: row.id, // KORREKTUR: .toString() entfernt, um eine Zahl zurückzugeben
-                    createdAt: new Date(row.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                    shareId: row.shareId || null,
-                    name: planData.name || 'Unbenannter Plan',
-                    ...settings,
-                    ...planData
-                };
-                return res.json({ status, plan: newPlanEntry, error: errorMessage });
-            } else {
+            if (planRows.length === 0) {
                 console.error(`[Job-Status] Inkonsistenz: Job ${jobId} ist 'complete' mit planId ${planId}, aber der Plan wurde in der DB nicht gefunden.`);
                 return res.json({ status: 'error', error: 'Der generierte Plan konnte nicht in der Datenbank gefunden werden. Er wurde möglicherweise gelöscht.' });
             }
+
+            // Rekonstruiert das Plan-Objekt, das vom Frontend erwartet wird.
+            const reconstructedPlan = {
+                id: planRows[0].id,
+                name: planRows[0].name,
+                createdAt: new Date(planRows[0].createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                settings: typeof planRows[0].settings === 'string' ? JSON.parse(planRows[0].settings) : planRows[0].settings,
+                shareId: planRows[0].shareId,
+                weeklyPlan: [],
+                recipes: [],
+                shoppingList: [] // Wird unten generiert
+            };
+
+            const recipeMap = new Map();
+            planRows.forEach(row => {
+                if (!row.recipe_id) return; // Überspringen, falls keine Rezeptdaten vorhanden sind
+
+                // Fügt einzigartige Rezepte zur flachen Liste hinzu
+                if (!recipeMap.has(row.recipe_id)) {
+                    const recipe = {
+                        id: row.recipe_id,
+                        title: row.title,
+                        ingredients: typeof row.ingredients === 'string' ? JSON.parse(row.ingredients) : row.ingredients,
+                        instructions: typeof row.instructions === 'string' ? JSON.parse(row.instructions) : row.instructions,
+                        totalCalories: row.totalCalories,
+                        protein: row.protein,
+                        carbs: row.carbs,
+                        fat: row.fat,
+                        category: row.category,
+                        image_url: row.image_url
+                    };
+                    recipeMap.set(recipe.id, recipe);
+                    reconstructedPlan.recipes.push(recipe);
+                }
+
+                // Baut den Wochenplan auf
+                let dayPlan = reconstructedPlan.weeklyPlan.find(dp => dp.day === row.day_of_week);
+                if (!dayPlan) {
+                    dayPlan = { day: row.day_of_week, meals: [], totalCalories: 0 };
+                    reconstructedPlan.weeklyPlan.push(dayPlan);
+                }
+                
+                dayPlan.meals.push({ mealType: row.meal_type, recipe: recipeMap.get(row.recipe_id) });
+                dayPlan.totalCalories += row.totalCalories || 0;
+            });
+            
+            reconstructedPlan.weeklyPlan.sort((a, b) => WEEKDAYS.indexOf(a.day) - WEEKDAYS.indexOf(b.day));
+            
+            // Generiert die Einkaufsliste on-the-fly
+            reconstructedPlan.shoppingList = await generateShoppingListForRecipes(reconstructedPlan.recipes, reconstructedPlan.settings.persons);
+            
+            return res.json({ status: 'complete', plan: reconstructedPlan, error: errorMessage });
         }
         
         res.json({ status, planId, error: errorMessage });
