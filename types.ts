@@ -32,7 +32,7 @@ export type Diet = 'vegetarian' | 'vegan' | 'omnivore';
 export type BreakfastOption = 'quark' | 'muesli' | 'custom';
 export type DietType = 'balanced' | 'low-carb' | 'keto' | 'high-protein' | 'mediterranean';
 export type DishComplexity = 'simple' | 'advanced' | 'fancy';
-export type View = 'shopping' | 'plan' | 'recipes' | 'archive';
+export type View = 'shopping' | 'plan' | 'recipes' | 'archive' | 'planner';
 
 export interface PlanSettings {
     persons: number;

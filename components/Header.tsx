@@ -47,6 +47,7 @@ const Header: React.FC<HeaderProps> = ({
                         <NavButton view="shopping" label="Einkaufsliste" currentView={currentView} onClick={onSetView} disabled={!planExists} />
                         <NavButton view="recipes" label="Rezepte" currentView={currentView} onClick={onSetView} disabled={!planExists} />
                         <NavButton view="archive" label="Archiv" currentView={currentView} onClick={onSetView} />
+                        <NavButton view="planner" label="Woche Planen" currentView={currentView} onClick={onSetView} />
                     </nav>
                     <div className="hidden sm:block h-8 border-l border-slate-300 mx-2"></div>
                      <button

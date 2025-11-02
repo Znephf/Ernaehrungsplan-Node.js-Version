@@ -4,6 +4,7 @@ import ShoppingListComponent from './ShoppingList';
 import WeeklyPlanComponent from './WeeklyPlan';
 import RecipesComponent from './Recipes';
 import ArchiveComponent from './Archive';
+import PlannerComponent from './Planner';
 
 interface MainContentProps {
     view: View;
@@ -16,6 +17,7 @@ interface MainContentProps {
     onLoadPlan: (id: number) => void;
     onGenerateImage: (recipe: Recipe, planId: number | null) => Promise<void>;
     onGenerateMissingImages: (recipes: Recipe[], planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
+    onCustomPlanSaved: () => void;
 }
 
 const MainContent: React.FC<MainContentProps> = ({
@@ -28,7 +30,8 @@ const MainContent: React.FC<MainContentProps> = ({
     onSelectRecipe,
     onLoadPlan,
     onGenerateImage,
-    onGenerateMissingImages
+    onGenerateMissingImages,
+    onCustomPlanSaved,
 }) => {
 
     const renderView = () => {
@@ -56,6 +59,8 @@ const MainContent: React.FC<MainContentProps> = ({
                         /> : null;
             case 'archive':
                 return <ArchiveComponent archive={archive} onLoadPlan={onLoadPlan} />;
+            case 'planner':
+                return <PlannerComponent archive={archive} onPlanSaved={onCustomPlanSaved} />;
             default:
                 return null;
         }
@@ -65,7 +70,7 @@ const MainContent: React.FC<MainContentProps> = ({
         <>
             {renderView()}
 
-            {!plan && view !== 'archive' && (
+            {!plan && view !== 'archive' && view !== 'planner' && (
                 <div className="text-center py-16 bg-white rounded-lg shadow-md">
                     <h2 className="text-2xl font-bold text-slate-700 mb-2">Willkommen beim KI Ernährungsplaner</h2>
                     <p className="text-slate-500">Erstellen Sie oben einen neuen Plan oder laden Sie einen bestehenden aus dem Archiv.</p>

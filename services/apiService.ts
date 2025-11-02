@@ -42,6 +42,19 @@ export const getArchive = async (): Promise<ArchiveEntry[]> => {
     return response.json();
 };
 
+export const saveCustomPlan = async (payload: { name: string, persons: number, dinners: { day: string, recipe: Recipe }[] }): Promise<ArchiveEntry> => {
+    const response = await fetch('/api/archive/custom-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+     if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save custom plan');
+    }
+    return response.json();
+};
+
 // Sends base64, expects back the new file URL
 export const saveImageUrl = async (planId: number, day: string, imageUrl: string): Promise<{ message: string, imageUrl: string }> => {
     const response = await fetch('/api/archive/image', {

@@ -114,6 +114,11 @@ const App: React.FC = () => {
         });
     };
     
+    const handleCustomPlanSaved = useCallback(() => {
+        fetchArchive().then(() => {
+            setCurrentView('archive');
+        });
+    }, [fetchArchive]);
 
     const handleSelectRecipe = (day: string) => {
         setSelectedRecipeDay(day);
@@ -121,7 +126,7 @@ const App: React.FC = () => {
     };
     
     const handleSetView = useCallback((view: View) => {
-        if (view === 'archive') {
+        if (view === 'archive' || view === 'planner') {
             fetchArchive();
         }
         setCurrentView(view);
@@ -240,6 +245,7 @@ const App: React.FC = () => {
                     onLoadPlan={handleLoadPlan}
                     onGenerateImage={generateImage}
                     onGenerateMissingImages={generateMissingImages}
+                    onCustomPlanSaved={handleCustomPlanSaved}
                 />
             </main>
         </div>

@@ -181,28 +181,9 @@ async function processGenerationJob(jobId) {
         
         await connection.query("UPDATE generation_jobs SET status = 'generating_shopping_list' WHERE jobId = ?", [jobId]);
 
-        const shoppingListPrompt = `Basierend auf diesen Rezepten für ${persons} Personen, erstelle eine vollständige, zusammengefasste Einkaufsliste. Gruppiere nach Supermarkt-Kategorien: ${JSON.stringify({ weeklyPlan: planData.weeklyPlan, recipes: planData.recipes })}`;
-        const shoppingListSchema = { type: Type.OBJECT, properties: { shoppingList: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, items: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ["category", "items"] } } }, required: ["shoppingList"] };
-        const shoppingListResponse = await generateWithFallbackAndRetry({ model: TEXT_MODEL_NAME, contents: [{ parts: [{ text: shoppingListPrompt }] }], config: { responseMimeType: 'application/json', responseSchema: shoppingListSchema } });
-        
-        let shoppingListData;
-        try {
-            if (!shoppingListResponse.text || shoppingListResponse.text.trim() === '') {
-                throw new Error("Leere Antwort vom Einkaufslisten-Modell erhalten.");
-            }
-            shoppingListData = JSON.parse(shoppingListResponse.text);
-        } catch (e) {
-            console.error("Fehler beim Parsen der Einkaufslisten-Antwort:", e);
-            console.error("Roh-Antwort vom Modell:", shoppingListResponse.text);
-            throw new Error(`Das KI-Modell hat eine ungültige Einkaufsliste gesendet. (${e.message})`);
-        }
+        const shoppingList = await generateShoppingListForRecipes(planData.recipes, persons);
 
-        if (!shoppingListData || !Array.isArray(shoppingListData.shoppingList)) {
-            console.error("Ungültiges Format der Einkaufsliste:", shoppingListData);
-            throw new Error('Die generierte Einkaufsliste hat ein ungültiges Format.');
-        }
-
-        const finalPlan = { ...planData, shoppingList: shoppingListData.shoppingList, imageUrls: {} };
+        const finalPlan = { ...planData, shoppingList, imageUrls: {} };
         
         const [result] = await connection.query('INSERT INTO archived_plans (name, settings, planData) VALUES (?, ?, ?)', [finalPlan.name, JSON.stringify(settings), JSON.stringify(finalPlan)]);
         
@@ -236,7 +217,34 @@ async function generateImageForRecipe(recipe, attempt) {
     };
 }
 
+async function generateShoppingListForRecipes(recipes, persons) {
+    const shoppingListPrompt = `Basierend auf diesen Rezepten für ${persons} Personen, erstelle eine vollständige, zusammengefasste Einkaufsliste. Gruppiere nach Supermarkt-Kategorien. Fasse identische Zutaten zusammen (z.B. aus "1 Zwiebel" und "2 Zwiebeln" wird "3 Zwiebeln"). Hier sind die Rezepte: ${JSON.stringify(recipes.map(r => ({ title: r.title, ingredients: r.ingredients })))}`;
+    const shoppingListSchema = { type: Type.OBJECT, properties: { shoppingList: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, items: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ["category", "items"] } } }, required: ["shoppingList"] };
+    const shoppingListResponse = await generateWithFallbackAndRetry({ model: TEXT_MODEL_NAME, contents: [{ parts: [{ text: shoppingListPrompt }] }], config: { responseMimeType: 'application/json', responseSchema: shoppingListSchema } });
+    
+    let shoppingListData;
+    try {
+        if (!shoppingListResponse.text || shoppingListResponse.text.trim() === '') {
+            throw new Error("Leere Antwort vom Einkaufslisten-Modell erhalten.");
+        }
+        shoppingListData = JSON.parse(shoppingListResponse.text);
+    } catch (e) {
+        console.error("Fehler beim Parsen der Einkaufslisten-Antwort:", e);
+        console.error("Roh-Antwort vom Modell:", shoppingListResponse.text);
+        throw new Error(`Das KI-Modell hat eine ungültige Einkaufsliste gesendet. (${e.message})`);
+    }
+
+    if (!shoppingListData || !Array.isArray(shoppingListData.shoppingList)) {
+        console.error("Ungültiges Format der Einkaufsliste:", shoppingListData);
+        throw new Error('Die generierte Einkaufsliste hat ein ungültiges Format.');
+    }
+
+    return shoppingListData.shoppingList;
+}
+
+
 module.exports = {
     processGenerationJob,
-    generateImageForRecipe
+    generateImageForRecipe,
+    generateShoppingListForRecipes,
 };
