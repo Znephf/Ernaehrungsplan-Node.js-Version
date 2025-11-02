@@ -20,7 +20,7 @@ const initializeDatabase = async () => {
     try {
         connection = await pool.getConnection();
         
-        // Recipes Table
+        // Recipes Table - Create if it doesn't exist
         await connection.query(`
             CREATE TABLE IF NOT EXISTS recipes (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -32,13 +32,20 @@ const initializeDatabase = async () => {
                 carbs FLOAT,
                 fat FLOAT,
                 category ENUM('breakfast', 'lunch', 'coffee', 'dinner', 'snack') NOT NULL,
-                dietaryPreference ENUM('omnivore', 'vegetarian', 'vegan'),
                 image_url VARCHAR(255),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE KEY (title)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
         console.log('Table "recipes" is ready.');
+
+        // Schema migration: Add dietaryPreference column to recipes if it doesn't exist
+        const [recipeColumns] = await connection.query("SHOW COLUMNS FROM `recipes` LIKE 'dietaryPreference'");
+        if (recipeColumns.length === 0) {
+            console.log('Adding missing column `dietaryPreference` to `recipes` table...');
+            await connection.query("ALTER TABLE `recipes` ADD COLUMN `dietaryPreference` ENUM('omnivore', 'vegetarian', 'vegan') NULL DEFAULT NULL AFTER `category`");
+            console.log('Column `dietaryPreference` added successfully.');
+        }
 
         // Plans Table
         await connection.query(`
