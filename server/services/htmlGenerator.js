@@ -28,7 +28,7 @@ async function generateShareableHtml(plan) {
     </style>
 </head>
 <body class="bg-slate-100">
-    <header class="bg-white shadow-md sticky top-0">
+    <header class="bg-white shadow-md sticky top-0 z-30">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
             <h1 class="text-2xl font-bold text-slate-800">KI Ernährungsplaner</h1>
             <nav class="flex items-center justify-center gap-2 sm:gap-4 p-1 bg-slate-100 rounded-lg">
@@ -136,7 +136,7 @@ async function generateShareableHtml(plan) {
                     if (dayPlan.meals.length === 0 || mealsHtml.trim() === '') return '';
 
                     return '<div id="recipe-day-' + escape(dayPlan.day) + '">' +
-                        '<h2 class="text-3xl font-bold text-slate-700 border-b-2 border-slate-200 pb-3 mb-6 sticky top-[80px] bg-slate-100/80 backdrop-blur-sm py-2">' + escape(dayPlan.day) + '</h2>' +
+                        '<h2 class="text-3xl font-bold text-slate-700 border-b-2 border-slate-200 pb-3 mb-6 sm:sticky top-20 z-20 bg-slate-100/80 backdrop-blur-sm py-2">' + escape(dayPlan.day) + '</h2>' +
                         '<div class="space-y-8">' + mealsHtml + '</div>' +
                         '</div>';
                 }).join('');

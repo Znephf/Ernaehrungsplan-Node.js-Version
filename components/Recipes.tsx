@@ -125,7 +125,7 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ weeklyPlan, recipes
       <div className="space-y-12">
         {(weeklyPlan || []).map((dayPlan) => (
           <div key={dayPlan.day} id={`recipe-${dayPlan.day}`}>
-            <h2 className="text-3xl font-bold text-slate-700 border-b-2 border-slate-200 pb-3 mb-6 sticky top-[80px] bg-slate-100/80 backdrop-blur-sm py-2">
+            <h2 className="text-3xl font-bold text-slate-700 border-b-2 border-slate-200 pb-3 mb-6 sm:sticky top-20 z-20 bg-slate-100/80 backdrop-blur-sm py-2">
               {dayPlan.day}
             </h2>
             <div className="space-y-8">
