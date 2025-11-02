@@ -80,17 +80,17 @@ router.post('/archive/custom-plan', async (req, res) => {
             };
         });
 
-        // 2. Rezeptliste erstellen
-        const recipes = dinners.map(d => ({ ...d.recipe, day: d.day }));
+        // 2. Rezeptliste erstellen (nur die tatsächlich verwendeten)
+        const usedRecipes = dinners.map(d => ({ ...d.recipe, day: d.day }));
         
         // 3. Einkaufsliste generieren
-        const shoppingList = await generateShoppingListForRecipes(recipes, persons);
+        const shoppingList = await generateShoppingListForRecipes(usedRecipes, persons);
 
         // 4. Plan-Daten und Einstellungen zusammenstellen
         const planData = {
             name,
             weeklyPlan,
-            recipes,
+            recipes: usedRecipes,
             shoppingList,
             imageUrls: {} // Beginnt ohne Bilder
         };
@@ -103,8 +103,8 @@ router.post('/archive/custom-plan', async (req, res) => {
             dishComplexity: 'simple',
             isGlutenFree: false, // Standard, könnte man ableiten
             isLactoseFree: false,
-            excludedIngredients: '',
-            desiredIngredients: '',
+            excludedIngredients: 'Individuell',
+            desiredIngredients: 'Individuell',
             breakfastOption: 'custom',
             customBreakfast: 'Individuell',
         };
@@ -116,12 +116,15 @@ router.post('/archive/custom-plan', async (req, res) => {
         );
         const newPlanId = result.insertId;
         
-        // 6. Neuen Plan abrufen und zurückgeben
+        // 6. Neuen Plan abrufen und zurückgeben (optional, aber gut für die UI)
         const [rows] = await pool.query('SELECT * FROM archived_plans WHERE id = ?', [newPlanId]);
+        const newPlanRow = rows[0];
         const newPlan = {
-            id: rows[0].id,
-            ...JSON.parse(rows[0].settings),
-            ...JSON.parse(rows[0].planData)
+            id: newPlanRow.id,
+            createdAt: new Date(newPlanRow.createdAt).toLocaleString('de-DE'),
+            shareId: newPlanRow.shareId,
+            ...JSON.parse(newPlanRow.settings),
+            ...JSON.parse(newPlanRow.planData)
         };
         
         res.status(201).json(newPlan);
@@ -131,5 +134,6 @@ router.post('/archive/custom-plan', async (req, res) => {
         res.status(500).json({ error: 'Der individuelle Plan konnte nicht gespeichert werden.' });
     }
 });
+
 
 module.exports = router;

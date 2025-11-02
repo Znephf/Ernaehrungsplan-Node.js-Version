@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, DragEvent } from 'react';
-import type { ArchiveEntry, Recipe, Diet, DietType, DishComplexity, WeeklyPlan, Recipes } from '../types';
+import type { ArchiveEntry, Recipe, Diet, DietType, DishComplexity } from '../types';
 import * as apiService from '../services/apiService';
 import { LoadingSpinnerIcon } from './IconComponents';
 
@@ -8,15 +8,11 @@ interface PlannerComponentProps {
   onPlanSaved: () => void;
 }
 
-// Helper to get a unique recipe identifier
-const getRecipeId = (recipe: Recipe, planId: number) => `${planId}-${recipe.title}`;
-
 // Helper to get unique recipes from the entire archive
 const getUniqueRecipes = (archive: ArchiveEntry[]): (Recipe & { sourcePlanId: number; sourcePlanSettings: any })[] => {
     const uniqueRecipes = new Map<string, Recipe & { sourcePlanId: number; sourcePlanSettings: any }>();
     archive.forEach(plan => {
-        plan.recipes.forEach(recipe => {
-            const recipeId = getRecipeId(recipe, plan.id);
+        (plan.recipes || []).forEach(recipe => {
             if (!uniqueRecipes.has(recipe.title)) { // Use title to deduplicate across plans
                 uniqueRecipes.set(recipe.title, { ...recipe, sourcePlanId: plan.id, sourcePlanSettings: { dietaryPreference: plan.dietaryPreference, dietType: plan.dietType, dishComplexity: plan.dishComplexity, isGlutenFree: plan.isGlutenFree, isLactoseFree: plan.isLactoseFree } });
             }
@@ -43,7 +39,7 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
     const [filterLactoseFree, setFilterLactoseFree] = useState(false);
 
     // Planner states
-    const [weeklySlots, setWeeklySlots] = useState<(Recipe & { uniqueId: string }) | null[]>(Array(7).fill(null));
+    const [weeklySlots, setWeeklySlots] = useState<((Recipe & { uniqueId: string }) | null)[]>(Array(7).fill(null));
     const [planName, setPlanName] = useState('');
     const [persons, setPersons] = useState(2);
     const [isSaving, setIsSaving] = useState(false);
@@ -110,7 +106,9 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
         setIsSaving(true);
         setError(null);
         
-        const filledSlots = weeklySlots.map((recipe, index) => ({ recipe, day: WEEKDAYS[index] })).filter(slot => slot.recipe !== null);
+        const filledSlots = weeklySlots
+            .map((recipe, index) => ({ recipe, day: WEEKDAYS[index] }))
+            .filter(slot => slot.recipe !== null);
 
         const customPlanPayload = {
             name: planName,
@@ -149,12 +147,14 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
                     </div>
                 </div>
                 <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-                    {filteredRecipes.map((recipe, index) => (
+                    {filteredRecipes.length > 0 ? filteredRecipes.map((recipe, index) => (
                         <div key={`${recipe.sourcePlanId}-${index}`} draggable onDragStart={(e) => handleDragStart(e, recipe)} className="bg-white p-3 rounded-md shadow hover:shadow-md cursor-grab active:cursor-grabbing border border-slate-200">
                             <p className="font-semibold text-slate-700">{recipe.title}</p>
                             <p className="text-xs text-slate-400">{recipe.totalCalories} kcal &bull; {dietPreferenceLabels[recipe.sourcePlanSettings.dietaryPreference]}</p>
                         </div>
-                    ))}
+                    )) : (
+                        <div className="text-center py-8 text-slate-500">Keine Gerichte für die aktuellen Filter gefunden.</div>
+                    )}
                 </div>
             </div>
 
@@ -170,7 +170,7 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ archive, onPlanSave
                                     <div className="bg-emerald-50 p-2 rounded-md shadow-sm relative">
                                         <p className="font-semibold text-emerald-800 text-sm">{weeklySlots[index]!.title}</p>
                                         <p className="text-xs text-emerald-600">{weeklySlots[index]!.totalCalories} kcal</p>
-                                        <button onClick={() => removeRecipeFromSlot(index)} className="absolute top-1 right-1 h-5 w-5 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold hover:bg-red-300">&times;</button>
+                                        <button onClick={() => removeRecipeFromSlot(index)} className="absolute top-1 right-1 h-5 w-5 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold hover:bg-red-300" aria-label={`Entferne ${weeklySlots[index]!.title} von ${day}`}>&times;</button>
                                     </div>
                                 ) : (
                                     <p className="text-sm text-slate-400 text-center pt-4">Rezept hierher ziehen</p>

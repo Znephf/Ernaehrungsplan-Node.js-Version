@@ -218,19 +218,43 @@ async function generateImageForRecipe(recipe, attempt) {
 }
 
 async function generateShoppingListForRecipes(recipes, persons) {
-    const shoppingListPrompt = `Basierend auf diesen Rezepten für ${persons} Personen, erstelle eine vollständige, zusammengefasste Einkaufsliste. Gruppiere nach Supermarkt-Kategorien. Fasse identische Zutaten zusammen (z.B. aus "1 Zwiebel" und "2 Zwiebeln" wird "3 Zwiebeln"). Hier sind die Rezepte: ${JSON.stringify(recipes.map(r => ({ title: r.title, ingredients: r.ingredients })))}`;
-    const shoppingListSchema = { type: Type.OBJECT, properties: { shoppingList: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, items: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ["category", "items"] } } }, required: ["shoppingList"] };
-    const shoppingListResponse = await generateWithFallbackAndRetry({ model: TEXT_MODEL_NAME, contents: [{ parts: [{ text: shoppingListPrompt }] }], config: { responseMimeType: 'application/json', responseSchema: shoppingListSchema } });
+    if (!recipes || recipes.length === 0) return [];
+    
+    const shoppingListPrompt = `Basierend auf diesen Rezepten für ${persons} Personen, erstelle eine vollständige, zusammengefasste Einkaufsliste. Gruppiere die Artikel nach gängigen Supermarkt-Kategorien (z.B. "Obst & Gemüse", "Molkereiprodukte & Eier", "Trockensortiment & Konserven", "Gewürze & Sonstiges"). Fasse identische Zutaten intelligent zusammen (z.B. aus "1 Zwiebel" und "2 Zwiebeln" wird "3 Zwiebeln"). Gib Mengenangaben an. Hier sind die Rezepte: ${JSON.stringify(recipes.map(r => ({ title: r.title, ingredients: r.ingredients })))}`;
+    
+    const shoppingListSchema = { 
+        type: Type.OBJECT, 
+        properties: { 
+            shoppingList: { 
+                type: Type.ARRAY, 
+                items: { 
+                    type: Type.OBJECT, 
+                    properties: { 
+                        category: { type: Type.STRING }, 
+                        items: { type: Type.ARRAY, items: { type: Type.STRING } } 
+                    }, 
+                    required: ["category", "items"] 
+                } 
+            } 
+        }, 
+        required: ["shoppingList"] 
+    };
+
+    const response = await generateWithFallbackAndRetry({ 
+        model: TEXT_MODEL_NAME, 
+        contents: [{ parts: [{ text: shoppingListPrompt }] }], 
+        config: { responseMimeType: 'application/json', responseSchema: shoppingListSchema } 
+    });
     
     let shoppingListData;
     try {
-        if (!shoppingListResponse.text || shoppingListResponse.text.trim() === '') {
+        if (!response.text || response.text.trim() === '') {
             throw new Error("Leere Antwort vom Einkaufslisten-Modell erhalten.");
         }
-        shoppingListData = JSON.parse(shoppingListResponse.text);
+        shoppingListData = JSON.parse(response.text);
     } catch (e) {
         console.error("Fehler beim Parsen der Einkaufslisten-Antwort:", e);
-        console.error("Roh-Antwort vom Modell:", shoppingListResponse.text);
+        console.error("Roh-Antwort vom Modell:", response.text);
         throw new Error(`Das KI-Modell hat eine ungültige Einkaufsliste gesendet. (${e.message})`);
     }
 
