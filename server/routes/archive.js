@@ -1,161 +1,165 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const { pool } = require('../services/database');
 const { generateShoppingListForRecipes } = require('../services/geminiService');
 
-// GET all archived plans
+const publicImagesDir = path.join(__dirname, '..', '..', 'public', 'images', 'recipes');
+
+
+// Alle Pläne aus dem Archiv abrufen
 router.get('/archive', async (req, res) => {
     try {
         const [plans] = await pool.query('SELECT * FROM archived_plans ORDER BY createdAt DESC');
-        const [imageRows] = await pool.query('SELECT recipeTitle, imageUrl FROM recipe_images');
+        const [imageRows] = await pool.query('SELECT recipe_title, image_url FROM recipe_images');
         
-        const imageMap = new Map(imageRows.map(row => [row.recipeTitle, row.imageUrl]));
-
-        const archive = plans.map(plan => {
-            const settings = typeof plan.settings === 'string' ? JSON.parse(plan.settings) : (plan.settings || {});
-            const planData = typeof plan.planData === 'string' ? JSON.parse(plan.planData) : (plan.planData || {});
-            
-            // Inject image URLs based on recipe titles
-            const imageUrls = {};
-            if (planData.recipes && Array.isArray(planData.recipes)) {
-                planData.recipes.forEach(recipe => {
+        const imageMap = new Map(imageRows.map(row => [row.recipe_title, row.image_url]));
+        
+        const archive = plans.map(row => {
+            try {
+                const settings = typeof row.settings === 'string' ? JSON.parse(row.settings) : row.settings;
+                const planData = typeof row.planData === 'string' ? JSON.parse(row.planData) : row.planData;
+                
+                if (!planData || typeof planData !== 'object' || !planData.name || !Array.isArray(planData.weeklyPlan) || !Array.isArray(planData.recipes) || !Array.isArray(planData.shoppingList)) {
+                    console.warn(`[Archiv] Plan mit ID ${row.id} wird übersprungen, da Plandaten korrupt sind.`);
+                    return null;
+                }
+                
+                // Dynamisch Bild-URLs aus der zentralen Tabelle zuweisen
+                const newImageUrls = {};
+                for (const recipe of planData.recipes) {
                     if (imageMap.has(recipe.title)) {
-                        imageUrls[recipe.day] = imageMap.get(recipe.title);
+                        newImageUrls[recipe.day] = imageMap.get(recipe.title);
                     }
-                });
-            }
-            planData.imageUrls = imageUrls;
+                }
+                planData.imageUrls = newImageUrls;
 
-            return {
-                id: plan.id,
-                createdAt: new Date(plan.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                shareId: plan.shareId || null,
-                name: planData.name || 'Unbenannter Plan',
-                ...settings,
-                ...planData
-            };
-        });
+
+                return {
+                    id: row.id,
+                    createdAt: new Date(row.createdAt).toLocaleString('de-DE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                    shareId: row.shareId || null,
+                    name: planData.name,
+                    ...settings,
+                    ...planData
+                };
+            } catch(e) {
+                console.error(`[Archiv] Fehler beim Verarbeiten von Plan mit ID ${row.id}:`, e);
+                return null;
+            }
+        }).filter(entry => entry !== null);
+        
         res.json(archive);
     } catch (error) {
-        console.error('Fehler beim Laden des Archivs:', error);
+        console.error('Fehler beim Abrufen des Archivs:', error);
         res.status(500).json({ error: 'Archiv konnte nicht geladen werden.' });
     }
 });
 
-// POST a new recipe image
+// Bild-URL für ein Rezept zentral speichern
 router.post('/recipe-image', async (req, res) => {
-    const { recipeTitle, imageUrl } = req.body;
-    if (!recipeTitle || !imageUrl) {
-        return res.status(400).json({ error: 'recipeTitle and imageUrl are required.' });
+    const { recipeTitle, base64Data } = req.body;
+    if (!recipeTitle || !base64Data) {
+        return res.status(400).json({ error: 'Fehlende Daten zum Speichern des Bildes.' });
     }
 
     try {
-        // Use ON DUPLICATE KEY UPDATE to handle existing recipes, updating the URL if a new one is generated.
-        await pool.query(
-            'INSERT INTO recipe_images (recipeTitle, imageUrl) VALUES (?, ?) ON DUPLICATE KEY UPDATE imageUrl = VALUES(imageUrl)',
-            [recipeTitle, imageUrl]
-        );
-        res.status(201).json({ message: 'Image saved successfully.' });
-    } catch (error) {
-        console.error(`Error saving image for recipe "${recipeTitle}":`, error);
-        res.status(500).json({ error: 'Could not save recipe image.' });
-    }
-});
-
-
-// PUT (update) an existing plan
-router.put('/archive/:id', async (req, res) => {
-    const { id } = req.params;
-    const plan = req.body;
-    
-    const settingsToSave = {
-        persons: plan.persons,
-        kcal: plan.kcal,
-        dietaryPreference: plan.dietaryPreference,
-        dietType: plan.dietType,
-        dishComplexity: plan.dishComplexity,
-        excludedIngredients: plan.excludedIngredients,
-        desiredIngredients: plan.desiredIngredients,
-        isGlutenFree: plan.isGlutenFree,
-        isLactoseFree: plan.isLactoseFree,
-        breakfastOption: plan.breakfastOption,
-        customBreakfast: plan.customBreakfast,
-    };
-    
-    const planDataToSave = {
-        name: plan.name,
-        shoppingList: plan.shoppingList,
-        weeklyPlan: plan.weeklyPlan,
-        recipes: plan.recipes,
-        // Image URLs are no longer stored in the planData JSON blob
-    };
-
-    try {
-        await pool.query(
-            'UPDATE archived_plans SET name = ?, settings = ?, planData = ? WHERE id = ?',
-            [plan.name, JSON.stringify(settingsToSave), JSON.stringify(planDataToSave), id]
-        );
-        res.json(plan); // Send back the full plan for optimistic UI updates
-    } catch (error) {
-        console.error(`Fehler beim Aktualisieren von Plan ${id}:`, error);
-        res.status(500).json({ error: 'Plan konnte nicht aktualisiert werden.' });
-    }
-});
-
-// POST a new custom plan
-router.post('/archive/custom', async (req, res) => {
-    const { name, recipes } = req.body;
-
-    if (!name || !Array.isArray(recipes) || recipes.length === 0) {
-        return res.status(400).json({ error: 'Planname und mindestens ein Rezept sind erforderlich.' });
-    }
-
-    try {
-        const persons = 2; 
-        const avgCalories = recipes.reduce((sum, r) => sum + r.totalCalories, 0) / recipes.length;
-        const kcal = isNaN(avgCalories) ? 2000 : Math.round(avgCalories);
-
-        const daysOfWeek = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+        const imageBuffer = Buffer.from(base64Data, 'base64');
+        const fileName = `${crypto.randomBytes(16).toString('hex')}.jpg`;
+        const filePath = path.join(publicImagesDir, fileName);
+        const fileUrl = `/images/recipes/${fileName}`;
         
-        const weeklyPlan = recipes.slice(0, 7).map((recipe, index) => {
-            const day = daysOfWeek[index];
-            recipe.day = day;
+        fs.writeFileSync(filePath, imageBuffer);
+
+        await pool.query(
+            'INSERT INTO recipe_images (recipe_title, image_url) VALUES (?, ?) ON DUPLICATE KEY UPDATE image_url = VALUES(image_url)',
+            [recipeTitle, fileUrl]
+        );
+
+        res.status(200).json({ message: 'Bild erfolgreich gespeichert.', imageUrl: fileUrl });
+    } catch (error) {
+        console.error(`Fehler beim Speichern des Bildes für Rezept "${recipeTitle}":`, error);
+        res.status(500).json({ error: 'Bild konnte nicht verarbeitet oder in der DB gespeichert werden.' });
+    }
+});
+
+
+// Neuen individuellen Plan speichern
+router.post('/archive/custom-plan', async (req, res) => {
+    const { name, persons, dinners } = req.body;
+    if (!name || !persons || !Array.isArray(dinners) || dinners.length === 0) {
+        return res.status(400).json({ error: 'Unvollständige Plandaten erhalten.' });
+    }
+
+    try {
+        // 1. Wochenplan erstellen
+        const weeklyPlan = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"].map(day => {
+            const dinnerEntry = dinners.find(d => d.day === day);
             return {
-                day: day,
-                breakfast: "Individuell",
+                day,
+                breakfast: "Individuelles Frühstück",
                 breakfastCalories: 0,
-                dinner: recipe.title,
-                dinnerCalories: recipe.totalCalories,
+                dinner: dinnerEntry ? dinnerEntry.recipe.title : "Kein Abendessen geplant",
+                dinnerCalories: dinnerEntry ? dinnerEntry.recipe.totalCalories : 0
             };
         });
 
-        const shoppingList = await generateShoppingListForRecipes(recipes, persons);
+        // 2. Rezeptliste erstellen (nur die tatsächlich verwendeten)
+        const usedRecipes = dinners.map(d => ({ ...d.recipe, day: d.day }));
+        
+        // 3. Einkaufsliste generieren
+        const shoppingList = await generateShoppingListForRecipes(usedRecipes, persons);
+
+        // 4. Plan-Daten und Einstellungen zusammenstellen
+        const planData = {
+            name,
+            weeklyPlan,
+            recipes: usedRecipes,
+            shoppingList,
+            // imageUrls wird bewusst weggelassen, da es jetzt dynamisch geladen wird
+        };
 
         const settings = {
-            persons, kcal, dietaryPreference: 'vegetarian', dietType: 'balanced',
-            dishComplexity: 'simple', excludedIngredients: '', desiredIngredients: '',
-            isGlutenFree: false, isLactoseFree: false, breakfastOption: 'custom',
-            customBreakfast: 'Individuell zusammengestellt'
+            persons: parseInt(persons, 10),
+            kcal: Math.round(weeklyPlan.reduce((sum, day) => sum + day.dinnerCalories, 0) / 7), // Durchschnittliche Kcal
+            dietaryPreference: 'omnivore', // Standard, könnte man ableiten
+            dietType: 'balanced',
+            dishComplexity: 'simple',
+            isGlutenFree: false, // Standard, könnte man ableiten
+            isLactoseFree: false,
+            excludedIngredients: 'Individuell',
+            desiredIngredients: 'Individuell',
+            breakfastOption: 'custom',
+            customBreakfast: 'Individuell',
         };
 
-        const planData = { name, shoppingList, weeklyPlan, recipes };
-
-        const [result] = await pool.query('INSERT INTO archived_plans (name, settings, planData) VALUES (?, ?, ?)', [name, JSON.stringify(settings), JSON.stringify(planData)]);
+        // 5. In Datenbank speichern
+        const [result] = await pool.query(
+            'INSERT INTO archived_plans (name, settings, planData) VALUES (?, ?, ?)',
+            [name, JSON.stringify(settings), JSON.stringify(planData)]
+        );
         const newPlanId = result.insertId;
-
-        const newPlanEntry = {
-            id: newPlanId,
-            createdAt: new Date().toLocaleString('de-DE'),
-            shareId: null,
-            ...settings,
-            ...planData,
+        
+        // 6. Neuen Plan abrufen und zurückgeben (optional, aber gut für die UI)
+        const [rows] = await pool.query('SELECT * FROM archived_plans WHERE id = ?', [newPlanId]);
+        const newPlanRow = rows[0];
+        const newPlan = {
+            id: newPlanRow.id,
+            createdAt: new Date(newPlanRow.createdAt).toLocaleString('de-DE'),
+            shareId: newPlanRow.shareId,
+            ...JSON.parse(newPlanRow.settings),
+            ...JSON.parse(newPlanRow.planData)
         };
         
-        res.status(201).json(newPlanEntry);
+        res.status(201).json(newPlan);
+
     } catch (error) {
         console.error('Fehler beim Speichern des individuellen Plans:', error);
-        res.status(500).json({ error: 'Individueller Plan konnte nicht gespeichert werden.' });
+        res.status(500).json({ error: 'Der individuelle Plan konnte nicht gespeichert werden.' });
     }
 });
+
 
 module.exports = router;

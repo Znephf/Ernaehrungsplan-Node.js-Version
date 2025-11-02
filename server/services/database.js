@@ -1,3 +1,4 @@
+
 const mysql = require('mysql2/promise');
 const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT } = process.env;
 
@@ -57,35 +58,19 @@ async function initializeDatabase() {
         console.log('Tabelle "generation_jobs" ist bereit.');
 
         await connection.query(`
-            CREATE TABLE IF NOT EXISTS app_jobs (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                jobId VARCHAR(36) NOT NULL UNIQUE,
-                jobType VARCHAR(50) NOT NULL,
-                status VARCHAR(50) NOT NULL DEFAULT 'pending',
-                progressText VARCHAR(255) NULL,
-                relatedPlanId INT NOT NULL,
-                resultJson JSON NULL,
-                errorMessage TEXT NULL,
-                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (relatedPlanId) REFERENCES archived_plans(id) ON DELETE CASCADE
-            );
-        `);
-        console.log('Tabelle "app_jobs" ist bereit.');
-        
-        await connection.query(`
             CREATE TABLE IF NOT EXISTS recipe_images (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                recipeTitle VARCHAR(255) NOT NULL UNIQUE,
-                imageUrl VARCHAR(1024) NOT NULL,
-                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                recipe_title VARCHAR(255) NOT NULL UNIQUE,
+                image_url VARCHAR(1024) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             );
         `);
         console.log('Tabelle "recipe_images" ist bereit.');
 
+
         connection.release();
     } catch (error) {
-        console.error('FATAL ERROR: Konnte die Datenbankverbindung nicht herstellen oder Tabelle nicht erstellen/aktualisieren!', error);
+        console.error('FATAL ERROR: Konnte die Datenbankverbindung nicht herstellen oder Tabelle nicht erstellen/aktualisieren.', error);
         process.exit(1);
     }
 }

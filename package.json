@@ -9,7 +9,6 @@
     "preview": "vite preview",
     "migrate:images": "node scripts/migrate_images.js",
     "migrate:complexity": "node scripts/migrate_complexity.js",
-    "migrate:persons": "node scripts/migrate_persons.js",
     "migrate:recipe-images": "node scripts/migrate_to_recipe_images.js"
   },
   "dependencies": {

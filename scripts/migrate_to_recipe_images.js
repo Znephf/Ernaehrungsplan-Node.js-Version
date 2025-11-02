@@ -1,16 +1,16 @@
 const path = require('path');
 const dotenv = require('dotenv');
 
-// Load environment variables
+// Lade Umgebungsvariablen aus der .env-Datei
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-// Dynamically import mysql2/promise
+// Importiert dynamisch die mysql2-Bibliothek, um die Kompatibilität sicherzustellen
 async function getDbConnection() {
     const mysql = await import('mysql2/promise');
     const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT } = process.env;
 
     if (!DB_HOST || !DB_USER || !DB_PASSWORD || !DB_NAME) {
-        console.error('DATABASE_ERROR: Missing one or more database environment variables.');
+        console.error('DATABASE_ERROR: Eine oder mehrere Datenbank-Umgebungsvariablen fehlen!');
         process.exit(1);
     }
 
@@ -26,85 +26,78 @@ async function getDbConnection() {
     });
 }
 
-async function migrateImageData() {
-    console.log('--- Starting migration from planData.imageUrls to recipe_images table ---');
+async function migrateRecipeImages() {
+    console.log('--- Starte Migration für zentralisierte Rezept-Bilder ---');
     let pool;
     try {
         pool = await getDbConnection();
-        console.log('Successfully connected to the database.');
+        console.log('Erfolgreich mit der Datenbank verbunden.');
 
-        // 1. Fetch all plans with imageUrls
+        // 1. Lade alle Pläne, die Bild-Daten im alten Format enthalten könnten
         const [plans] = await pool.query("SELECT id, planData FROM archived_plans WHERE planData IS NOT NULL AND JSON_VALID(planData) AND JSON_UNQUOTE(JSON_EXTRACT(planData, '$.imageUrls')) IS NOT NULL AND JSON_UNQUOTE(JSON_EXTRACT(planData, '$.imageUrls')) != '{}'");
         
         if (plans.length === 0) {
-            console.log('No plans with image URLs found to migrate. Exiting.');
+            console.log('Keine Pläne mit Bild-URLs im alten Format gefunden. Beende Skript.');
             await pool.end();
             return;
         }
 
-        console.log(`Found ${plans.length} plans with image data to process.`);
+        console.log(`${plans.length} Pläne mit potenziellen Bildern zur Migration gefunden.`);
         let totalImagesMigrated = 0;
-        const seenRecipeTitles = new Set();
 
+        // 2. Gehe jeden Plan durch
         for (const plan of plans) {
             let planData;
             try {
                 planData = JSON.parse(plan.planData);
             } catch (e) {
-                console.error(`Could not parse planData for plan ID ${plan.id}. Skipping.`);
+                console.error(`Konnte die planData für Plan-ID ${plan.id} nicht verarbeiten. Überspringe.`);
                 continue;
             }
 
-            const { imageUrls, recipes } = planData;
-            if (!imageUrls || typeof imageUrls !== 'object' || !Array.isArray(recipes)) {
+            if (!planData.imageUrls || typeof planData.imageUrls !== 'object' || !Array.isArray(planData.recipes)) {
                 continue;
             }
 
-            const recipesByDay = recipes.reduce((acc, recipe) => {
-                acc[recipe.day] = recipe;
-                return acc;
-            }, {});
+            // 3. Verarbeite jedes Bild im Plan
+            for (const day in planData.imageUrls) {
+                const imageUrl = planData.imageUrls[day];
+                const recipeForDay = planData.recipes.find(r => r.day === day);
 
-            for (const day in imageUrls) {
-                const imageUrl = imageUrls[day];
-                const recipe = recipesByDay[day];
-
-                if (recipe && recipe.title && imageUrl) {
-                    const recipeTitle = recipe.title.trim();
-                    if (seenRecipeTitles.has(recipeTitle)) {
-                        // Avoid inserting duplicates from different plans for the same recipe
-                        continue;
-                    }
+                if (recipeForDay && recipeForDay.title && typeof imageUrl === 'string' && imageUrl.startsWith('/')) {
                     try {
-                        // Use INSERT IGNORE to avoid errors on duplicate recipe titles
+                        // 4. Füge den Eintrag in die neue Tabelle ein. Bei Duplikaten wird der Eintrag ignoriert.
                         const [result] = await pool.query(
-                            'INSERT IGNORE INTO recipe_images (recipeTitle, imageUrl) VALUES (?, ?)',
-                            [recipeTitle, imageUrl]
+                            'INSERT INTO recipe_images (recipe_title, image_url) VALUES (?, ?) ON DUPLICATE KEY UPDATE image_url = VALUES(image_url)',
+                            [recipeForDay.title, imageUrl]
                         );
+
                         if (result.affectedRows > 0) {
-                            console.log(`  - Migrated image for recipe: "${recipeTitle}"`);
-                            totalImagesMigrated++;
-                            seenRecipeTitles.add(recipeTitle);
+                             console.log(`  -> Bild für "${recipeForDay.title}" migriert. URL: ${imageUrl}`);
+                             totalImagesMigrated++;
                         }
-                    } catch (dbError) {
-                        console.error(`  - FAILED to migrate image for "${recipeTitle}":`, dbError.message);
+                       
+                    } catch (err) {
+                        console.error(`  - Fehler beim Migrieren des Bildes für "${recipeForDay.title}":`, err.message);
                     }
                 }
             }
         }
 
-        console.log(`\n--- Migration Complete ---`);
-        console.log(`Total new images migrated to recipe_images table: ${totalImagesMigrated}`);
+        console.log(`\n--- Migration abgeschlossen ---`);
+        console.log(`Insgesamt migrierte Bilder: ${totalImagesMigrated}`);
 
     } catch (error) {
-        console.error('\n--- A CRITICAL ERROR OCCURRED DURING MIGRATION ---');
+        console.error('\n--- EIN KRITISCHER FEHLER IST AUFGETRETEN ---');
         console.error(error.message);
+        console.error('Migration fehlgeschlagen. Bitte prüfen Sie die Datenbank-Zugangsdaten in der .env-Datei und stellen Sie sicher, dass die Datenbank läuft.');
     } finally {
         if (pool) {
             await pool.end();
-            console.log('Database connection closed.');
+            console.log('Datenbankverbindung geschlossen.');
         }
     }
 }
 
-migrateImageData();
+// Führe die Migrationsfunktion aus
+migrateRecipeImages();
