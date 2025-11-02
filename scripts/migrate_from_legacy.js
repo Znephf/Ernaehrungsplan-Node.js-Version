@@ -1,3 +1,4 @@
+
 const path = require('path');
 const dotenv = require('dotenv');
 
@@ -56,7 +57,9 @@ async function migrateLegacyData() {
             try {
                 const planData = JSON.parse(plan.planData);
                 const settings = JSON.parse(plan.settings);
-                const planDietPreference = settings?.dietaryPreference || 'omnivore';
+                
+                // FIX: Replaced optional chaining (?.) with a compatible syntax for older Node.js versions.
+                const planDietPreference = (settings && settings.dietaryPreference) ? settings.dietaryPreference : 'omnivore';
                 
                 let recipesToProcess = [];
                 if (planData.recipes && Array.isArray(planData.recipes)) {
@@ -88,6 +91,10 @@ async function migrateLegacyData() {
                         category = MealCategoryMap[recipe.mealType];
                     }
 
+                    // This query inserts a new recipe if it doesn't exist.
+                    // If it does exist (ON DUPLICATE KEY), it will ONLY update the `dietaryPreference`
+                    // if the existing value is NULL. This correctly fills in missing data without
+                    // overwriting already-set preferences.
                     const [result] = await pool.query(
                         `INSERT INTO recipes (title, ingredients, instructions, totalCalories, protein, carbs, fat, category, dietaryPreference) 
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -121,7 +128,7 @@ async function migrateLegacyData() {
 
         console.log(`\n--- Migration Complete ---`);
         console.log(`Total new recipes added: ${newRecipesAdded}`);
-        console.log(`Total existing recipes updated: ${recipesUpdated}`);
+        console.log(`Total existing recipes updated (missing diet filled): ${recipesUpdated}`);
 
     } catch (error) {
         console.error('\n--- A CRITICAL ERROR OCCURRED ---');
