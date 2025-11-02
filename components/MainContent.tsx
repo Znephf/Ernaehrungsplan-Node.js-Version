@@ -26,6 +26,8 @@ interface MainContentProps {
   onPlanSaved: () => void;
   generateImage: (recipe: Recipe) => Promise<void>;
   generateMissingImages: (weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
+  isBulkImageGenerating: boolean;
+  onGenerateAllImages: () => void;
 }
 
 const MainContent: React.FC<MainContentProps> = (props) => {
@@ -46,6 +48,8 @@ const MainContent: React.FC<MainContentProps> = (props) => {
     onPlanSaved,
     generateImage,
     generateMissingImages,
+    isBulkImageGenerating,
+    onGenerateAllImages,
   } = props;
 
   const renderView = () => {
@@ -86,6 +90,8 @@ const MainContent: React.FC<MainContentProps> = (props) => {
             imageErrors={imageErrors}
             generateImage={generateImage}
             generateMissingImages={generateMissingImages}
+            isBulkImageGenerating={isBulkImageGenerating}
+            onGenerateAllImages={onGenerateAllImages}
           />
         ) : <p>Kein Plan zum Anzeigen der Rezepte vorhanden.</p>;
       case 'archive':

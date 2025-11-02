@@ -63,6 +63,9 @@ const App: React.FC = () => {
     // This is the currently displayed plan, which could be from generation, archive, or default.
     const [activePlan, setActivePlan] = useState<ArchiveEntry | null>(null);
 
+    const [isBulkImageGenerating, setIsBulkImageGenerating] = useState(false);
+    const [bulkImageStatus, setBulkImageStatus] = useState('');
+
 
     // --- Authentication ---
     useEffect(() => {
@@ -134,6 +137,25 @@ const App: React.FC = () => {
         fetchArchive();
         setCurrentView('archive');
     };
+    
+    const handleGenerateAllImages = async () => {
+        if (!activePlan) return;
+        setIsBulkImageGenerating(true);
+        setBulkImageStatus('Starte... 0%');
+        try {
+            await generateMissingImages(activePlan.weeklyPlan, activePlan.id, setBulkImageStatus);
+        } catch (error) {
+            console.error("Fehler bei der Massen-Bilderstellung:", error);
+            setBulkImageStatus('Ein Fehler ist aufgetreten.');
+        } finally {
+            setIsBulkImageGenerating(false);
+        }
+    };
+
+    const cancelBulkImageGeneration = () => {
+        setIsBulkImageGenerating(false);
+    };
+
 
     // --- UI Navigation ---
     const handleSelectRecipe = (day: string) => {
@@ -189,6 +211,10 @@ const App: React.FC = () => {
                 <LoadingOverlay status={generationStatus} onCancel={cancelGeneration} />
             )}
 
+            {isBulkImageGenerating && (
+                <LoadingOverlay status={bulkImageStatus} onCancel={cancelBulkImageGeneration} />
+            )}
+
             {shareUrl && <ShareModal url={shareUrl} onClose={() => setShareUrl(null)} />}
             
             {generationError && <div className="container mx-auto p-4"><div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert"><p>{generationError}</p></div></div>}
@@ -210,6 +236,8 @@ const App: React.FC = () => {
                 onSelectRecipe={handleSelectRecipe}
                 onPlanSaved={handlePlanSaved}
                 generateImage={generateImage}
+                isBulkImageGenerating={isBulkImageGenerating}
+                onGenerateAllImages={handleGenerateAllImages}
                 generateMissingImages={(weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void): Promise<{ [key: string]: string; }> => generateMissingImages(weeklyPlan, activePlan?.id || null, onProgress)}
             />
         </div>

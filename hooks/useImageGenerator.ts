@@ -8,7 +8,7 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
     const [imageErrors, setImageErrors] = useState<{ [id: number]: string | null }>({});
     
     const executeImageGeneration = useCallback(async (recipe: Recipe): Promise<string | null> => {
-        const maxAttempts = 10;
+        const maxAttempts = 5;
         let lastKnownError: Error | null = null;
         
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -42,6 +42,9 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
                 const errorMsg = (lastKnownError.message || '').toLowerCase();
                 if (errorMsg.includes('blockiert') || errorMsg.includes('sicherheit') || errorMsg.includes('quota')) {
                     break;
+                }
+                if (attempt < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                 }
             }
         }
@@ -87,7 +90,10 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
 
         const finalUrls = { ...imageUrls };
 
-        if (recipesToGenerate.length === 0) return finalUrls;
+        if (recipesToGenerate.length === 0) {
+            onProgress?.('Alle Bilder bereits vorhanden.');
+            return finalUrls;
+        }
         
         for (let i = 0; i < recipesToGenerate.length; i++) {
             const recipe = recipesToGenerate[i];
@@ -117,7 +123,8 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
                 await new Promise(resolve => setTimeout(resolve, 3000));
             }
         }
-
+        
+        onProgress?.('Fertig!');
         if (onImageSaved) onImageSaved();
         return finalUrls;
 

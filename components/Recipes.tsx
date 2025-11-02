@@ -3,7 +3,7 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 // Fix: Added WeeklyPlan to the import
 import type { Recipes, Recipe, WeeklyPlan, Meal } from '../types';
-import { FireIcon, PrintIcon, LoadingSpinnerIcon, ProteinIcon, CarbsIcon, FatIcon } from './IconComponents';
+import { FireIcon, PrintIcon, LoadingSpinnerIcon, ProteinIcon, CarbsIcon, FatIcon, CameraIcon } from './IconComponents';
 import GeneratedRecipeImage from './GeneratedRecipeImage';
 import { MealCategoryLabels } from '../types';
 
@@ -18,9 +18,11 @@ interface RecipesComponentProps {
   imageErrors: { [id: number]: string | null };
   generateImage: (recipe: Recipe) => Promise<void>;
   generateMissingImages: (weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
+  isBulkImageGenerating: boolean;
+  onGenerateAllImages: () => void;
 }
 
-const RecipesComponent: React.FC<RecipesComponentProps> = ({ weeklyPlan, recipes, persons, imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages }) => {
+const RecipesComponent: React.FC<RecipesComponentProps> = ({ weeklyPlan, recipes, persons, imageUrls, loadingImages, imageErrors, generateImage, generateMissingImages, isBulkImageGenerating, onGenerateAllImages }) => {
   const [isCreatingPdf, setIsCreatingPdf] = useState(false);
   const [pdfStatus, setPdfStatus] = useState('');
   const [isPdfGenerationQueued, setIsPdfGenerationQueued] = useState(false);
@@ -112,14 +114,24 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ weeklyPlan, recipes
           <h2 className="text-2xl font-bold text-slate-700">Kochanleitungen für die Woche</h2>
           <p className="text-slate-500">Alle Rezepte sind für {persons} Personen ausgelegt.</p>
         </div>
-        <button
-          onClick={handleCreatePdf}
-          disabled={isCreatingPdf}
-          className="flex items-center justify-center gap-2 w-48 px-4 py-2 bg-slate-600 text-white font-semibold rounded-lg shadow-md hover:bg-slate-700 disabled:bg-slate-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-colors"
-        >
-          {isCreatingPdf ? <LoadingSpinnerIcon /> : <PrintIcon />}
-          <span>{isCreatingPdf ? pdfStatus : 'PDF erstellen'}</span>
-        </button>
+        <div className="flex flex-wrap justify-center sm:justify-end gap-2">
+          <button
+            onClick={onGenerateAllImages}
+            disabled={isCreatingPdf || isBulkImageGenerating}
+            className="flex items-center justify-center gap-2 w-48 px-4 py-2 bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-700 disabled:bg-slate-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors"
+          >
+            {isBulkImageGenerating ? <LoadingSpinnerIcon /> : <CameraIcon />}
+            <span>Alle Bilder erstellen</span>
+          </button>
+          <button
+            onClick={handleCreatePdf}
+            disabled={isCreatingPdf || isBulkImageGenerating}
+            className="flex items-center justify-center gap-2 w-48 px-4 py-2 bg-slate-600 text-white font-semibold rounded-lg shadow-md hover:bg-slate-700 disabled:bg-slate-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-colors"
+          >
+            {isCreatingPdf ? <LoadingSpinnerIcon /> : <PrintIcon />}
+            <span>{isCreatingPdf ? pdfStatus : 'PDF erstellen'}</span>
+          </button>
+        </div>
       </div>
 
       <div className="space-y-12">
