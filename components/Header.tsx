@@ -38,7 +38,7 @@ const Header: React.FC<HeaderProps> = ({
     onShowPlanner
 }) => {
     return (
-        <header className="bg-white shadow-md sticky top-0 z-10">
+        <header className="bg-white shadow-md sticky top-0 z-30">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
                 <h1 className="text-2xl font-bold text-slate-800">
                     KI Ernährungsplaner
