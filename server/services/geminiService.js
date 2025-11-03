@@ -186,21 +186,26 @@ const generateImageForRecipe = async (recipe, attempt) => {
     return { apiResponse: response, debug: { imagePrompt } };
 };
 
-const generateShoppingListOnly = async (scaledIngredients) => {
-    const systemInstruction = `You are an expert shopping list generator. Your task is to create a complete, categorized shopping list from a pre-calculated list of ingredients. Your response must be in valid JSON format.
+const generateShoppingListOnly = async (ingredientsList) => {
+    const systemInstruction = `You are an expert shopping list generator. Your task is to create a complete, categorized shopping list from a list of structured ingredient objects. Your response must be in valid JSON format.
 The JSON must strictly follow this schema:
 {
   "shoppingList": [ { "category": "string (e.g., 'Obst & Gemüse')", "items": ["string (German, with quantities)"] } ]
 }
-- Consolidate similar items (e.g., "200g Zwiebeln" and "150g Zwiebeln" becomes "350g Zwiebeln").
-- Format the output items nicely (e.g., "Mehl: 500g").
-- All text must be in German.
-- Do not use markdown or add any comments in the JSON.
+
+CRITICAL INSTRUCTIONS:
+1.  **Consolidate All Ingredients**: The input list may contain duplicates or similar items. You MUST consolidate them.
+    -   **Sum Quantities**: For identical ingredients and units (e.g., two entries for {"ingredient": "Mehl", "quantity": 500, "unit": "g"}), sum their quantities.
+    -   **Intelligently Merge**: For similar ingredients (e.g., "rote Paprika" and "gelbe Paprika"), merge them into a single item (e.g., "Paprika (gemischt): 2 Stück"). If units differ (e.g., 'Stück' and 'g'), use your best judgment to create a practical shopping item.
+2.  **Categorize**: Group the final, consolidated items into logical supermarket categories.
+3.  **Format Items**: Format the output items nicely (e.g., "Mehl: 1000g" or "Paprika, gemischt: 3 Stück").
+4.  **Language**: All text must be in German.
+5.  **Format**: Do not use markdown or add any comments in the JSON.
 `;
 
     const userPrompt = `
-Generate a categorized shopping list from these ingredients. The quantities are already correctly calculated. You just need to consolidate and categorize them.
-Ingredients: ${JSON.stringify(scaledIngredients)}
+Generate a categorized shopping list from this complete list of ingredients for the week. Please consolidate them as instructed.
+Ingredients List: ${JSON.stringify(ingredientsList)}
 
 Please provide only the "shoppingList" part of the response in the specified JSON format.
 `;
