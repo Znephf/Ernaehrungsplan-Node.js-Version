@@ -1,3 +1,4 @@
+
 const fs = require('fs');
 const path = require('path');
 
@@ -65,7 +66,7 @@ async function generateShareableHtml(plan) {
                 if (!ing || typeof ing.quantity === 'undefined' || ing.ingredient === null) return null;
                 
                 let scaledQuantity = (ing.quantity / (basePersons || 1)) * targetPersons;
-                const simpleUnits = ['Stück', 'Prise', 'Bund', 'Zehe', 'Stangen'];
+                const simpleUnits = ['Stück', 'Prise', 'Bund', 'Zehe', 'Stangen', 'Dose', 'El'];
                 if (ing.unit && simpleUnits.some(u => ing.unit.toLowerCase().includes(u.toLowerCase()))) {
                     scaledQuantity = Math.round(scaledQuantity * 10) / 10;
                 } else {
@@ -79,7 +80,6 @@ async function generateShareableHtml(plan) {
                     unit = 'Stücke';
                 }
                 
-                // FIX: Replaced template literal with string concatenation to avoid parser errors in Node.js
                 return escape(scaledQuantity + ' ' + unit + ' ' + ing.ingredient);
             }
 
@@ -95,7 +95,7 @@ async function generateShareableHtml(plan) {
                             '<div class="p-6 space-y-4 flex-grow">' +
                                 dayPlan.meals.map(meal => '<div>' +
                                     '<p class="font-semibold text-emerald-800 flex justify-between"><span>' + (MealCategoryLabels[meal.mealType] || meal.mealType) + ':</span><span class="font-normal text-slate-500">' + meal.recipe.totalCalories + ' kcal</span></p>' +
-                                    '<a href="#recipe-day-' + escape(dayPlan.day) + '" class="recipe-link text-left text-slate-600 hover:text-emerald-600 font-semibold transition-colors w-full">' + escape(meal.recipe.title) + '</a>' +
+                                    '<a href="#recipe-day-' + escape(dayPlan.day) + '-' + escape(meal.mealType) + '" class="recipe-link text-left text-slate-600 hover:text-emerald-600 font-semibold transition-colors w-full">' + escape(meal.recipe.title) + '</a>' +
                                 '</div>').join('') +
                             '</div>' +
                         '</div>').join('') +
@@ -120,6 +120,7 @@ async function generateShareableHtml(plan) {
                 const mainTitle = '<div class="text-center sm:text-left"><h2 class="text-3xl font-bold text-slate-700">Kochanleitungen</h2>' + personsText + '</div>';
 
                 const weeklyPlanHtml = plan.weeklyPlan.map(dayPlan => {
+                    if (dayPlan.meals.length === 0) return '';
                     const mealsHtml = dayPlan.meals.map(meal => {
                         const recipe = meal.recipe;
                         if (!recipe) return '';
@@ -128,20 +129,25 @@ async function generateShareableHtml(plan) {
                             '<div class="bg-slate-200"><img src="' + escape(recipe.image_url) + '" alt="' + escape(recipe.title) + '" class="w-full h-auto object-cover aspect-video"/></div>' :
                             '<div class="aspect-video bg-slate-200 flex items-center justify-center"><p class="text-slate-500">Kein Bild vorhanden</p></div>';
 
-                        const macrosHtml = recipe.protein !== undefined ?
+                        const macrosHtml = (recipe.protein !== undefined && recipe.protein !== null) ?
                             '<div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-slate-600 p-3 bg-slate-50 rounded-lg">' +
                             '<span class="flex items-center gap-1.5 text-sm">' + Icons.protein + '<div><span class="font-bold">' + recipe.protein + 'g</span><span class="text-slate-500 text-xs block">Protein</span></div></span>' +
                             '<span class="flex items-center gap-1.5 text-sm">' + Icons.carbs + '<div><span class="font-bold">' + recipe.carbs + 'g</span><span class="text-slate-500 text-xs block">Kohlenh.</span></div></span>' +
                             '<span class="flex items-center gap-1.5 text-sm">' + Icons.fat + '<div><span class="font-bold">' + recipe.fat + 'g</span><span class="text-slate-500 text-xs block">Fett</span></div></span>' +
                             '</div>' : '';
                         
-                        const ingredientsHtml = '<ul class="space-y-2 list-disc list-inside text-slate-600">' + (recipe.ingredients || []).map(ing => {
+                        const ingredientItems = [];
+                        (recipe.ingredients || []).forEach(ing => {
                             const formatted = formatIngredient(ing, recipe.base_persons, plan.settings.persons);
-                            return formatted ? '<li>' + formatted + '</li>' : '';
-                        }).join('') + '</ul>';
+                            if (formatted) {
+                                ingredientItems.push('<li>' + formatted + '</li>');
+                            }
+                        });
+                        const ingredientsHtml = '<ul class="space-y-2 list-disc list-inside text-slate-600">' + ingredientItems.join('') + '</ul>';
+                        
                         const instructionsHtml = '<ol class="space-y-3 list-decimal list-inside text-slate-600">' + (recipe.instructions || []).map(step => '<li>' + escape(step) + '</li>').join('') + '</ol>';
 
-                        return '<div class="bg-white rounded-lg shadow-lg overflow-hidden">' +
+                        return '<div id="recipe-day-' + escape(dayPlan.day) + '-' + escape(meal.mealType) + '" class="bg-white rounded-lg shadow-lg overflow-hidden">' +
                             imageUrlHtml +
                             '<div class="p-6">' +
                             '<div class="flex flex-wrap items-center justify-between gap-2">' +
@@ -157,10 +163,10 @@ async function generateShareableHtml(plan) {
                             '</div>' +
                             '</div>';
                     }).join('');
+                    
+                    if (mealsHtml.trim() === '') return '';
 
-                    if (dayPlan.meals.length === 0 || mealsHtml.trim() === '') return '';
-
-                    return '<div id="recipe-day-' + escape(dayPlan.day) + '">' +
+                    return '<div>' +
                         '<h2 class="text-3xl font-bold text-slate-700 border-b-2 border-slate-200 pb-3 mb-6 sm:sticky top-20 z-20 bg-slate-100/80 backdrop-blur-sm py-2">' + escape(dayPlan.day) + '</h2>' +
                         '<div class="space-y-8">' + mealsHtml + '</div>' +
                         '</div>';
