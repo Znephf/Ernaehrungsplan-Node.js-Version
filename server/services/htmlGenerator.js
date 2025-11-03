@@ -79,7 +79,8 @@ async function generateShareableHtml(plan) {
                     unit = 'Stücke';
                 }
                 
-                return escape(`${scaledQuantity} ${unit} ${ing.ingredient}`);
+                // FIX: Replaced template literal with string concatenation to avoid parser errors in Node.js
+                return escape(scaledQuantity + ' ' + unit + ' ' + ing.ingredient);
             }
 
             function renderWeeklyPlan(plan) {
