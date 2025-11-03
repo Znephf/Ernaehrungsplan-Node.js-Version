@@ -20,6 +20,7 @@
     "fix:calories": "node scripts/fix_recipe_calories.js",
     "fix:diet-preference": "node scripts/fix_null_diet_preference.js",
     "fix:recipe-metadata": "node scripts/fix_null_recipe_metadata.js",
+    "fix:job-fk": "node scripts/fix_job_foreign_key.js",
     "regenerate:shares": "node scripts/regenerate_shares.js"
   },
   "keywords": [
