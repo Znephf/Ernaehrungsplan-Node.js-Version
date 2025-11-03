@@ -1,3 +1,4 @@
+// Fix: Refactored the Gemini service to support batch processing of ingredients, reducing API calls.
 const { GoogleGenAI } = require('@google/genai');
 const { pool } = require('./database');
 const { API_KEY, API_KEY_FALLBACK } = process.env;
@@ -226,22 +227,27 @@ Please provide only the "shoppingList" part of the response in the specified JSO
     }
 };
 
-const convertIngredientsToStructuredFormat = async (ingredientStrings, originalPersons) => {
-    const systemInstruction = `You are a precise data conversion tool. Your only task is to convert an array of ingredient strings into a structured JSON array.
-The output MUST be a valid JSON array of objects, where each object has the keys "ingredient", "quantity", and "unit".
+const convertMultipleIngredientsToStructuredFormat = async (recipeBatch) => {
+    const systemInstruction = `You are a precise data conversion tool. Your only task is to convert an array of recipe objects, each with an array of ingredient strings, into a structured JSON array.
+The output MUST be a valid JSON array of objects, where each object has the "recipeId" from the input and a new "structuredIngredients" array.
+For each recipe in the input array, you must perform the following actions on its 'ingredients' array:
+- Convert each string into a structured object: { "ingredient": "string", "quantity": "number", "unit": "string" }.
 - For items without a clear unit (e.g., "1 Zwiebel"), use "Stück" as the unit.
 - If quantity is not specified, assume 1. For units like "Prise" or "Bund", quantity should be 1.
-- The provided ingredient quantities are for a specific number of people. You MUST calculate the equivalent quantities for a SINGLE person (a base of 1). Divide the original quantity by the provided number of people. Round to a reasonable number of decimals if necessary.
-- Do not output anything other than the JSON array. No explanations, no markdown.
+- CRITICAL: The provided ingredient quantities are for a specific number of people ('originalPersons'). You MUST calculate the equivalent quantities for a SINGLE person (a base of 1). Divide the original quantity by the provided 'originalPersons' value. Round to a reasonable number of decimals if necessary.
+- Do not output anything other than the final JSON array. No explanations, no markdown.
+
+INPUT SCHEMA: [{ "recipeId": number, "originalPersons": number, "ingredients": ["string"] }]
+OUTPUT SCHEMA: [{ "recipeId": number, "structuredIngredients": [{ "ingredient": "string", "quantity": number, "unit": "string" }] }]
 `;
 
     const userPrompt = `
-    Convert the following ingredient list. The original quantities are for ${originalPersons} people. Calculate the quantities for 1 person.
+    Convert the following batch of recipes. For each, use 'originalPersons' to calculate the quantities for 1 person.
 
-    Ingredient List:
-    ${JSON.stringify(ingredientStrings)}
+    Recipe Batch:
+    ${JSON.stringify(recipeBatch)}
 
-    Return ONLY the JSON array.
+    Return ONLY the JSON array matching the specified output schema.
     `;
     
     const response = await generateWithFallback({
@@ -256,24 +262,21 @@ The output MUST be a valid JSON array of objects, where each object has the keys
     try {
         const text = response.text.trim();
         const data = JSON.parse(text);
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.every(item => item.hasOwnProperty('recipeId') && item.hasOwnProperty('structuredIngredients'))) {
             return data;
         }
-        const key = Object.keys(data)[0];
-        if (Array.isArray(data[key])) {
-            return data[key];
-        }
-        throw new Error("Parsed JSON is not an array.");
+        throw new Error("Parsed JSON does not match the required output schema.");
     } catch (e) {
-        console.error("Failed to parse Gemini response for ingredient conversion as JSON.", e);
+        console.error("Failed to parse Gemini response for batch ingredient conversion as JSON.", e);
         console.error("Raw response text:", response.text);
-        throw new Error("The AI response for ingredient conversion was not in the expected format.");
+        throw new Error("The AI response for batch ingredient conversion was not in the expected format.");
     }
 };
+
 
 module.exports = {
     generatePlan,
     generateImageForRecipe,
     generateShoppingListOnly,
-    convertIngredientsToStructuredFormat,
+    convertMultipleIngredientsToStructuredFormat,
 };
