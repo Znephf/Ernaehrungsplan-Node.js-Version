@@ -17,28 +17,12 @@ router.get('/', async (req, res) => {
             ORDER BY r.title ASC
         `);
         
-        const defaultPersons = 2; // Default scaling for the recipe archive view
-
         const parsedRecipes = recipes.map(recipe => {
             const ingredients = JSON.parse(recipe.ingredients || '[]');
-            const basePersons = recipe.base_persons || 1;
             
-            // Scale ingredients for display and convert back to simple strings
-            const scaledIngredients = ingredients.map(ing => {
-                if (typeof ing === 'object' && ing.quantity !== undefined) {
-                    const scaledQuantity = (ing.quantity / basePersons) * defaultPersons;
-                     // Simple formatting, can be improved
-                    if (ing.unit.toLowerCase() === 'stück' && scaledQuantity === 1) {
-                         return `${ing.ingredient}`;
-                    }
-                    return `${scaledQuantity}${ing.unit || ''} ${ing.ingredient}`;
-                }
-                return ing; // Fallback for old string format
-            });
-
             return {
                 ...recipe,
-                ingredients: scaledIngredients,
+                ingredients: ingredients,
                 instructions: JSON.parse(recipe.instructions || '[]')
             };
         });

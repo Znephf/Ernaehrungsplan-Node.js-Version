@@ -1,5 +1,5 @@
-import React from 'react';
-import type { Recipe } from '../types';
+import React, { useState } from 'react';
+import type { Recipe, StructuredIngredient } from '../types';
 import { MealCategoryLabels } from '../types';
 import { PrintIcon, CloseIcon, ProteinIcon, CarbsIcon, FatIcon, FireIcon } from './IconComponents';
 import GeneratedRecipeImage from './GeneratedRecipeImage';
@@ -14,6 +14,30 @@ interface RecipeDetailModalProps {
 }
 
 const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, imageUrl, isLoading, error, onGenerate }) => {
+    const [persons, setPersons] = useState(2);
+
+    const formatIngredient = (ing: StructuredIngredient, basePersons = 1, targetPersons: number) => {
+        let scaledQuantity = (ing.quantity / basePersons) * targetPersons;
+
+        // Avoid tiny decimal places for things like pieces or pinches
+        if (['Stück', 'Prise', 'Bund', 'Zehe'].includes(ing.unit)) {
+            scaledQuantity = Math.round(scaledQuantity * 10) / 10; // Round to one decimal place
+        } else {
+            scaledQuantity = Math.round(scaledQuantity); // Round other units to whole numbers
+        }
+
+        // Don't show quantity if it's 1 and unit is "Stück"
+        if (ing.unit === 'Stück' && scaledQuantity === 1) {
+            return ing.ingredient;
+        }
+        
+        // Handle pluralization for "Stück"
+        const unit = (ing.unit === 'Stück' && scaledQuantity > 1) ? 'Stücke' : ing.unit;
+        
+        if (scaledQuantity === 0) return null;
+
+        return `${scaledQuantity} ${unit} ${ing.ingredient}`;
+    };
     
     const handlePrint = () => {
         const printContent = document.getElementById('printable-recipe-area');
@@ -77,8 +101,25 @@ const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, 
 
                             <div className="mt-6 grid grid-cols-1 md:grid-cols-5 gap-x-8 gap-y-6">
                                 <div className="md:col-span-2">
-                                    <h4 className="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Zutaten:</h4>
-                                    <ul className="space-y-2 list-disc list-inside text-slate-600">{(recipe.ingredients || []).map((ingredient, index) => <li key={index}>{ingredient}</li>)}</ul>
+                                    <div className="border-b-2 border-slate-200 pb-2 mb-3 flex justify-between items-center">
+                                        <h4 className="text-lg font-semibold text-slate-700">Zutaten:</h4>
+                                        <div className="flex items-center gap-1.5 text-sm">
+                                            <label htmlFor="persons-input" className="text-slate-600">Für</label>
+                                            <input
+                                                id="persons-input"
+                                                type="number"
+                                                value={persons}
+                                                onChange={e => setPersons(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                                className="w-14 p-1 text-center border border-slate-300 rounded-md"
+                                                min="1"
+                                            />
+                                            <span className="text-slate-600">Pers.</span>
+                                        </div>
+                                    </div>
+                                    <ul className="space-y-2 list-disc list-inside text-slate-600">{(recipe.ingredients || []).map((ingredient, index) => {
+                                        const formatted = formatIngredient(ingredient, recipe.base_persons, persons);
+                                        return formatted ? <li key={index}>{formatted}</li> : null;
+                                    }).filter(Boolean)}</ul>
                                 </div>
                                 <div className="md:col-span-3">
                                     <h4 className="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Anleitung:</h4>

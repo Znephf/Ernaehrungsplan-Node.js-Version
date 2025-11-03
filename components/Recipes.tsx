@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 // Fix: Added WeeklyPlan to the import
-import type { Recipes, Recipe, WeeklyPlan, Meal } from '../types';
+import type { Recipes, Recipe, WeeklyPlan, Meal, StructuredIngredient } from '../types';
 import { FireIcon, PrintIcon, LoadingSpinnerIcon, ProteinIcon, CarbsIcon, FatIcon, CameraIcon } from './IconComponents';
 import GeneratedRecipeImage from './GeneratedRecipeImage';
 import { MealCategoryLabels } from '../types';
@@ -26,6 +26,27 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ weeklyPlan, recipes
   const [isCreatingPdf, setIsCreatingPdf] = useState(false);
   const [pdfStatus, setPdfStatus] = useState('');
   const [isPdfGenerationQueued, setIsPdfGenerationQueued] = useState(false);
+
+    const formatIngredient = (ing: StructuredIngredient, basePersons = 1, targetPersons: number) => {
+        let scaledQuantity = (ing.quantity / basePersons) * targetPersons;
+
+        // Round to one decimal for pieces, otherwise whole numbers
+        if (['Stück', 'Prise', 'Bund', 'Zehe'].includes(ing.unit)) {
+            scaledQuantity = Math.round(scaledQuantity * 10) / 10;
+        } else {
+            scaledQuantity = Math.round(scaledQuantity);
+        }
+
+        if (ing.unit === 'Stück' && scaledQuantity === 1) {
+            return ing.ingredient;
+        }
+        
+        const unit = (ing.unit === 'Stück' && scaledQuantity > 1) ? 'Stücke' : ing.unit;
+
+        // Avoid returning "0 Einheit Zutat" if quantity is 0
+        if (scaledQuantity === 0) return null;
+        return `${scaledQuantity} ${unit} ${ing.ingredient}`;
+    };
 
   const handleCreatePdf = async () => {
     setIsCreatingPdf(true);
@@ -178,9 +199,10 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ weeklyPlan, recipes
                         <div className="md:col-span-2">
                           <h4 className="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Zutaten:</h4>
                           <ul className="space-y-2 list-disc list-inside text-slate-600">
-                            {(recipe.ingredients || []).map((ingredient, index) => (
-                              <li key={index}>{ingredient}</li>
-                            ))}
+                            {(recipe.ingredients || []).map((ingredient, index) => {
+                                const formatted = formatIngredient(ingredient, recipe.base_persons, persons);
+                                return formatted ? <li key={index}>{formatted}</li> : null;
+                            }).filter(Boolean)}
                           </ul>
                         </div>
                         <div className="md:col-span-3 md:border-l md:border-slate-200 md:pl-8">

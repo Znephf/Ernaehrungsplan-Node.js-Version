@@ -24,7 +24,6 @@ async function getFullPlanById(planId) {
     const recipes = [];
     const recipeMap = new Map();
     const planSettings = JSON.parse(plan.settings || '{}');
-    const persons = planSettings.persons || 1;
 
 
     const daysOrder = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
@@ -32,19 +31,11 @@ async function getFullPlanById(planId) {
     for (const link of recipeLinks) {
         let recipe = recipeMap.get(link.id);
         if (!recipe) {
-             const ingredients = JSON.parse(link.ingredients || '[]');
-             // Scale ingredients for display
-             const scaledIngredients = ingredients.map(ing => {
-                const basePersons = link.base_persons || 1;
-                const scaledQuantity = (ing.quantity / basePersons) * persons;
-                // Format back to string for frontend compatibility
-                return `${scaledQuantity} ${ing.unit} ${ing.ingredient}`.replace(' 1 Stück', '');
-             });
-
-            recipe = {
+             const ingredients = JSON.parse(link.ingredients || '[]'); // Keep as structured ingredients
+             recipe = {
                 id: link.id,
                 title: link.title,
-                ingredients: scaledIngredients, // Now a string array
+                ingredients: ingredients,
                 instructions: JSON.parse(link.instructions || '[]'),
                 totalCalories: link.totalCalories,
                 protein: link.protein,

@@ -1,4 +1,4 @@
-import type { ShoppingList, WeeklyPlan, Recipes, MealCategory } from './types';
+import type { ShoppingList, WeeklyPlan, Recipes, MealCategory, Recipe, StructuredIngredient } from './types';
 
 export const shoppingList: ShoppingList = [
   {
@@ -73,18 +73,23 @@ export const shoppingList: ShoppingList = [
   }
 ];
 
-// Fix: Restructured recipes and weeklyPlan to match the current type definitions.
-// Removed 'day' from recipes and added ids/categories.
-// Rebuilt weeklyPlan to use the `meals` array with full recipe objects.
 export const recipes: Recipes = [
   {
     id: 1,
     category: 'dinner',
+    base_persons: 2,
     title: "Große Shakshuka mit Feta und Paprika",
     ingredients: [
-      "1 EL Olivenöl", "2-3 Knoblauchzehen (gehackt)", "3 Paprika (gemischt, in Streifen)",
-      "800g gehackte Tomaten (2 Dosen)", "1 TL Paprikapulver", "1/2 TL Kreuzkümmel",
-      "Salz, Pfeffer", "4 Eier", "200g Feta", "frische Petersilie"
+      { ingredient: 'Olivenöl', quantity: 1, unit: 'EL' },
+      { ingredient: 'Knoblauchzehen (gehackt)', quantity: 2.5, unit: 'Stück' },
+      { ingredient: 'Paprika (gemischt, in Streifen)', quantity: 3, unit: 'Stück' },
+      { ingredient: 'gehackte Tomaten (2 Dosen)', quantity: 800, unit: 'g' },
+      { ingredient: 'Paprikapulver', quantity: 1, unit: 'TL' },
+      { ingredient: 'Kreuzkümmel', quantity: 0.5, unit: 'TL' },
+      { ingredient: 'Salz, Pfeffer', quantity: 1, unit: 'Prise' },
+      { ingredient: 'Eier', quantity: 4, unit: 'Stück' },
+      { ingredient: 'Feta', quantity: 200, unit: 'g' },
+      { ingredient: 'frische Petersilie', quantity: 1, unit: 'Bund' }
     ],
     instructions: [
       "Olivenöl in einer großen Pfanne erhitzen, Knoblauch kurz andünsten.",
@@ -98,12 +103,21 @@ export const recipes: Recipes = [
   {
     id: 2,
     category: 'dinner',
+    base_persons: 2,
     title: "Tofu-Curry-Pfanne mit Paprika & Zucchini",
     ingredients: [
-      "400g Naturtofu", "1 EL Sojasauce", "1 EL Olivenöl", "1-2 Knoblauchzehen (gehackt)",
-      "1 Stück Ingwer (ca. 2 cm, gerieben)", "2 TL Currypulver", "400ml Kokosmilch",
-      "1 rote Paprika (in Streifen)", "1 Zucchini (in Würfeln)", "Saft einer halben Limette",
-      "Salz, Pfeffer", "2 Packungen Konjak-Reis"
+      { ingredient: 'Naturtofu', quantity: 400, unit: 'g' },
+      { ingredient: 'Sojasauce', quantity: 1, unit: 'EL' },
+      { ingredient: 'Olivenöl', quantity: 1, unit: 'EL' },
+      { ingredient: 'Knoblauchzehen (gehackt)', quantity: 1.5, unit: 'Stück' },
+      { ingredient: 'Ingwer (ca. 2 cm, gerieben)', quantity: 1, unit: 'Stück' },
+      { ingredient: 'Currypulver', quantity: 2, unit: 'TL' },
+      { ingredient: 'Kokosmilch', quantity: 400, unit: 'ml' },
+      { ingredient: 'rote Paprika (in Streifen)', quantity: 1, unit: 'Stück' },
+      { ingredient: 'Zucchini (in Würfeln)', quantity: 1, unit: 'Stück' },
+      { ingredient: 'Saft einer halben Limette', quantity: 0.5, unit: 'Stück' },
+      { ingredient: 'Salz, Pfeffer', quantity: 1, unit: 'Prise' },
+      { ingredient: 'Konjak-Reis', quantity: 2, unit: 'Packungen' }
     ],
     instructions: [
       "Tofu trocken pressen, würfeln und mit Sojasauce marinieren. Konjak-Reis nach Packungsanweisung vorbereiten.",
@@ -117,12 +131,19 @@ export const recipes: Recipes = [
   {
     id: 3,
     category: 'dinner',
+    base_persons: 2,
     title: "Linsen-Bolognese mit Konjak-Nudeln",
     ingredients: [
-      "2 Packungen Konjak-Nudeln", "1 EL Olivenöl", "1-2 Karotten (fein gewürfelt)",
-      "2 Stangen Staudensellerie (fein gewürfelt)", "2 Knoblauchzehen (gehackt)",
-      "150g rote Linsen (trocken)", "500g passierte Tomaten", "200ml Gemüsebrühe",
-      "1 TL getrockneter Oregano", "Salz, Pfeffer"
+      { ingredient: 'Konjak-Nudeln', quantity: 2, unit: 'Packungen' },
+      { ingredient: 'Olivenöl', quantity: 1, unit: 'EL' },
+      { ingredient: 'Karotten (fein gewürfelt)', quantity: 1.5, unit: 'Stück' },
+      { ingredient: 'Stangen Staudensellerie (fein gewürfelt)', quantity: 2, unit: 'Stück' },
+      { ingredient: 'Knoblauchzehen (gehackt)', quantity: 2, unit: 'Stück' },
+      { ingredient: 'rote Linsen (trocken)', quantity: 150, unit: 'g' },
+      { ingredient: 'passierte Tomaten', quantity: 500, unit: 'g' },
+      { ingredient: 'Gemüsebrühe', quantity: 200, unit: 'ml' },
+      { ingredient: 'getrockneter Oregano', quantity: 1, unit: 'TL' },
+      { ingredient: 'Salz, Pfeffer', quantity: 1, unit: 'Prise' }
     ],
     instructions: [
       "Konjak-Nudeln vorbereiten.",
@@ -135,11 +156,20 @@ export const recipes: Recipes = [
   {
     id: 4,
     category: 'dinner',
+    base_persons: 2,
     title: "Gebratener Halloumi auf großem Salat",
     ingredients: [
-      "400g Halloumi", "1 EL Olivenöl", "1 Kopf Romanasalat", "1 Gurke",
-      "250g Kirschtomaten", "1 rote Paprika", "1 Avocado",
-      "Für das Dressing: 4 EL Olivenöl, 2 EL Balsamico, 1 TL Senf, Salz, Pfeffer"
+      { ingredient: 'Halloumi', quantity: 400, unit: 'g' },
+      { ingredient: 'Olivenöl', quantity: 1, unit: 'EL' },
+      { ingredient: 'Kopf Romanasalat', quantity: 1, unit: 'Stück' },
+      { ingredient: 'Gurke', quantity: 1, unit: 'Stück' },
+      { ingredient: 'Kirschtomaten', quantity: 250, unit: 'g' },
+      { ingredient: 'rote Paprika', quantity: 1, unit: 'Stück' },
+      { ingredient: 'Avocado', quantity: 1, unit: 'Stück' },
+      { ingredient: 'Dressing: Olivenöl', quantity: 4, unit: 'EL' },
+      { ingredient: 'Dressing: Balsamico', quantity: 2, unit: 'EL' },
+      { ingredient: 'Dressing: Senf', quantity: 1, unit: 'TL' },
+      { ingredient: 'Dressing: Salz, Pfeffer', quantity: 1, unit: 'Prise' }
     ],
     instructions: [
       "Salat und Gemüse waschen und mundgerecht schneiden.",
@@ -152,11 +182,17 @@ export const recipes: Recipes = [
   {
     id: 5,
     category: 'dinner',
+    base_persons: 2,
     title: "Cremige Champignon-Pfanne mit Konjak-Nudeln",
     ingredients: [
-      "2 Packungen Konjak-Nudeln", "1 EL Butter oder Olivenöl", "500g Champignons (in Scheiben)",
-      "2 Knoblauchzehen (gehackt)", "200g Kräuter-Frischkäse oder Crème fraîche",
-      "100ml Gemüsebrühe", "Salz, Pfeffer", "frische Petersilie"
+      { ingredient: 'Konjak-Nudeln', quantity: 2, unit: 'Packungen' },
+      { ingredient: 'Butter oder Olivenöl', quantity: 1, unit: 'EL' },
+      { ingredient: 'Champignons (in Scheiben)', quantity: 500, unit: 'g' },
+      { ingredient: 'Knoblauchzehen (gehackt)', quantity: 2, unit: 'Stück' },
+      { ingredient: 'Kräuter-Frischkäse oder Crème fraîche', quantity: 200, unit: 'g' },
+      { ingredient: 'Gemüsebrühe', quantity: 100, unit: 'ml' },
+      { ingredient: 'Salz, Pfeffer', quantity: 1, unit: 'Prise' },
+      { ingredient: 'frische Petersilie', quantity: 1, unit: 'Bund' }
     ],
     instructions: [
       "Konjak-Nudeln vorbereiten.",
@@ -169,11 +205,17 @@ export const recipes: Recipes = [
   {
     id: 6,
     category: 'dinner',
+    base_persons: 2,
     title: "Gefüllte Paprika mit Linsen & Feta",
     ingredients: [
-      "4 große Paprika", "100g rote Linsen (trocken)", "300ml Gemüsebrühe",
-      "1 Karotte (fein gerieben)", "1 Zucchini (fein gewürfelt)", "150g Feta",
-      "Salz, Pfeffer", "getrocknete Kräuter (Thymian, Oregano)"
+      { ingredient: 'große Paprika', quantity: 4, unit: 'Stück' },
+      { ingredient: 'rote Linsen (trocken)', quantity: 100, unit: 'g' },
+      { ingredient: 'Gemüsebrühe', quantity: 300, unit: 'ml' },
+      { ingredient: 'Karotte (fein gerieben)', quantity: 1, unit: 'Stück' },
+      { ingredient: 'Zucchini (fein gewürfelt)', quantity: 1, unit: 'Stück' },
+      { ingredient: 'Feta', quantity: 150, unit: 'g' },
+      { ingredient: 'Salz, Pfeffer', quantity: 1, unit: 'Prise' },
+      { ingredient: 'getrocknete Kräuter (Thymian, Oregano)', quantity: 1, unit: 'TL' }
     ],
     instructions: [
       "Backofen auf 180°C Umluft vorheizen.",
@@ -187,11 +229,17 @@ export const recipes: Recipes = [
   {
     id: 7,
     category: 'dinner',
+    base_persons: 2,
     title: "Großes Gemüse-Omelett aus der Pfanne",
     ingredients: [
-      "6-8 Eier", "100ml Milch oder Sahne", "Salz, Pfeffer, Muskatnuss", "1 EL Olivenöl",
-      "200g Champignons (in Scheiben)", "1 Zucchini (gewürfelt)", "1 rote Paprika (gewürfelt)",
-      "100g geriebener Käse"
+      { ingredient: 'Eier', quantity: 7, unit: 'Stück' },
+      { ingredient: 'Milch oder Sahne', quantity: 100, unit: 'ml' },
+      { ingredient: 'Salz, Pfeffer, Muskatnuss', quantity: 1, unit: 'Prise' },
+      { ingredient: 'Olivenöl', quantity: 1, unit: 'EL' },
+      { ingredient: 'Champignons (in Scheiben)', quantity: 200, unit: 'g' },
+      { ingredient: 'Zucchini (gewürfelt)', quantity: 1, unit: 'Stück' },
+      { ingredient: 'rote Paprika (gewürfelt)', quantity: 1, unit: 'Stück' },
+      { ingredient: 'geriebener Käse', quantity: 100, unit: 'g' }
     ],
     instructions: [
       "Eier mit Milch und Gewürzen verquirlen.",
@@ -203,10 +251,10 @@ export const recipes: Recipes = [
   }
 ];
 
-const breakfastRecipes = {
-  beeren: { id: 101, title: 'CremeQuark mit Beerenmix', ingredients: ['500g CremeQuark', '75g Beerenmix'], instructions: ['Zutaten mischen.'], totalCalories: 450, category: 'breakfast' as MealCategory },
-  walnuss: { id: 102, title: 'CremeQuark mit Walnüssen', ingredients: ['500g CremeQuark', '25g Walnüsse'], instructions: ['Zutaten mischen.'], totalCalories: 550, category: 'breakfast' as MealCategory },
-  mandel: { id: 103, title: 'CremeQuark mit Mandeln', ingredients: ['500g CremeQuark', '25g Mandeln'], instructions: ['Zutaten mischen.'], totalCalories: 530, category: 'breakfast' as MealCategory },
+const breakfastRecipes: { [key: string]: Recipe } = {
+  beeren: { id: 101, title: 'CremeQuark mit Beerenmix', ingredients: [{ ingredient: 'CremeQuark', quantity: 500, unit: 'g' }, { ingredient: 'Beerenmix', quantity: 75, unit: 'g' }], instructions: ['Zutaten mischen.'], totalCalories: 450, category: 'breakfast', base_persons: 1 },
+  walnuss: { id: 102, title: 'CremeQuark mit Walnüssen', ingredients: [{ ingredient: 'CremeQuark', quantity: 500, unit: 'g' }, { ingredient: 'Walnüsse', quantity: 25, unit: 'g' }], instructions: ['Zutaten mischen.'], totalCalories: 550, category: 'breakfast', base_persons: 1 },
+  mandel: { id: 103, title: 'CremeQuark mit Mandeln', ingredients: [{ ingredient: 'CremeQuark', quantity: 500, unit: 'g' }, { ingredient: 'Mandeln', quantity: 25, unit: 'g' }], instructions: ['Zutaten mischen.'], totalCalories: 530, category: 'breakfast', base_persons: 1 },
 };
 
 export const weeklyPlan: WeeklyPlan = [

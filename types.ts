@@ -14,12 +14,18 @@ export const MealCategoryLabels: Record<MealCategory, string> = {
 
 export const MEAL_ORDER: MealCategory[] = ['breakfast', 'lunch', 'coffee', 'snack', 'dinner'];
 
+// New structured type for ingredients
+export interface StructuredIngredient {
+    ingredient: string;
+    quantity: number;
+    unit: string;
+}
 
 // Main data structures
 export interface Recipe {
     id: number;
     title: string;
-    ingredients: string[];
+    ingredients: StructuredIngredient[];
     instructions: string[];
     totalCalories: number;
     protein?: number;
@@ -32,6 +38,7 @@ export interface Recipe {
     isGlutenFree?: boolean;
     isLactoseFree?: boolean;
     image_url?: string | null;
+    base_persons?: number;
 }
 
 export type Recipes = Recipe[];

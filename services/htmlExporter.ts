@@ -1,4 +1,4 @@
-import type { PlanData, ShoppingList, WeeklyPlan, Recipes, Recipe, ArchiveEntry } from '../types';
+import type { PlanData, ShoppingList, WeeklyPlan, Recipes, Recipe, ArchiveEntry, StructuredIngredient } from '../types';
 
 // Helper function to escape HTML special characters
 const escapeHtml = (unsafe: string) => {
@@ -9,6 +9,30 @@ const escapeHtml = (unsafe: string) => {
          .replace(/>/g, "&gt;")
          .replace(/"/g, "&quot;")
          .replace(/'/g, "&#039;");
+};
+
+// Fix: Added a helper function to format structured ingredients for display.
+const formatIngredient = (ing: StructuredIngredient, basePersons: number = 1, targetPersons: number): string | null => {
+    let scaledQuantity = (ing.quantity / basePersons) * targetPersons;
+
+    // Avoid tiny decimal places for things like pieces or pinches
+    if (['Stück', 'Prise', 'Bund', 'Zehe'].includes(ing.unit)) {
+        scaledQuantity = Math.round(scaledQuantity * 10) / 10; // Round to one decimal place
+    } else {
+        scaledQuantity = Math.round(scaledQuantity); // Round other units to whole numbers
+    }
+
+    // Don't show quantity if it's 1 and unit is "Stück"
+    if (ing.unit === 'Stück' && scaledQuantity === 1) {
+        return ing.ingredient;
+    }
+    
+    // Handle pluralization for "Stück"
+    const unit = (ing.unit === 'Stück' && scaledQuantity > 1) ? 'Stücke' : ing.unit;
+    
+    if (scaledQuantity === 0) return null;
+
+    return `${scaledQuantity} ${unit} ${ing.ingredient}`;
 };
 
 // Helper function to compress images to a smaller JPEG format
@@ -121,12 +145,14 @@ function renderWeeklyPlan(weeklyPlan: WeeklyPlan, planName: string): string {
 }
 
 // Fix: Updated function to get recipe and day from weeklyPlan structure.
-function renderRecipes(weeklyPlan: WeeklyPlan, recipes: Recipes, imageUrls: { [key: string]: string }): string {
+// Fix: Updated function to correctly handle structured ingredients and display person count.
+function renderRecipes(weeklyPlan: WeeklyPlan, recipes: Recipes, imageUrls: { [key: string]: string }, persons: number): string {
+  const personsText = `<p class="text-slate-500">Alle Rezepte sind für ${persons} ${persons > 1 ? 'Personen' : 'Person'} ausgelegt.</p>`;
   return `
     <div class="space-y-8">
       <div class="text-center sm:text-left">
           <h2 class="text-3xl font-bold text-slate-700">Kochanleitungen für das Abendessen</h2>
-          <p class="text-slate-500">Alle Rezepte sind für 2 Personen ausgelegt.</p>
+          ${personsText}
       </div>
       <div class="space-y-12">
         ${weeklyPlan.map(dayPlan => {
@@ -161,7 +187,11 @@ function renderRecipes(weeklyPlan: WeeklyPlan, recipes: Recipes, imageUrls: { [k
                 <div class="md:col-span-2">
                   <h4 class="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Zutaten:</h4>
                   <ul class="space-y-2 list-disc list-inside text-slate-600">
-                    ${(recipe.ingredients || []).map(ing => `<li>${escapeHtml(ing)}</li>`).join('')}
+                    ${(recipe.ingredients || []).map(ing => {
+                        // Fix: Format structured ingredient object into a string before rendering.
+                        const formatted = formatIngredient(ing, recipe.base_persons || 1, persons);
+                        return formatted ? `<li>${escapeHtml(formatted)}</li>` : '';
+                    }).join('')}
                   </ul>
                 </div>
                 <div class="md:col-span-3 md:border-l md:border-slate-200 md:pl-8">
@@ -198,7 +228,8 @@ export const generateAndDownloadHtml = async (plan: PlanData | ArchiveEntry, ima
 
     const weeklyPlanHtml = renderWeeklyPlan(plan.weeklyPlan, plan.name);
     const shoppingListHtml = renderShoppingList(plan.shoppingList);
-    const recipesHtml = renderRecipes(plan.weeklyPlan, plan.recipes, compressedImageUrls);
+    // Fix: Pass the number of persons to the renderRecipes function.
+    const recipesHtml = renderRecipes(plan.weeklyPlan, plan.recipes, compressedImageUrls, plan.settings.persons);
 
     const fullHtml = `
       <!DOCTYPE html>
