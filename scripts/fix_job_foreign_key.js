@@ -26,64 +26,75 @@ const REFERENCED_TABLE = 'plans';
 const LEGACY_REFERENCED_TABLE = 'legacy_archived_plans';
 
 async function fixJobForeignKey() {
-    console.log('--- Starting Foreign Key Correction Script for `app_jobs` ---');
+    console.log('--- Starting Foreign Key Correction Script for `app_jobs` (v2) ---');
     let pool;
     try {
         pool = await getDbConnection();
         console.log('Successfully connected to the database.');
 
-        // 1. Check the existing CREATE TABLE statement to find the constraint
+        // --- NEW STEP: Clean up orphaned jobs ---
+        console.log('\nStep 1: Searching for orphaned jobs...');
+        const [orphanedJobs] = await pool.query(
+            `SELECT id, jobId, relatedPlanId FROM ${TABLE_NAME}
+             WHERE relatedPlanId IS NOT NULL 
+             AND relatedPlanId NOT IN (SELECT id FROM ${REFERENCED_TABLE})`
+        );
+
+        if (orphanedJobs.length > 0) {
+            console.log(`Found ${orphanedJobs.length} orphaned job(s) pointing to non-existent plans.`);
+            orphanedJobs.forEach(job => {
+                console.log(`  - Job ID ${job.jobId} (DB ID ${job.id}) points to non-existent plan ID ${job.relatedPlanId}.`);
+            });
+
+            console.log('Deleting orphaned jobs...');
+            const [deleteResult] = await pool.query(
+                `DELETE FROM ${TABLE_NAME}
+                 WHERE relatedPlanId IS NOT NULL 
+                 AND relatedPlanId NOT IN (SELECT id FROM ${REFERENCED_TABLE})`
+            );
+            console.log(`Successfully deleted ${deleteResult.affectedRows} orphaned job(s).`);
+        } else {
+            console.log('No orphaned jobs found. Data is consistent.');
+        }
+
+        // --- Step 2: Check and fix constraints ---
+        console.log('\nStep 2: Checking and correcting foreign key constraints...');
+        
         const [createTableResult] = await pool.query(`SHOW CREATE TABLE ${TABLE_NAME}`);
         const createStatement = createTableResult[0]['Create Table'];
         
         const oldConstraintRegex = new RegExp(`CONSTRAINT \`${OLD_CONSTRAINT_NAME}\` FOREIGN KEY .* REFERENCES \`${LEGACY_REFERENCED_TABLE}\``);
-        const newConstraintRegex = new RegExp(`CONSTRAINT \`${NEW_CONSTRAINT_NAME}\` FOREIGN KEY .* REFERENCES \`${REFERENCED_TABLE}\``);
 
-        if (newConstraintRegex.test(createStatement)) {
-            console.log('SUCCESS: The correct foreign key constraint already exists. No action needed.');
-            await pool.end();
-            return;
-        }
-
+        // Check if the old, incorrect constraint exists and drop it
         if (oldConstraintRegex.test(createStatement)) {
-            console.log(`Found incorrect foreign key '${OLD_CONSTRAINT_NAME}' referencing '${LEGACY_REFERENCED_TABLE}'.`);
-            
-            // 2. Drop the incorrect foreign key
+            console.log(`Found incorrect foreign key '${OLD_CONSTRAINT_NAME}'.`);
             console.log(` -> Dropping constraint '${OLD_CONSTRAINT_NAME}'...`);
             await pool.query(`ALTER TABLE ${TABLE_NAME} DROP FOREIGN KEY ${OLD_CONSTRAINT_NAME}`);
             console.log(' -> Constraint dropped successfully.');
-            
-            // 3. Add the correct foreign key
-            console.log(` -> Adding new constraint '${NEW_CONSTRAINT_NAME}' referencing '${REFERENCED_TABLE}'...`);
+        } else {
+            console.log(`Old constraint '${OLD_CONSTRAINT_NAME}' not found. No need to drop.`);
+        }
+
+        // Re-fetch the create statement in case we just dropped a constraint
+        const [updatedCreateTableResult] = await pool.query(`SHOW CREATE TABLE ${TABLE_NAME}`);
+        const updatedCreateStatement = updatedCreateTableResult[0]['Create Table'];
+        
+        const newConstraintRegex = new RegExp(`CONSTRAINT \`${NEW_CONSTRAINT_NAME}\` FOREIGN KEY .* REFERENCES \`${REFERENCED_TABLE}\``);
+
+        // Check if the new, correct constraint exists. If not, add it.
+        if (newConstraintRegex.test(updatedCreateStatement)) {
+            console.log(`Correct constraint '${NEW_CONSTRAINT_NAME}' already exists. No action needed.`);
+        } else {
+            console.log(`Correct constraint '${NEW_CONSTRAINT_NAME}' not found. Adding it now...`);
             await pool.query(
                 `ALTER TABLE ${TABLE_NAME} ADD CONSTRAINT ${NEW_CONSTRAINT_NAME}
                  FOREIGN KEY (relatedPlanId) REFERENCES ${REFERENCED_TABLE}(id)
                  ON DELETE CASCADE`
             );
             console.log(' -> New constraint added successfully.');
-            console.log('\n--- Foreign Key Correction Complete ---');
-        } else {
-            // It's possible there is no constraint at all, or it has a different name.
-            // We'll assume if the old one isn't there, we are safe to add the new one.
-            console.log(`No constraint named '${OLD_CONSTRAINT_NAME}' found referencing the legacy table. Attempting to add the correct constraint...`);
-            try {
-                await pool.query(
-                    `ALTER TABLE ${TABLE_NAME} ADD CONSTRAINT ${NEW_CONSTRAINT_NAME}
-                     FOREIGN KEY (relatedPlanId) REFERENCES ${REFERENCED_TABLE}(id)
-                     ON DELETE CASCADE`
-                );
-                console.log(' -> New constraint added successfully.');
-                console.log('\n--- Foreign Key Correction Complete ---');
-            } catch (addError) {
-                 if (addError.code === 'ER_FK_DUP_NAME' || addError.message.includes("Duplicate foreign key constraint name")) {
-                    console.log(`A constraint named '${NEW_CONSTRAINT_NAME}' already exists. No action needed.`);
-                 } else if (addError.code === 'ER_CANNOT_ADD_FOREIGN') {
-                    console.error('\nERROR: Could not add the new foreign key. This might be because some `relatedPlanId` values in `app_jobs` do not exist in the `plans` table. Please clean up orphaned job entries and run the script again.');
-                 } else {
-                    console.warn(`Could not add the new foreign key. It might already exist with a different name. Please check your DB schema manually if sharing still fails. Error: ${addError.message}`);
-                 }
-            }
         }
+
+        console.log('\n--- Foreign Key Correction Complete ---');
 
     } catch (error) {
         console.error('\n--- A CRITICAL SCRIPT ERROR OCCURRED ---');
