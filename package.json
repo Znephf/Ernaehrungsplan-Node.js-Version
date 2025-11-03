@@ -19,6 +19,7 @@
     "fix:shopping-list": "node scripts/regenerate_shopping_list.js",
     "fix:calories": "node scripts/fix_recipe_calories.js",
     "fix:diet-preference": "node scripts/fix_null_diet_preference.js",
+    "fix:recipe-metadata": "node scripts/fix_null_recipe_metadata.js",
     "regenerate:shares": "node scripts/regenerate_shares.js"
   },
   "keywords": [
