@@ -1,7 +1,9 @@
 
+
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../services/database');
+const { saveCustomPlanToDatabase } = require('../services/jobService');
 
 // Holt das gesamte Plan-Archiv
 router.get('/archive', async (req, res) => {
@@ -93,6 +95,47 @@ router.get('/archive', async (req, res) => {
     } catch (error) {
         console.error('Fehler beim Laden des Archivs:', error);
         res.status(500).json({ error: 'Archiv konnte nicht geladen werden.' });
+    }
+});
+
+// Speichert einen benutzerdefinierten Plan aus dem Planner
+router.post('/plan', async (req, res) => {
+    try {
+        const { name, persons, mealsByDay } = req.body;
+        if (!name || !persons || !mealsByDay) {
+            return res.status(400).json({ error: 'Missing required fields: name, persons, mealsByDay.' });
+        }
+        
+        const savedPlan = await saveCustomPlanToDatabase({ name, persons, mealsByDay });
+        res.status(201).json(savedPlan);
+
+    } catch (error) {
+        console.error('Error saving custom plan:', error);
+        res.status(500).json({ error: 'Failed to save custom plan.' });
+    }
+});
+
+// Löscht einen Plan (aber nicht die zugehörigen Rezepte)
+router.delete('/plan/:id', async (req, res) => {
+    const { id } = req.params;
+    if (!id) {
+        return res.status(400).json({ error: 'Plan ID is required.' });
+    }
+
+    try {
+        // Dank "ON DELETE CASCADE" bei der `plan_id` in `plan_recipes`
+        // werden die Verknüpfungen automatisch gelöscht, aber die Rezepte selbst bleiben erhalten.
+        const [result] = await pool.query('DELETE FROM plans WHERE id = ?', [id]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Plan not found.' });
+        }
+        
+        res.status(200).json({ message: `Plan with ID ${id} successfully deleted.` });
+
+    } catch (error) {
+        console.error(`Error deleting plan with ID ${id}:`, error);
+        res.status(500).json({ error: 'Failed to delete plan.' });
     }
 });
 

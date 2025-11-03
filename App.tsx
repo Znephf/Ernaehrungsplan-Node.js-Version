@@ -36,7 +36,7 @@ const App: React.FC = () => {
     const [currentView, setCurrentView] = useState<View>('plan');
     
     // Hooks for different functionalities
-    const { archive, loadPlanFromArchive, fetchArchive } = useArchive();
+    const { archive, loadPlanFromArchive, fetchArchive, removePlan } = useArchive();
     const { 
         plan: generatedPlan, 
         isLoading: isGenerating, 
@@ -141,6 +141,21 @@ const App: React.FC = () => {
         fetchArchive();
         setCurrentView('archive');
     };
+
+    const handleDeletePlan = async (id: number) => {
+        if (window.confirm('Möchten Sie diesen Plan wirklich unwiderruflich löschen? Die Rezepte bleiben im Rezepte-Archiv erhalten.')) {
+            try {
+                await apiService.deletePlan(id);
+                removePlan(id); // Update local state for instant UI feedback
+                if (activePlan?.id === id) {
+                    setActivePlan(null); // Clear active plan if it was the one deleted
+                }
+            } catch (error) {
+                console.error("Fehler beim Löschen des Plans:", error);
+                alert("Der Plan konnte nicht gelöscht werden. Bitte versuchen Sie es später erneut.");
+            }
+        }
+    };
     
     const handleGenerateAllImages = async () => {
         if (!activePlan) return;
@@ -237,6 +252,7 @@ const App: React.FC = () => {
                 onSettingsChange={setSettings}
                 onGeneratePlan={handleGeneratePlan}
                 onLoadPlan={handleLoadPlan}
+                onDeletePlan={handleDeletePlan}
                 onSelectRecipe={handleSelectRecipe}
                 onPlanSaved={handlePlanSaved}
                 generateImage={generateImage}

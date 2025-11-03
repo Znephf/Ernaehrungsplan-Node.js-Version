@@ -57,6 +57,13 @@ export const saveCustomPlan = async (data: { name: string; persons: number; meal
     return handleResponse(response);
 };
 
+export const deletePlan = async (id: number): Promise<{ message: string }> => {
+    const response = await fetch(`/api/plan/${id}`, {
+        method: 'DELETE',
+    });
+    return handleResponse(response);
+};
+
 // Get all recipes
 export const getAllRecipes = async (): Promise<Recipe[]> => {
     const response = await fetch('/api/recipes');

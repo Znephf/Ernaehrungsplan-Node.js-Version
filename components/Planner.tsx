@@ -69,7 +69,8 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
         if (checked) {
             newVisibleMeals.add(mealType);
         } else {
-            const hasRecipesInSlots = Object.values(weeklySlots).some(daySlots => 
+            // FIX: Explicitly cast `daySlots` to `any[]` to resolve TypeScript error where it's inferred as `unknown`.
+            const hasRecipesInSlots = Object.values(weeklySlots).some((daySlots: any[]) => 
                 daySlots.some(slot => slot.mealType === mealType)
             );
             if (hasRecipesInSlots && !window.confirm(`Möchten Sie wirklich alle "${MealCategoryLabels[mealType]}"-Gerichte aus dem Plan entfernen?`)) {
@@ -110,7 +111,8 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
     };
 
     const handleSavePlan = async () => {
-        if (!planName.trim() || Object.values(weeklySlots).every(day => day.length === 0)) {
+        // FIX: Explicitly cast `day` to `any[]` to resolve TypeScript error where it's inferred as `unknown`.
+        if (!planName.trim() || Object.values(weeklySlots).every((day: any[]) => day.length === 0)) {
             setError("Bitte geben Sie einen Plannamen an und fügen Sie mindestens ein Rezept hinzu.");
             return;
         }

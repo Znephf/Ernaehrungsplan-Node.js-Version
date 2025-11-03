@@ -12,7 +12,7 @@ export const MealCategoryLabels: Record<MealCategory, string> = {
     snack: 'Snack'
 };
 
-export const MEAL_ORDER: MealCategory[] = ['breakfast', 'lunch', 'coffee', 'dinner', 'snack'];
+export const MEAL_ORDER: MealCategory[] = ['breakfast', 'lunch', 'coffee', 'snack', 'dinner'];
 
 
 // Main data structures

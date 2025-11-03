@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { ArchiveEntry, DietType, Diet, DishComplexity, PlanSettings } from '../types';
-import { HideIcon } from './IconComponents';
+import { HideIcon, TrashIcon } from './IconComponents';
 
 interface ArchiveComponentProps {
   archive: ArchiveEntry[];
   onLoadPlan: (id: number) => void;
+  onDeletePlan: (id: number) => void;
 }
 
 const dietPreferenceLabels: Record<Diet, string> = {
@@ -28,7 +29,7 @@ const dishComplexityLabels: Record<DishComplexity, string> = {
 };
 
 
-const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan }) => {
+const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan, onDeletePlan }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPreferences, setSelectedPreferences] = useState<Set<Diet>>(new Set());
   const [selectedDietTypes, setSelectedDietTypes] = useState<Set<DietType>>(new Set());
@@ -286,6 +287,14 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
                     className="p-2 text-slate-500 hover:bg-amber-100 hover:text-amber-600 rounded-full transition-colors"
                   >
                     <HideIcon />
+                  </button>
+                  <button
+                    onClick={() => onDeletePlan(entry.id)}
+                    aria-label={`Plan ${entry.name} löschen`}
+                    className="p-2 text-slate-500 hover:bg-red-100 hover:text-red-600 rounded-full transition-colors"
+                    title="Diesen Plan löschen"
+                  >
+                    <TrashIcon />
                   </button>
                   <button
                     onClick={() => onLoadPlan(entry.id)}

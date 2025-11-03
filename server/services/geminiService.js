@@ -103,10 +103,14 @@ The JSON must strictly follow this schema:
   "recipes": [ { "id": "number (Must match a recipeId from weeklyPlan)", "title": "string (German)", "ingredients": ["string (German, with quantities for the specified number of persons)"], "instructions": ["string (German, step-by-step)"], "totalCalories": "number (PER PERSON for this dish)", "protein": "number (in grams, PER PERSON)", "carbs": "number (in grams, PER PERSON)", "fat": "number (in grams, PER PERSON)", "category": "string (Enum: ${MEAL_CATEGORIES.join(', ')})" } ],
   "shoppingList": [ { "category": "string (e.g., 'Obst & Gemüse')", "items": ["string (German, with quantities)"] } ]
 }
-- Provide recipes only for the meal types specified by the user.
+
+RULES FOR MEALS:
+1. Strictly adhere to the user's list of 'includedMeals'. Generate recipes ONLY for these meal types. If a meal type is not in the list, do NOT include it for any day.
+2. For each day in the 'weeklyPlan', each 'mealType' must appear AT MOST ONCE. Do not generate two breakfasts for Monday, for example.
+
 - Ensure all recipeIds in weeklyPlan correspond to a recipe in the recipes array.
 - All calorie counts and nutritional values for individual RECIPES (protein, carbs, fat, totalCalories) must be calculated PER PERSON.
-- CRITICAL DAILY CALORIE INSTRUCTION: The value for "totalCalories" in each day's "weeklyPlan" is the MOST IMPORTANT calculation. It represents the SUM of calories for ALL meals on that day, for ALL people. This daily total must be very close (+/- 100 kcal) to the user's target calories PER PERSON multiplied by the number of people. Do NOT apply the per-person calorie target to the daily total, but the sum for all people.
+- CRITICAL DAILY CALORIE INSTRUCTION: The value for "totalCalories" in each day's "weeklyPlan" is the MOST IMPORTANT calculation. It represents the SUM of calories for all meals on that day for ONE SINGLE PERSON. This daily total must be very close (+/- 50 kcal) to the user's target calories PER PERSON.
 - The shopping list must be complete and categorized logically for the total number of people.
 - All text must be in German.
 - Do not use markdown in the JSON response.
@@ -149,18 +153,7 @@ Please generate the full plan in the specified JSON format.
         const text = response.text.trim();
         const planData = JSON.parse(text);
         
-        // Post-processing step: Convert recipe calories to be for the total number of persons before saving.
-        // This keeps the database consistent with the older data structure where recipe calories are for all persons.
-        // The daily total calories in weeklyPlan is already for all persons.
-        if (planData.recipes && Array.isArray(planData.recipes)) {
-            planData.recipes.forEach(recipe => {
-                if (recipe.totalCalories) recipe.totalCalories *= persons;
-                if (recipe.protein) recipe.protein *= persons;
-                if (recipe.carbs) recipe.carbs *= persons;
-                if (recipe.fat) recipe.fat *= persons;
-            });
-        }
-
+        // Return data as is, since AI is now providing all calorie values on a per-person basis.
         return planData;
     } catch (e) {
         console.error("Failed to parse Gemini response as JSON.", e);

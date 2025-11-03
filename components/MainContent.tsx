@@ -22,6 +22,7 @@ interface MainContentProps {
   onSettingsChange: (settings: PlanSettings) => void;
   onGeneratePlan: () => void;
   onLoadPlan: (id: number) => void;
+  onDeletePlan: (id: number) => void;
   onSelectRecipe: (day: string) => void;
   onPlanSaved: () => void;
   generateImage: (recipe: Recipe) => Promise<void>;
@@ -44,6 +45,7 @@ const MainContent: React.FC<MainContentProps> = (props) => {
     onSettingsChange,
     onGeneratePlan,
     onLoadPlan,
+    onDeletePlan,
     onSelectRecipe,
     onPlanSaved,
     generateImage,
@@ -95,7 +97,7 @@ const MainContent: React.FC<MainContentProps> = (props) => {
           />
         ) : <p>Kein Plan zum Anzeigen der Rezepte vorhanden.</p>;
       case 'archive':
-        return <ArchiveComponent archive={archive} onLoadPlan={onLoadPlan} />;
+        return <ArchiveComponent archive={archive} onLoadPlan={onLoadPlan} onDeletePlan={onDeletePlan} />;
       case 'recipe-archive':
         return <RecipeArchiveComponent />;
       case 'planner':

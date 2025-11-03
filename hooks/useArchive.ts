@@ -27,5 +27,9 @@ export const useArchive = () => {
         );
     }, []);
 
-    return { archive, loadPlanFromArchive, fetchArchive, updatePlanInArchive };
+    const removePlan = useCallback((id: number) => {
+        setArchive(prev => prev.filter(entry => entry.id !== id));
+    }, []);
+
+    return { archive, loadPlanFromArchive, fetchArchive, updatePlanInArchive, removePlan };
 };

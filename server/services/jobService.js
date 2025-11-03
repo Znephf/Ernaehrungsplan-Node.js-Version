@@ -5,6 +5,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const { pool } = require('./database');
 const { generateShareableHtml } = require('./htmlGenerator');
+const { generateShoppingListOnly } = require('./geminiService');
 
 async function getFullPlanById(planId) {
     const [planRows] = await pool.query('SELECT * FROM plans WHERE id = ?', [planId]);
@@ -61,13 +62,11 @@ async function getFullPlanById(planId) {
         }
         
         dayPlan.meals.push({ mealType: link.meal_type, recipe: recipe });
-        // The daily total is the sum of recipe calories (which are per person) * number of persons
-        dayPlan.totalCalories += (recipe.totalCalories || 0);
     }
     
-    // Final calculation of daily total calories for all persons
+    // Final calculation of daily total calories per person.
     weeklyPlan.forEach(dayPlan => {
-        dayPlan.totalCalories = dayPlan.meals.reduce((sum, meal) => sum + (meal.recipe.totalCalories || 0), 0) * persons;
+        dayPlan.totalCalories = dayPlan.meals.reduce((sum, meal) => sum + (meal.recipe.totalCalories || 0), 0);
     });
     
     weeklyPlan.sort((a, b) => daysOrder.indexOf(a.day) - daysOrder.indexOf(b.day));
@@ -88,8 +87,7 @@ async function savePlanToDatabase(planData, settings) {
     try {
         await connection.beginTransaction();
         
-        // The AI now returns recipe calories PER PERSON. We store them PER PERSON in the DB.
-        // The daily total in weeklyPlan from AI is for ALL persons.
+        // AI now returns recipe calories PER PERSON, and we store them as such.
 
         const now = new Date();
         const [planResult] = await connection.query(
@@ -105,7 +103,7 @@ async function savePlanToDatabase(planData, settings) {
                  ON DUPLICATE KEY UPDATE title=VALUES(title)`,
                 [
                     recipe.title, JSON.stringify(recipe.ingredients), JSON.stringify(recipe.instructions),
-                    recipe.totalCalories, // Now saving the per-person value directly
+                    recipe.totalCalories, // Saving the per-person value directly
                     recipe.protein, 
                     recipe.carbs, 
                     recipe.fat, 
@@ -138,6 +136,62 @@ async function savePlanToDatabase(planData, settings) {
     } catch (error) {
         await connection.rollback();
         console.error('Fehler beim Speichern des Plans in der Datenbank:', error);
+        throw error;
+    } finally {
+        connection.release();
+    }
+}
+
+async function saveCustomPlanToDatabase({ name, persons, mealsByDay }) {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const settings = { persons }; // Simplified settings for custom plan
+        const now = new Date();
+
+        // 1. Create plan entry
+        const [planResult] = await connection.query(
+            'INSERT INTO plans (name, createdAt, settings) VALUES (?, ?, ?)',
+            [name, now, JSON.stringify(settings)]
+        );
+        const newPlanId = planResult.insertId;
+
+        const allRecipesForPlan = [];
+
+        // 2. Link recipes
+        for (const day of Object.keys(mealsByDay)) {
+            for (const meal of mealsByDay[day]) {
+                if (meal.recipe && meal.recipe.id) {
+                    await connection.query(
+                        'INSERT INTO plan_recipes (plan_id, recipe_id, day_of_week, meal_type) VALUES (?, ?, ?, ?)',
+                        [newPlanId, meal.recipe.id, day, meal.mealType]
+                    );
+                    allRecipesForPlan.push(meal.recipe);
+                }
+            }
+        }
+        
+        // 3. Generate shopping list
+        if (allRecipesForPlan.length > 0) {
+            console.log(`Generating shopping list for custom plan #${newPlanId}...`);
+            const shoppingList = await generateShoppingListOnly(settings, allRecipesForPlan);
+            
+            // 4. Update plan with shopping list
+            await connection.query(
+                'UPDATE plans SET shoppingList = ? WHERE id = ?',
+                [JSON.stringify(shoppingList), newPlanId]
+            );
+        }
+
+        await connection.commit();
+        
+        // 5. Return full plan data
+        return getFullPlanById(newPlanId);
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('Error in saveCustomPlanToDatabase:', error);
         throw error;
     } finally {
         connection.release();
@@ -180,4 +234,4 @@ async function processShareJob(jobId) {
 }
 
 
-module.exports = { savePlanToDatabase, getFullPlanById, processShareJob };
+module.exports = { savePlanToDatabase, getFullPlanById, processShareJob, saveCustomPlanToDatabase };
