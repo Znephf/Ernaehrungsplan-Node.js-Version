@@ -270,7 +270,7 @@ OUTPUT SCHEMA: [{ "recipeId": number, "structuredIngredients": [{ "ingredient": 
         if (Array.isArray(data) && data.every(item => item.hasOwnProperty('recipeId') && item.hasOwnProperty('structuredIngredients'))) {
             return data;
         }
-        throw new Error("Parsed JSON does not match the required output schema.");
+        throw new Error("Parsed JSON does not match the required output schema..");
     } catch (e) {
         console.error("Failed to parse Gemini response for batch ingredient conversion as JSON.", e);
         console.error("Raw response text:", response.text);
