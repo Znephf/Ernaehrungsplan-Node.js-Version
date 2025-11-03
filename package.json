@@ -1,5 +1,3 @@
-
-
 {
   "name": "ernaehrungsplan-app",
   "version": "1.0.0",
@@ -17,6 +15,7 @@
     "migrate:to-normalized-db": "node scripts/migrate_to_normalized_db.js",
     "migrate:link-images": "node scripts/migrate_link_images.js",
     "migrate:fix-legacy": "node scripts/migrate_from_legacy.js",
+    "migrate:ingredients": "node scripts/migrate_structured_ingredients.js",
     "fix:shopping-list": "node scripts/regenerate_shopping_list.js",
     "fix:calories": "node scripts/fix_recipe_calories.js",
     "regenerate:shares": "node scripts/regenerate_shares.js"

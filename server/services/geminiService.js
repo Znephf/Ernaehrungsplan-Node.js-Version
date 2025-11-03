@@ -1,5 +1,3 @@
-
-
 const { GoogleGenAI } = require('@google/genai');
 const { pool } = require('./database');
 const { API_KEY, API_KEY_FALLBACK } = process.env;
@@ -62,7 +60,7 @@ async function generateWithFallback(requestPayload) {
 
 const MEAL_CATEGORIES = ['breakfast', 'lunch', 'coffee', 'dinner', 'snack'];
 
-const generatePlanAndShoppingList = async (settings, previousPlanRecipes = []) => {
+const generatePlan = async (settings, previousPlanRecipes = []) => {
     const {
         persons, kcal, dietaryPreference, dietType, dishComplexity,
         excludedIngredients, desiredIngredients, isGlutenFree, isLactoseFree, includedMeals,
@@ -100,26 +98,31 @@ The JSON must strictly follow this schema:
 {
   "name": "string (A creative and appealing name for the meal plan, in German)",
   "weeklyPlan": [ { "day": "string (e.g., 'Montag')", "meals": [ { "mealType": "string (Enum: ${MEAL_CATEGORIES.join(', ')})", "recipeId": "number (A unique integer ID for the recipe, starting from 1)" } ], "totalCalories": "number" } ],
-  "recipes": [ { "id": "number (Must match a recipeId from weeklyPlan)", "title": "string (German)", "ingredients": ["string (German, with quantities for the specified number of persons)"], "instructions": ["string (German, step-by-step)"], "totalCalories": "number (PER PERSON for this dish)", "protein": "number (in grams, PER PERSON)", "carbs": "number (in grams, PER PERSON)", "fat": "number (in grams, PER PERSON)", "category": "string (Enum: ${MEAL_CATEGORIES.join(', ')})" } ],
-  "shoppingList": [ { "category": "string (e.g., 'Obst & Gemüse')", "items": ["string (German, with quantities)"] } ]
+  "recipes": [ { 
+    "id": "number (Must match a recipeId from weeklyPlan)", 
+    "title": "string (German)", 
+    "ingredients": [ { "ingredient": "string (German)", "quantity": "number (e.g., 200)", "unit": "string (e.g., 'g', 'ml', 'Stück')" } ], 
+    "instructions": ["string (German, step-by-step)"], 
+    "totalCalories": "number (for ONE PERSON)", "protein": "number (in grams, for ONE PERSON)", "carbs": "number (in grams, for ONE PERSON)", "fat": "number (in grams, for ONE PERSON)", 
+    "category": "string (Enum: ${MEAL_CATEGORIES.join(', ')})" } ]
 }
 
+CRITICAL RULES FOR RECIPES AND CALORIES:
+1. ALL RECIPES and their nutritional values (calories, protein, carbs, fat) MUST be calculated for a single serving (for ONE PERSON). This is the most important rule.
+2. The 'ingredients' array MUST be in the structured format: { "ingredient", "quantity", "unit" }.
+3. The "totalCalories" in each day's "weeklyPlan" is the sum of calories for all meals for ONE PERSON and must be very close (+/- 50 kcal) to the user's target.
+
 RULES FOR MEALS:
-1. Strictly adhere to the user's list of 'includedMeals'. Generate recipes ONLY for these meal types. If a meal type is not in the list, do NOT include it for any day.
-2. For each day in the 'weeklyPlan', each 'mealType' must appear AT MOST ONCE. Do not generate two breakfasts for Monday, for example.
+1. Strictly adhere to the user's list of 'includedMeals'. Generate recipes ONLY for these meal types.
+2. For each day, each 'mealType' must appear AT MOST ONCE.
 
 - Ensure all recipeIds in weeklyPlan correspond to a recipe in the recipes array.
-- All calorie counts and nutritional values for individual RECIPES (protein, carbs, fat, totalCalories) must be calculated PER PERSON.
-- CRITICAL DAILY CALORIE INSTRUCTION: The value for "totalCalories" in each day's "weeklyPlan" is the MOST IMPORTANT calculation. It represents the SUM of calories for all meals on that day for ONE SINGLE PERSON. This daily total must be very close (+/- 50 kcal) to the user's target calories PER PERSON.
-- The shopping list must be complete and categorized logically for the total number of people.
 - All text must be in German.
-- Do not use markdown in the JSON response.
-- Do not include comments in the JSON.
+- Do not use markdown or comments in the JSON.
 `;
 
     const userPrompt = `
 Create a new weekly meal plan based on these settings:
-- Number of people: ${persons}
 - Target calories per person per day: ${kcal}
 - Dietary preference: ${dietPreferenceText}
 - Diet type: ${dietType}
@@ -135,6 +138,7 @@ ${previousRecipesText}
 ${breakfastInstruction}
 ${snackInstruction}
 
+Reminder: All recipes and their nutritional info must be for ONE person. The user has specified the plan should be for ${persons} people, but your output recipe data must be for ONE.
 Please generate the full plan in the specified JSON format.
 `;
 
@@ -153,7 +157,7 @@ Please generate the full plan in the specified JSON format.
         const text = response.text.trim();
         const planData = JSON.parse(text);
         
-        // Return data as is, since AI is now providing all calorie values on a per-person basis.
+        // Return data as is, AI provides per-person values now.
         return planData;
     } catch (e) {
         console.error("Failed to parse Gemini response as JSON.", e);
@@ -181,23 +185,21 @@ const generateImageForRecipe = async (recipe, attempt) => {
     return { apiResponse: response, debug: { imagePrompt } };
 };
 
-const generateShoppingListOnly = async (settings, recipes) => {
-    const { persons } = settings;
-    const recipeTitles = recipes.map(r => `"${r.title}"`).join(', ');
-
-    const systemInstruction = `You are an expert shopping list generator. Your task is to create a complete, categorized shopping list based on a list of recipes and the number of people. Your response must be in valid JSON format, containing only the shopping list.
+const generateShoppingListOnly = async (scaledIngredients) => {
+    const systemInstruction = `You are an expert shopping list generator. Your task is to create a complete, categorized shopping list from a pre-calculated list of ingredients. Your response must be in valid JSON format.
 The JSON must strictly follow this schema:
 {
   "shoppingList": [ { "category": "string (e.g., 'Obst & Gemüse')", "items": ["string (German, with quantities)"] } ]
 }
-- Consolidate ingredients from all recipes.
-- Calculate the total required quantity of each item for the specified number of people for one week.
+- Consolidate similar items (e.g., "200g Zwiebeln" and "150g Zwiebeln" becomes "350g Zwiebeln").
+- Format the output items nicely (e.g., "Mehl: 500g").
 - All text must be in German.
 - Do not use markdown or add any comments in the JSON.
 `;
 
     const userPrompt = `
-Generate a weekly shopping list for ${persons} people based on the following recipes: ${recipeTitles}.
+Generate a categorized shopping list from these ingredients. The quantities are already correctly calculated. You just need to consolidate and categorize them.
+Ingredients: ${JSON.stringify(scaledIngredients)}
 
 Please provide only the "shoppingList" part of the response in the specified JSON format.
 `;
@@ -224,8 +226,54 @@ Please provide only the "shoppingList" part of the response in the specified JSO
     }
 };
 
+const convertIngredientsToStructuredFormat = async (ingredientStrings, originalPersons) => {
+    const systemInstruction = `You are a precise data conversion tool. Your only task is to convert an array of ingredient strings into a structured JSON array.
+The output MUST be a valid JSON array of objects, where each object has the keys "ingredient", "quantity", and "unit".
+- For items without a clear unit (e.g., "1 Zwiebel"), use "Stück" as the unit.
+- If quantity is not specified, assume 1. For units like "Prise" or "Bund", quantity should be 1.
+- The provided ingredient quantities are for a specific number of people. You MUST calculate the equivalent quantities for a SINGLE person (a base of 1). Divide the original quantity by the provided number of people. Round to a reasonable number of decimals if necessary.
+- Do not output anything other than the JSON array. No explanations, no markdown.
+`;
+
+    const userPrompt = `
+    Convert the following ingredient list. The original quantities are for ${originalPersons} people. Calculate the quantities for 1 person.
+
+    Ingredient List:
+    ${JSON.stringify(ingredientStrings)}
+
+    Return ONLY the JSON array.
+    `;
+    
+    const response = await generateWithFallback({
+        model: 'gemini-2.5-flash',
+        contents: userPrompt,
+        config: {
+            systemInstruction: systemInstruction,
+            responseMimeType: 'application/json',
+        }
+    });
+
+    try {
+        const text = response.text.trim();
+        const data = JSON.parse(text);
+        if (Array.isArray(data)) {
+            return data;
+        }
+        const key = Object.keys(data)[0];
+        if (Array.isArray(data[key])) {
+            return data[key];
+        }
+        throw new Error("Parsed JSON is not an array.");
+    } catch (e) {
+        console.error("Failed to parse Gemini response for ingredient conversion as JSON.", e);
+        console.error("Raw response text:", response.text);
+        throw new Error("The AI response for ingredient conversion was not in the expected format.");
+    }
+};
+
 module.exports = {
-    generatePlanAndShoppingList,
+    generatePlan,
     generateImageForRecipe,
     generateShoppingListOnly,
+    convertIngredientsToStructuredFormat,
 };

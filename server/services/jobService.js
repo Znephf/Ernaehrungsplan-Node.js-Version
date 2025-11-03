@@ -1,5 +1,3 @@
-
-
 const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
@@ -34,10 +32,19 @@ async function getFullPlanById(planId) {
     for (const link of recipeLinks) {
         let recipe = recipeMap.get(link.id);
         if (!recipe) {
+             const ingredients = JSON.parse(link.ingredients || '[]');
+             // Scale ingredients for display
+             const scaledIngredients = ingredients.map(ing => {
+                const basePersons = link.base_persons || 1;
+                const scaledQuantity = (ing.quantity / basePersons) * persons;
+                // Format back to string for frontend compatibility
+                return `${scaledQuantity} ${ing.unit} ${ing.ingredient}`.replace(' 1 Stück', '');
+             });
+
             recipe = {
                 id: link.id,
                 title: link.title,
-                ingredients: JSON.parse(link.ingredients || '[]'),
+                ingredients: scaledIngredients, // Now a string array
                 instructions: JSON.parse(link.instructions || '[]'),
                 totalCalories: link.totalCalories,
                 protein: link.protein,
@@ -50,6 +57,7 @@ async function getFullPlanById(planId) {
                 isGlutenFree: link.isGlutenFree,
                 isLactoseFree: link.isLactoseFree,
                 image_url: link.image_url,
+                base_persons: link.base_persons,
             };
             recipeMap.set(link.id, recipe);
             recipes.push(recipe);
@@ -87,35 +95,30 @@ async function savePlanToDatabase(planData, settings) {
     try {
         await connection.beginTransaction();
         
-        // AI now returns recipe calories PER PERSON, and we store them as such.
-
         const now = new Date();
         const [planResult] = await connection.query(
             'INSERT INTO plans (name, createdAt, settings, shoppingList) VALUES (?, ?, ?, ?)',
-            [planData.name, now, JSON.stringify(settings), JSON.stringify(planData.shoppingList)]
+            [planData.name, now, JSON.stringify(settings), JSON.stringify([])] // Start with empty shopping list
         );
         const newPlanId = planResult.insertId;
 
         for (const recipe of planData.recipes) {
             const [recipeResult] = await connection.query(
-                `INSERT INTO recipes (title, ingredients, instructions, totalCalories, protein, carbs, fat, category, dietaryPreference, dietType, dishComplexity, isGlutenFree, isLactoseFree) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `INSERT INTO recipes (title, ingredients, instructions, totalCalories, protein, carbs, fat, category, dietaryPreference, dietType, dishComplexity, isGlutenFree, isLactoseFree, base_persons) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON DUPLICATE KEY UPDATE title=VALUES(title)`,
                 [
                     recipe.title, JSON.stringify(recipe.ingredients), JSON.stringify(recipe.instructions),
-                    recipe.totalCalories, // Saving the per-person value directly
-                    recipe.protein, 
-                    recipe.carbs, 
-                    recipe.fat, 
-                    recipe.category,
+                    recipe.totalCalories,
+                    recipe.protein, recipe.carbs, recipe.fat, recipe.category,
                     settings.dietaryPreference, settings.dietType, settings.dishComplexity, 
-                    settings.isGlutenFree, settings.isLactoseFree
+                    settings.isGlutenFree, settings.isLactoseFree,
+                    1 // All new recipes are generated for a base of 1 person
                 ]
             );
             
             const recipeId = recipeResult.insertId > 0 ? recipeResult.insertId : (await connection.query('SELECT id FROM recipes WHERE title = ?', [recipe.title]))[0][0].id;
 
-            // Finde die richtige Tages- und Mahlzeitzuordnung
             for (const day of planData.weeklyPlan) {
                 for (const meal of day.meals) {
                     if (meal.recipeId === recipe.id) {
@@ -130,7 +133,6 @@ async function savePlanToDatabase(planData, settings) {
 
         await connection.commit();
         
-        // Lade den vollständigen Plan erneut, um sicherzustellen, dass alle Daten korrekt sind
         return getFullPlanById(newPlanId);
 
     } catch (error) {
@@ -147,37 +149,48 @@ async function saveCustomPlanToDatabase({ name, persons, mealsByDay }) {
     try {
         await connection.beginTransaction();
 
-        const settings = { persons }; // Simplified settings for custom plan
+        const settings = { persons };
         const now = new Date();
 
-        // 1. Create plan entry
         const [planResult] = await connection.query(
             'INSERT INTO plans (name, createdAt, settings) VALUES (?, ?, ?)',
             [name, now, JSON.stringify(settings)]
         );
         const newPlanId = planResult.insertId;
 
-        const allRecipesForPlan = [];
-
-        // 2. Link recipes
+        const recipeIdsInPlan = new Set();
         for (const day of Object.keys(mealsByDay)) {
             for (const meal of mealsByDay[day]) {
                 if (meal.recipe && meal.recipe.id) {
-                    await connection.query(
+                     await connection.query(
                         'INSERT INTO plan_recipes (plan_id, recipe_id, day_of_week, meal_type) VALUES (?, ?, ?, ?)',
                         [newPlanId, meal.recipe.id, day, meal.mealType]
                     );
-                    allRecipesForPlan.push(meal.recipe);
+                    recipeIdsInPlan.add(meal.recipe.id);
                 }
             }
         }
         
-        // 3. Generate shopping list
-        if (allRecipesForPlan.length > 0) {
-            console.log(`Generating shopping list for custom plan #${newPlanId}...`);
-            const shoppingList = await generateShoppingListOnly(settings, allRecipesForPlan);
+        if (recipeIdsInPlan.size > 0) {
+            console.log(`Generating shopping list for custom plan #${newPlanId} for ${persons} person(s).`);
             
-            // 4. Update plan with shopping list
+            const [recipesForPlan] = await pool.query(
+                'SELECT id, ingredients, base_persons FROM recipes WHERE id IN (?)',
+                [[...recipeIdsInPlan]]
+            );
+            
+            const scaledIngredients = [];
+            recipesForPlan.forEach(recipe => {
+                const ingredients = JSON.parse(recipe.ingredients || '[]');
+                const basePersons = recipe.base_persons || 1;
+                ingredients.forEach(ing => {
+                    const scaledQuantity = (ing.quantity / basePersons) * persons;
+                    scaledIngredients.push({ ...ing, quantity: scaledQuantity });
+                });
+            });
+            
+            const shoppingList = await generateShoppingListOnly(scaledIngredients);
+            
             await connection.query(
                 'UPDATE plans SET shoppingList = ? WHERE id = ?',
                 [JSON.stringify(shoppingList), newPlanId]
@@ -185,8 +198,6 @@ async function saveCustomPlanToDatabase({ name, persons, mealsByDay }) {
         }
 
         await connection.commit();
-        
-        // 5. Return full plan data
         return getFullPlanById(newPlanId);
 
     } catch (error) {
@@ -213,7 +224,6 @@ async function processShareJob(jobId) {
         await pool.query('UPDATE app_jobs SET progressText = ? WHERE jobId = ?', ['Generiere dynamische HTML-Datei...', jobId]);
         
         const shareId = crypto.randomBytes(8).toString('hex');
-        // Übergebe den Namen für den <title>-Tag
         const htmlContent = await generateShareableHtml({ name: plan.name });
         
         const fileName = `${shareId}.html`;

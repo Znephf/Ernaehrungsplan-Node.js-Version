@@ -1,5 +1,3 @@
-
-
 const mysql = require('mysql2/promise');
 
 const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT } = process.env;
@@ -98,6 +96,7 @@ async function initializeDatabase() {
         await checkAndAlterTable(connection, 'recipes', 'isGlutenFree', 'ALTER TABLE recipes ADD COLUMN isGlutenFree BOOLEAN');
         await checkAndAlterTable(connection, 'recipes', 'isLactoseFree', 'ALTER TABLE recipes ADD COLUMN isLactoseFree BOOLEAN');
         await checkAndAlterTable(connection, 'plans', 'shoppingList', 'ALTER TABLE plans ADD COLUMN shoppingList JSON');
+        await checkAndAlterTable(connection, 'recipes', 'base_persons', 'ALTER TABLE recipes ADD COLUMN base_persons INT DEFAULT 1');
 
 
     } catch (error) {

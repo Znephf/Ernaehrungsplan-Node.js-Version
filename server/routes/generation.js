@@ -1,11 +1,12 @@
 
+
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
 const { pool } = require('../services/database');
-const { generatePlanAndShoppingList, generateImageForRecipe } = require('../services/geminiService');
+const { generatePlan, generateShoppingListOnly, generateImageForRecipe } = require('../services/geminiService');
 const { savePlanToDatabase } = require('../services/jobService');
 
 const jobs = {}; // In-memory Job-Speicher
@@ -22,15 +23,29 @@ router.post('/generate-plan-job', async (req, res) => {
     // Asynchrone Verarbeitung
     (async () => {
         try {
+            // --- SCHRITT 1: Plan und Rezepte generieren ---
             jobs[jobId].status = 'generating_plan';
-            const generatedPlan = await generatePlanAndShoppingList(settings, previousPlanRecipes);
+            const generatedPlan = await generatePlan(settings, previousPlanRecipes);
             
-            jobs[jobId].status = 'generating_shopping_list'; // Status-Update
+            // Plan mit leerer Einkaufsliste speichern, um IDs zu erhalten
+            const savedPlanWithRecipes = await savePlanToDatabase(generatedPlan, settings);
             
-            // Speichere den Plan in der Datenbank. Diese Funktion gibt den vollständigen, gespeicherten Plan zurück.
-            const savedPlan = await savePlanToDatabase(generatedPlan, settings);
+            // --- SCHRITT 2: Einkaufsliste generieren ---
+            jobs[jobId].status = 'generating_shopping_list';
             
-            jobs[jobId].plan = savedPlan;
+            // Einkaufsliste basierend auf den gespeicherten Rezepten erstellen
+            const shoppingList = await generateShoppingListOnly(settings, savedPlanWithRecipes.recipes);
+            
+            // Plan in der DB mit der neuen Einkaufsliste aktualisieren
+            await pool.query(
+                'UPDATE plans SET shoppingList = ? WHERE id = ?',
+                [JSON.stringify(shoppingList), savedPlanWithRecipes.id]
+            );
+
+            // Einkaufsliste zum Plan-Objekt für die Rückgabe hinzufügen
+            savedPlanWithRecipes.shoppingList = shoppingList;
+            
+            jobs[jobId].plan = savedPlanWithRecipes;
             jobs[jobId].status = 'complete';
 
         } catch (error) {
