@@ -61,6 +61,27 @@ async function generateShareableHtml(plan) {
             };
             const escape = (str) => String(str).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
             
+            function formatIngredient(ing, basePersons, targetPersons) {
+                if (!ing || typeof ing.quantity === 'undefined' || ing.ingredient === null) return null;
+                
+                let scaledQuantity = (ing.quantity / (basePersons || 1)) * targetPersons;
+                const simpleUnits = ['Stück', 'Prise', 'Bund', 'Zehe', 'Stangen'];
+                if (ing.unit && simpleUnits.some(u => ing.unit.toLowerCase().includes(u.toLowerCase()))) {
+                    scaledQuantity = Math.round(scaledQuantity * 10) / 10;
+                } else {
+                    scaledQuantity = Math.round(scaledQuantity);
+                }
+                if (scaledQuantity === 0) return null;
+
+                let unit = ing.unit;
+                if (ing.unit && ing.unit.toLowerCase() === 'stück') {
+                    if (scaledQuantity === 1) return escape(ing.ingredient);
+                    unit = 'Stücke';
+                }
+                
+                return escape(`${scaledQuantity} ${unit} ${ing.ingredient}`);
+            }
+
             function renderWeeklyPlan(plan) {
                 return '<div class="space-y-8">' +
                     '<h2 class="text-3xl font-bold text-center text-slate-700">' + escape(plan.name) + '</h2>' +
@@ -112,8 +133,11 @@ async function generateShareableHtml(plan) {
                             '<span class="flex items-center gap-1.5 text-sm">' + Icons.carbs + '<div><span class="font-bold">' + recipe.carbs + 'g</span><span class="text-slate-500 text-xs block">Kohlenh.</span></div></span>' +
                             '<span class="flex items-center gap-1.5 text-sm">' + Icons.fat + '<div><span class="font-bold">' + recipe.fat + 'g</span><span class="text-slate-500 text-xs block">Fett</span></div></span>' +
                             '</div>' : '';
-
-                        const ingredientsHtml = '<ul class="space-y-2 list-disc list-inside text-slate-600">' + (recipe.ingredients || []).map(ing => '<li>' + escape(ing) + '</li>').join('') + '</ul>';
+                        
+                        const ingredientsHtml = '<ul class="space-y-2 list-disc list-inside text-slate-600">' + (recipe.ingredients || []).map(ing => {
+                            const formatted = formatIngredient(ing, recipe.base_persons, plan.settings.persons);
+                            return formatted ? '<li>' + formatted + '</li>' : '';
+                        }).join('') + '</ul>';
                         const instructionsHtml = '<ol class="space-y-3 list-decimal list-inside text-slate-600">' + (recipe.instructions || []).map(step => '<li>' + escape(step) + '</li>').join('') + '</ol>';
 
                         return '<div class="bg-white rounded-lg shadow-lg overflow-hidden">' +

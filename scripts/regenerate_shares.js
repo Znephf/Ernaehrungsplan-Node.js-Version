@@ -68,7 +68,7 @@ async function regenerateAllShareableHtmls() {
         console.log(`Failed to regenerate: ${errorCount} files.`);
 
     } catch (error) {
-        console.error('\n--- A CRITICAL SCRIPT ERROR OCCURRED ---');
+        console.error('\n--- A CRITICAL SCRIPT ERROR OCCURRED! ---');
         console.error(error.message);
     } finally {
         if (pool) {
