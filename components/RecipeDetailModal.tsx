@@ -105,14 +105,28 @@ const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, 
                                         <h4 className="text-lg font-semibold text-slate-700">Zutaten:</h4>
                                         <div className="flex items-center gap-1.5 text-sm">
                                             <label htmlFor="persons-input" className="text-slate-600">Für</label>
-                                            <input
-                                                id="persons-input"
-                                                type="number"
-                                                value={persons}
-                                                onChange={e => setPersons(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                                                className="w-14 p-1 text-center border border-slate-300 rounded-md"
-                                                min="1"
-                                            />
+                                            <div className="flex items-center">
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => setPersons(p => Math.max(1, p - 1))}
+                                                    className="px-3 h-8 bg-slate-200 text-slate-700 font-bold border border-slate-300 rounded-l-md hover:bg-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:z-10 transition-colors" 
+                                                    aria-label="Anzahl Personen verringern"
+                                                >−</button>
+                                                <input
+                                                    id="persons-input"
+                                                    type="text"
+                                                    value={persons}
+                                                    readOnly
+                                                    className="w-10 h-8 text-center bg-white border-t border-b border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:z-10"
+                                                    aria-label="Anzahl Personen"
+                                                />
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => setPersons(p => p + 1)}
+                                                    className="px-3 h-8 bg-slate-200 text-slate-700 font-bold border border-slate-300 rounded-r-md hover:bg-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:z-10" 
+                                                    aria-label="Anzahl Personen erhöhen"
+                                                >+</button>
+                                            </div>
                                             <span className="text-slate-600">Pers.</span>
                                         </div>
                                     </div>
