@@ -76,7 +76,7 @@ const Header: React.FC<HeaderProps> = ({
                         title="Abmelden"
                     >
                         <LogoutIcon />
-                        <span className="hidden sm:inline">Abmelden</span>
+                        <span>Abmelden</span>
                     </button>
                 </div>
             </div>
