@@ -104,7 +104,10 @@ async function generateShareableHtml(plan) {
             }
             function renderShoppingList(plan) {
                  return '<div class="space-y-8">' +
-                    '<h2 class="text-3xl font-bold text-slate-700">Wöchentliche Einkaufsliste</h2>' +
+                    '<div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">' +
+                        '<h2 class="text-3xl font-bold text-slate-700">Wöchentliche Einkaufsliste</h2>' +
+                        '<button id="reset-shopping-list" class="px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-md shadow-sm">Einkaufsliste zurücksetzen</button>' +
+                    '</div>' +
                     '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-1">' +
                         plan.shoppingList.map(({ category, items }) => '<div class="bg-white rounded-lg shadow-lg p-6 break-inside-avoid">' +
                             '<h3 class="text-xl font-semibold text-emerald-700 border-b-2 border-emerald-200 pb-2 mb-4">' + escape(category) + '</h3>' +
@@ -189,13 +192,54 @@ async function generateShareableHtml(plan) {
                         window.scrollTo(0,0);
                     });
                 });
+                
+                const path = window.location.pathname;
+                const shareId = path.substring(path.lastIndexOf('/') + 1).replace('.html', '');
+                const storageKey = 'shoppingListState_' + shareId;
+
+                const resetButton = document.getElementById('reset-shopping-list');
+                if (resetButton) {
+                    resetButton.addEventListener('click', () => {
+                        if (window.confirm('Möchten Sie den Status der gesamten Einkaufsliste wirklich zurücksetzen? Alle Haken werden entfernt.')) {
+                            localStorage.removeItem(storageKey);
+                            location.reload();
+                        }
+                    });
+                }
+                
+                let state = {};
+                try { state = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch(e) { console.error('Could not parse shopping list state.'); state = {}; }
+
                 document.querySelectorAll('.shopping-item-checkbox').forEach(checkbox => {
+                    const label = checkbox.closest('label');
+                    const span = label ? label.querySelector('span') : null;
+                    if (!span) return;
+                    
+                    const itemText = span.textContent.trim();
+                    
+                    if (state[itemText]) {
+                        checkbox.checked = true;
+                        span.style.textDecoration = 'line-through';
+                        span.style.color = '#94a3b8';
+                    }
+
                     checkbox.addEventListener('change', e => {
-                        const span = e.target.closest('label').querySelector('span');
-                        if (e.target.checked) { span.style.textDecoration = 'line-through'; span.style.color = '#94a3b8'; } 
-                        else { span.style.textDecoration = 'none'; span.style.color = '#475569'; }
+                        let currentState = {};
+                        try { currentState = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch(err) { currentState = {}; }
+
+                        currentState[itemText] = e.target.checked;
+                        localStorage.setItem(storageKey, JSON.stringify(currentState));
+
+                        if (e.target.checked) { 
+                            span.style.textDecoration = 'line-through';
+                            span.style.color = '#94a3b8';
+                        } else { 
+                            span.style.textDecoration = 'none';
+                            span.style.color = '#475569';
+                        }
                     });
                 });
+
                 document.querySelectorAll('a.recipe-link').forEach(link => {
                     link.addEventListener('click', e => {
                         e.preventDefault();
