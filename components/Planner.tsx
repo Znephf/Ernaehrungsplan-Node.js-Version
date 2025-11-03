@@ -3,6 +3,7 @@ import type { Recipe, Diet, DietType, DishComplexity, MealCategory } from '../ty
 import { MealCategoryLabels, MEAL_ORDER } from '../types';
 import * as apiService from '../services/apiService';
 import { LoadingSpinnerIcon, CloseIcon } from './IconComponents';
+import LoadingOverlay from './LoadingOverlay';
 
 const useMediaQuery = (query: string): boolean => {
     const isClient = typeof window === 'object';
@@ -246,6 +247,15 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
 
     return (
         <div>
+            {isSaving && (
+                <LoadingOverlay 
+                    status="Dein Plan wird gespeichert und die Einkaufsliste generiert..."
+                    onCancel={() => {
+                        setIsSaving(false); 
+                        setError("Speichern abgebrochen.");
+                    }} 
+                />
+            )}
             {isDesktop ? (
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
                     {/* ===== LEFT COLUMN: Recipe List ===== */}

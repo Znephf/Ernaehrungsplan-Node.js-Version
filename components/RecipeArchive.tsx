@@ -1,11 +1,14 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import type { Recipe, Diet, MealCategory } from '../types';
+import type { Recipe, Diet, MealCategory, DietType, DishComplexity } from '../types';
 import * as apiService from '../services/apiService';
 import { MealCategoryLabels } from '../types';
 import RecipeDetailModal from './RecipeDetailModal';
 import { useImageGenerator } from '../hooks/useImageGenerator';
 
 const dietPreferenceLabels: Record<Diet, string> = { omnivore: 'Alles', vegetarian: 'Vegetarisch', vegan: 'Vegan' };
+const dietTypeLabels: Record<DietType, string> = { balanced: 'Ausgewogen', 'low-carb': 'Low-Carb', keto: 'Ketogen', 'high-protein': 'High-Protein', mediterranean: 'Mediterran' };
+const dishComplexityLabels: Record<DishComplexity, string> = { simple: 'Einfach', advanced: 'Fortgeschritten', fancy: 'Pfiffig' };
+
 
 const FilterToggleButton: React.FC<{ label: string; isSelected: boolean; onClick: () => void; }> = ({ label, isSelected, onClick }) => (
     <button onClick={onClick} className={`px-3 py-1 text-sm rounded-full transition-colors font-medium whitespace-nowrap ${ isSelected ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-200 text-slate-700 hover:bg-slate-300' }`}>{label}</button>
@@ -78,6 +81,10 @@ const RecipeArchiveComponent: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedMealCategories, setSelectedMealCategories] = useState<Set<MealCategory>>(new Set());
     const [selectedPreferences, setSelectedPreferences] = useState<Set<Diet>>(new Set());
+    const [selectedDietTypes, setSelectedDietTypes] = useState<Set<DietType>>(new Set());
+    const [selectedComplexities, setSelectedComplexities] = useState<Set<DishComplexity>>(new Set());
+    const [filterGlutenFree, setFilterGlutenFree] = useState(false);
+    const [filterLactoseFree, setFilterLactoseFree] = useState(false);
     
     const handleFilterToggle = <T extends string>(value: T, currentFilters: Set<T>, setFilters: React.Dispatch<React.SetStateAction<Set<T>>>) => {
         const newFilters = new Set(currentFilters);
@@ -90,9 +97,14 @@ const RecipeArchiveComponent: React.FC = () => {
             const matchesSearch = !searchTerm.trim() || recipe.title.toLowerCase().includes(searchTerm.toLowerCase().trim());
             const matchesCategory = selectedMealCategories.size === 0 || selectedMealCategories.has(recipe.category);
             const matchesPreference = selectedPreferences.size === 0 || (recipe.dietaryPreference && selectedPreferences.has(recipe.dietaryPreference));
-            return matchesSearch && matchesCategory && matchesPreference;
+            const matchesDietType = selectedDietTypes.size === 0 || (recipe.dietType && selectedDietTypes.has(recipe.dietType));
+            const matchesComplexity = selectedComplexities.size === 0 || (recipe.dishComplexity && selectedComplexities.has(recipe.dishComplexity));
+            const matchesGlutenFree = !filterGlutenFree || !!recipe.isGlutenFree;
+            const matchesLactoseFree = !filterLactoseFree || !!recipe.isLactoseFree;
+            
+            return matchesSearch && matchesCategory && matchesPreference && matchesDietType && matchesComplexity && matchesGlutenFree && matchesLactoseFree;
         });
-    }, [allRecipes, searchTerm, selectedMealCategories, selectedPreferences]);
+    }, [allRecipes, searchTerm, selectedMealCategories, selectedPreferences, selectedDietTypes, selectedComplexities, filterGlutenFree, filterLactoseFree]);
     
     if (isLoading) {
         return <div className="text-center py-16">Lade Rezepte...</div>;
@@ -108,6 +120,19 @@ const RecipeArchiveComponent: React.FC = () => {
                 <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Mahlzeit:</span>{(Object.keys(MealCategoryLabels) as MealCategory[]).map(key => <FilterToggleButton key={key} label={MealCategoryLabels[key]} isSelected={selectedMealCategories.has(key)} onClick={() => handleFilterToggle(key, selectedMealCategories, setSelectedMealCategories)} />)}</div>
                     <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Ernährung:</span>{(Object.keys(dietPreferenceLabels) as Diet[]).map(key => <FilterToggleButton key={key} label={dietPreferenceLabels[key]} isSelected={selectedPreferences.has(key)} onClick={() => handleFilterToggle(key, selectedPreferences, setSelectedPreferences)} />)}</div>
+                    <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Diät-Typ:</span>{(Object.keys(dietTypeLabels) as DietType[]).map(key => <FilterToggleButton key={key} label={dietTypeLabels[key]} isSelected={selectedDietTypes.has(key)} onClick={() => handleFilterToggle(key, selectedDietTypes, setSelectedDietTypes)} />)}</div>
+                    <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Koch-Niveau:</span>{(Object.keys(dishComplexityLabels) as DishComplexity[]).map(key => <FilterToggleButton key={key} label={dishComplexityLabels[key]} isSelected={selectedComplexities.has(key)} onClick={() => handleFilterToggle(key, selectedComplexities, setSelectedComplexities)} />)}</div>
+                    <div className="flex flex-wrap items-center gap-2 pt-2">
+                        <span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Optionen:</span>
+                        <label className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700 bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded-full transition-colors has-[:checked]:bg-emerald-600 has-[:checked]:text-white has-[:checked]:shadow-sm">
+                            <input type="checkbox" checked={filterGlutenFree} onChange={(e) => setFilterGlutenFree(e.target.checked)} className="h-0 w-0 absolute opacity-0" />
+                            <span>Nur Glutenfrei</span>
+                        </label>
+                        <label className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700 bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded-full transition-colors has-[:checked]:bg-emerald-600 has-[:checked]:text-white has-[:checked]:shadow-sm">
+                            <input type="checkbox" checked={filterLactoseFree} onChange={(e) => setFilterLactoseFree(e.target.checked)} className="h-0 w-0 absolute opacity-0" />
+                            <span>Nur Laktosefrei</span>
+                        </label>
+                    </div>
                 </div>
             </div>
 
