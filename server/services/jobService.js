@@ -149,7 +149,6 @@ async function saveCustomPlanToDatabase({ name, persons, mealsByDay }) {
         );
         const newPlanId = planResult.insertId;
 
-        const recipeIdsInPlan = new Set();
         for (const day of Object.keys(mealsByDay)) {
             for (const meal of mealsByDay[day]) {
                 if (meal.recipe && meal.recipe.id) {
@@ -157,35 +156,48 @@ async function saveCustomPlanToDatabase({ name, persons, mealsByDay }) {
                         'INSERT INTO plan_recipes (plan_id, recipe_id, day_of_week, meal_type) VALUES (?, ?, ?, ?)',
                         [newPlanId, meal.recipe.id, day, meal.mealType]
                     );
-                    recipeIdsInPlan.add(meal.recipe.id);
                 }
             }
         }
         
-        if (recipeIdsInPlan.size > 0) {
+        if (Object.keys(mealsByDay).length > 0) {
             console.log(`Generating shopping list for custom plan #${newPlanId} for ${persons} person(s).`);
-            
-            const [recipesForPlan] = await pool.query(
-                'SELECT id, ingredients, base_persons FROM recipes WHERE id IN (?)',
-                [[...recipeIdsInPlan]]
-            );
-            
-            const scaledIngredients = [];
-            recipesForPlan.forEach(recipe => {
-                const ingredients = JSON.parse(recipe.ingredients || '[]');
-                const basePersons = recipe.base_persons || 1;
-                ingredients.forEach(ing => {
-                    const scaledQuantity = (ing.quantity / basePersons) * persons;
-                    scaledIngredients.push({ ...ing, quantity: scaledQuantity });
-                });
-            });
-            
-            const shoppingList = await generateShoppingListOnly(scaledIngredients);
-            
-            await connection.query(
-                'UPDATE plans SET shoppingList = ? WHERE id = ?',
-                [JSON.stringify(shoppingList), newPlanId]
-            );
+
+            // To avoid multiple DB queries, fetch all needed recipes once
+            const allRecipeIds = new Set();
+            for (const day in mealsByDay) {
+                mealsByDay[day].forEach(meal => allRecipeIds.add(meal.recipe.id));
+            }
+
+            if (allRecipeIds.size > 0) {
+                const [recipesData] = await pool.query(
+                    'SELECT id, ingredients, base_persons FROM recipes WHERE id IN (?)',
+                    [[...allRecipeIds]]
+                );
+                const recipeDataMap = new Map(recipesData.map(r => [r.id, r]));
+
+                const scaledIngredients = [];
+                for (const day in mealsByDay) {
+                    for (const meal of mealsByDay[day]) {
+                        const recipeInfo = recipeDataMap.get(meal.recipe.id);
+                        if (recipeInfo) {
+                            const ingredients = JSON.parse(recipeInfo.ingredients || '[]');
+                            const basePersons = recipeInfo.base_persons || 1;
+                            ingredients.forEach(ing => {
+                                const scaledQuantity = (ing.quantity / basePersons) * persons;
+                                scaledIngredients.push({ ...ing, quantity: scaledQuantity });
+                            });
+                        }
+                    }
+                }
+
+                const shoppingList = await generateShoppingListOnly(scaledIngredients);
+                
+                await connection.query(
+                    'UPDATE plans SET shoppingList = ? WHERE id = ?',
+                    [JSON.stringify(shoppingList), newPlanId]
+                );
+            }
         }
 
         await connection.commit();

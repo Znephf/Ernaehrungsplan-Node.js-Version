@@ -33,8 +33,32 @@ router.post('/generate-plan-job', async (req, res) => {
             // --- SCHRITT 2: Einkaufsliste generieren ---
             jobs[jobId].status = 'generating_shopping_list';
             
-            // Einkaufsliste basierend auf den gespeicherten Rezepten erstellen
-            const shoppingList = await generateShoppingListOnly(settings, savedPlanWithRecipes.recipes);
+            // BEHOBEN: Zutaten für die Einkaufsliste manuell skalieren, basierend auf den Planeinstellungen.
+            // Die KI generiert Rezepte für 1 Person, aber die Einkaufsliste muss für die in den Einstellungen angegebene Personenzahl sein.
+            const scaledIngredients = [];
+            const persons = settings.persons || 1; // Personenanzahl aus den Einstellungen holen.
+
+            // Alle Mahlzeiten der Woche durchgehen, um alle Zutaten zu sammeln.
+            savedPlanWithRecipes.weeklyPlan.forEach(dayPlan => {
+                dayPlan.meals.forEach(meal => {
+                    const recipe = meal.recipe;
+                    if (recipe && Array.isArray(recipe.ingredients)) {
+                        const basePersons = recipe.base_persons || 1; // Sollte für neue Rezepte immer 1 sein.
+                        recipe.ingredients.forEach(ing => {
+                            const quantity = typeof ing.quantity === 'number' ? ing.quantity : 0;
+                            const scaledQuantity = (quantity / basePersons) * persons;
+                            scaledIngredients.push({
+                                ingredient: ing.ingredient,
+                                quantity: scaledQuantity,
+                                unit: ing.unit
+                            });
+                        });
+                    }
+                });
+            });
+
+            // Die KI mit der korrekt skalierten Zutatenliste aufrufen.
+            const shoppingList = await generateShoppingListOnly(scaledIngredients);
             
             // Plan in der DB mit der neuen Einkaufsliste aktualisieren
             await pool.query(
