@@ -1,6 +1,6 @@
 // Fix: Implemented the main App component to manage state, authentication, and orchestrate different views.
 import React, { useState, useEffect, useCallback } from 'react';
-import type { View, PlanSettings, ArchiveEntry, WeeklyPlan, Recipe } from './types';
+import type { View, PlanSettings, ArchiveEntry, WeeklyPlan, Recipe, MealCategory } from './types';
 import * as apiService from './services/apiService';
 
 import Header from './components/Header';
@@ -177,11 +177,11 @@ const App: React.FC = () => {
 
 
     // --- UI Navigation ---
-    const handleSelectRecipe = (day: string) => {
+    const handleSelectRecipe = (day: string, mealType: MealCategory) => {
         setCurrentView('recipes');
         // Logic to scroll to the recipe can be added in RecipesComponent
         setTimeout(() => {
-            const element = document.getElementById(`recipe-${day}`);
+            const element = document.getElementById(`recipe-${day}-${mealType}`);
             if (element) {
                 element.scrollIntoView({ behavior: 'smooth' });
             }

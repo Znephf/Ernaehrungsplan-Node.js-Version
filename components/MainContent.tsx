@@ -1,6 +1,6 @@
 // Fix: Implemented the MainContent component to act as a view router, displaying the correct component based on the current view state.
 import React from 'react';
-import type { View, PlanData, PlanSettings, Recipe, ShoppingList, WeeklyPlan, ArchiveEntry } from '../types';
+import type { View, PlanData, PlanSettings, Recipe, ShoppingList, WeeklyPlan, ArchiveEntry, MealCategory } from '../types';
 import WeeklyPlanComponent from './WeeklyPlan';
 import ShoppingListComponent from './ShoppingList';
 import RecipesComponent from './Recipes';
@@ -23,7 +23,7 @@ interface MainContentProps {
   onGeneratePlan: () => void;
   onLoadPlan: (id: number) => void;
   onDeletePlan: (id: number) => void;
-  onSelectRecipe: (day: string) => void;
+  onSelectRecipe: (day: string, mealType: MealCategory) => void;
   onPlanSaved: () => void;
   generateImage: (recipe: Recipe) => Promise<void>;
   generateMissingImages: (weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;

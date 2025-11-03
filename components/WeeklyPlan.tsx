@@ -1,12 +1,12 @@
 import React from 'react';
-import type { WeeklyPlan } from '../types';
+import type { WeeklyPlan, MealCategory } from '../types';
 import { MealCategoryLabels, MEAL_ORDER } from '../types';
 import { FireIcon } from './IconComponents';
 
 interface WeeklyPlanComponentProps {
   weeklyPlan: WeeklyPlan;
   planName: string;
-  onSelectRecipe: (day: string) => void;
+  onSelectRecipe: (day: string, mealType: MealCategory) => void;
   isGlutenFree?: boolean;
   isLactoseFree?: boolean;
 }
@@ -44,7 +44,7 @@ const WeeklyPlanComponent: React.FC<WeeklyPlanComponentProps> = ({ weeklyPlan, p
                                             <span>{MealCategoryLabels[meal.mealType]}:</span>
                                             <span className="font-normal text-slate-500">{meal.recipe.totalCalories} kcal</span>
                                         </p>
-                                        <button onClick={() => onSelectRecipe(dayPlan.day)} className="text-left text-slate-600 hover:text-emerald-600 font-semibold transition-colors w-full">
+                                        <button onClick={() => onSelectRecipe(dayPlan.day, meal.mealType)} className="text-left text-slate-600 hover:text-emerald-600 font-semibold transition-colors w-full">
                                             {meal.recipe.title}
                                         </button>
                                     </div>
