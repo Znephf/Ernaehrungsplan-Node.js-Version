@@ -32,7 +32,7 @@ router.post('/share', async (req, res) => {
         res.status(202).json({ jobId });
     } catch (error) {
         console.error(`[Share Job] KRITISCHER FEHLER beim Erstellen des Share-Jobs für planId ${planId}:`, error);
-        res.status(500).json({ error: 'Job konnte nicht erstellt werden.' });
+        res.status(500).json({ error: 'Der Share-Job konnte nicht erstellt werden. Bitte prüfen Sie die Server-Logs für die genaue Fehlermeldung.' });
     }
 });
 
