@@ -12,8 +12,8 @@ router.post('/share', async (req, res) => {
     }
     const jobId = crypto.randomBytes(16).toString('hex');
     try {
-        // Prüfen, ob der Plan existiert
-        const [planRows] = await pool.query('SELECT id FROM archived_plans WHERE id = ?', [planId]);
+        // BEHOBEN: Die Abfrage zielt nun auf die korrekte 'plans'-Tabelle, nicht mehr auf die veraltete 'archived_plans'.
+        const [planRows] = await pool.query('SELECT id FROM plans WHERE id = ?', [planId]);
         if (planRows.length === 0) {
             return res.status(404).json({ error: 'Der angegebene Plan wurde nicht gefunden.' });
         }
