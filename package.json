@@ -18,6 +18,7 @@
     "migrate:ingredients": "node scripts/migrate_structured_ingredients.js",
     "fix:shopping-list": "node scripts/regenerate_shopping_list.js",
     "fix:calories": "node scripts/fix_recipe_calories.js",
+    "fix:diet-preference": "node scripts/fix_null_diet_preference.js",
     "regenerate:shares": "node scripts/regenerate_shares.js"
   },
   "keywords": [
