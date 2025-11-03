@@ -1,5 +1,4 @@
-
-
+// Fix: Refactored the Gemini service to support batch processing of ingredients, reducing API calls.
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
@@ -57,8 +56,26 @@ router.post('/generate-plan-job', async (req, res) => {
                 });
             });
 
-            // Die KI mit der korrekt skalierten Zutatenliste aufrufen.
-            const shoppingList = await generateShoppingListOnly(scaledIngredients);
+            // --- NEU: Zutaten vor der Übergabe an die KI serverseitig zusammenfassen ---
+            const aggregatedIngredients = new Map();
+            scaledIngredients.forEach(ing => {
+                // Normalisiere Zutat und Einheit für eine zuverlässige Gruppierung
+                const key = `${(ing.ingredient || '').toLowerCase().trim()}|${(ing.unit || '').toLowerCase().trim()}`;
+                if (aggregatedIngredients.has(key)) {
+                    const existing = aggregatedIngredients.get(key);
+                    existing.quantity += ing.quantity;
+                } else {
+                    // Erstelle eine Kopie des Objekts, um das Original nicht zu verändern
+                    aggregatedIngredients.set(key, { ...ing });
+                }
+            });
+
+            // Konvertiere die Map zurück in ein Array für die API
+            const finalIngredientsList = Array.from(aggregatedIngredients.values());
+
+
+            // Die KI mit der korrekt skalierten UND zusammengefassten Zutatenliste aufrufen.
+            const shoppingList = await generateShoppingListOnly(finalIngredientsList);
             
             // Plan in der DB mit der neuen Einkaufsliste aktualisieren
             await pool.query(

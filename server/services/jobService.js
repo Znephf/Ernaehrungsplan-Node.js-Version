@@ -190,8 +190,25 @@ async function saveCustomPlanToDatabase({ name, persons, mealsByDay }) {
                         }
                     }
                 }
+                
+                // --- NEU: Zutaten vor der Übergabe an die KI serverseitig zusammenfassen ---
+                const aggregatedIngredients = new Map();
+                scaledIngredients.forEach(ing => {
+                    // Normalisiere Zutat und Einheit für eine zuverlässige Gruppierung
+                    const key = `${(ing.ingredient || '').toLowerCase().trim()}|${(ing.unit || '').toLowerCase().trim()}`;
+                    if (aggregatedIngredients.has(key)) {
+                        const existing = aggregatedIngredients.get(key);
+                        existing.quantity += ing.quantity;
+                    } else {
+                        // Erstelle eine Kopie des Objekts, um das Original nicht zu verändern
+                        aggregatedIngredients.set(key, { ...ing });
+                    }
+                });
 
-                const shoppingList = await generateShoppingListOnly(scaledIngredients);
+                // Konvertiere die Map zurück in ein Array für die API
+                const finalIngredientsList = Array.from(aggregatedIngredients.values());
+
+                const shoppingList = await generateShoppingListOnly(finalIngredientsList);
                 
                 await connection.query(
                     'UPDATE plans SET shoppingList = ? WHERE id = ?',
