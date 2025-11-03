@@ -8,8 +8,6 @@ const escapeHtml = (unsafe) => {
 };
 
 async function generateShareableHtml(plan) {
-    // Die Funktion benötigt jetzt nur noch den Plannamen für den Titel.
-    // Der gesamte Inhalt wird client-seitig über die Share-ID geladen.
     const planName = plan.name || 'Ernährungsplan';
 
     return `<!DOCTYPE html>
@@ -80,104 +78,128 @@ async function generateShareableHtml(plan) {
                     unit = 'Stücke';
                 }
                 
-                return escape(scaledQuantity + ' ' + unit + ' ' + ing.ingredient);
+                return escape(`${scaledQuantity} ${unit} ${ing.ingredient}`);
             }
 
             function renderWeeklyPlan(plan) {
-                return '<div class="space-y-8">' +
-                    '<h2 class="text-3xl font-bold text-center text-slate-700">' + escape(plan.name) + '</h2>' +
-                    '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">' +
-                        plan.weeklyPlan.map(dayPlan => '<div class="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">' +
-                            '<div class="bg-emerald-600 text-white p-4 flex justify-between items-center">' +
-                                '<h3 class="text-xl font-bold">' + escape(dayPlan.day) + '</h3>' +
-                                '<div class="flex items-center gap-1 text-sm bg-emerald-700 px-2 py-1 rounded-full">' + Icons.fire + '<span>' + dayPlan.totalCalories + ' kcal</span></div>' +
-                            '</div>' +
-                            '<div class="p-6 space-y-4 flex-grow">' +
-                                dayPlan.meals.map(meal => '<div>' +
-                                    '<p class="font-semibold text-emerald-800 flex justify-between"><span>' + (MealCategoryLabels[meal.mealType] || meal.mealType) + ':</span><span class="font-normal text-slate-500">' + meal.recipe.totalCalories + ' kcal</span></p>' +
-                                    '<a href="#recipe-day-' + escape(dayPlan.day) + '-' + escape(meal.mealType) + '" class="recipe-link text-left text-slate-600 hover:text-emerald-600 font-semibold transition-colors w-full">' + escape(meal.recipe.title) + '</a>' +
-                                '</div>').join('') +
-                            '</div>' +
-                        '</div>').join('') +
-                    '</div>' +
-                '</div>';
+                const dayPlansHtml = plan.weeklyPlan.map(dayPlan => {
+                    const mealsHtml = dayPlan.meals.map(meal => `
+                        <div>
+                            <p class="font-semibold text-emerald-800 flex justify-between">
+                                <span>${MealCategoryLabels[meal.mealType] || meal.mealType}:</span>
+                                <span class="font-normal text-slate-500">${meal.recipe.totalCalories} kcal</span>
+                            </p>
+                            <a href="#recipe-day-${escape(dayPlan.day)}-${escape(meal.mealType)}" class="recipe-link text-left text-slate-600 hover:text-emerald-600 font-semibold transition-colors w-full">
+                                ${escape(meal.recipe.title)}
+                            </a>
+                        </div>
+                    `).join('');
+
+                    return `
+                        <div class="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
+                            <div class="bg-emerald-600 text-white p-4 flex justify-between items-center">
+                                <h3 class="text-xl font-bold">${escape(dayPlan.day)}</h3>
+                                <div class="flex items-center gap-1 text-sm bg-emerald-700 px-2 py-1 rounded-full">${Icons.fire}<span>${dayPlan.totalCalories} kcal</span></div>
+                            </div>
+                            <div class="p-6 space-y-4 flex-grow">${mealsHtml}</div>
+                        </div>`;
+                }).join('');
+
+                return `
+                    <div class="space-y-8">
+                        <h2 class="text-3xl font-bold text-center text-slate-700">${escape(plan.name)}</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">${dayPlansHtml}</div>
+                    </div>`;
             }
+
             function renderShoppingList(plan) {
-                 return '<div class="space-y-8">' +
-                    '<div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">' +
-                        '<h2 class="text-3xl font-bold text-slate-700">Wöchentliche Einkaufsliste</h2>' +
-                        '<button id="reset-shopping-list" class="px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-md shadow-sm">Einkaufsliste zurücksetzen</button>' +
-                    '</div>' +
-                    '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-1">' +
-                        plan.shoppingList.map(({ category, items }) => '<div class="bg-white rounded-lg shadow-lg p-6 break-inside-avoid">' +
-                            '<h3 class="text-xl font-semibold text-emerald-700 border-b-2 border-emerald-200 pb-2 mb-4">' + escape(category) + '</h3>' +
-                            '<ul class="space-y-2">' +
-                                (items || []).map(item => '<li><label class="flex items-center cursor-pointer select-none"><input type="checkbox" class="shopping-item-checkbox h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"><span class="ml-3 text-slate-600">' + escape(item) + '</span></label></li>').join('') +
-                            '</ul>' +
-                        '</div>').join('') +
-                    '</div>' +
-                '</div>';
+                const categoriesHtml = plan.shoppingList.map(({ category, items }) => {
+                    const itemsHtml = (items || [])
+                        .map(item => \`<li><label class="flex items-center cursor-pointer select-none"><input type="checkbox" class="shopping-item-checkbox h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"><span class="ml-3 text-slate-600">\${escape(item)}</span></label></li>\`)
+                        .join('');
+
+                    return \`
+                        <div class="bg-white rounded-lg shadow-lg p-6 break-inside-avoid">
+                            <h3 class="text-xl font-semibold text-emerald-700 border-b-2 border-emerald-200 pb-2 mb-4">\${escape(category)}</h3>
+                            <ul class="space-y-2">\${itemsHtml}</ul>
+                        </div>\`;
+                }).join('');
+
+                return \`
+                    <div class="space-y-8">
+                        <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
+                            <h2 class="text-3xl font-bold text-slate-700">Wöchentliche Einkaufsliste</h2>
+                            <button id="reset-shopping-list" class="px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-md shadow-sm">Einkaufsliste zurücksetzen</button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-1">
+                            \${categoriesHtml}
+                        </div>
+                    </div>\`;
             }
+
             function renderRecipes(plan) {
-                const personsText = '<p class="text-slate-500">Alle Rezepte sind für ' + (plan.settings.persons || 2) + ' Personen ausgelegt.</p>';
-                const mainTitle = '<div class="text-center sm:text-left"><h2 class="text-3xl font-bold text-slate-700">Kochanleitungen</h2>' + personsText + '</div>';
+                const persons = plan.settings.persons || 2;
+                const personsText = \`<p class="text-slate-500">Alle Rezepte sind für \${persons} \${persons > 1 ? 'Personen' : 'Person'} ausgelegt.</p>\`;
+                const mainTitle = \`<div class="text-center sm:text-left"><h2 class="text-3xl font-bold text-slate-700">Kochanleitungen</h2>\${personsText}</div>\`;
 
                 const weeklyPlanHtml = plan.weeklyPlan.map(dayPlan => {
-                    if (dayPlan.meals.length === 0) return '';
+                    if (!dayPlan.meals || dayPlan.meals.length === 0) return '';
+                    
                     const mealsHtml = dayPlan.meals.map(meal => {
                         const recipe = meal.recipe;
                         if (!recipe) return '';
 
-                        const imageUrlHtml = recipe.image_url ?
-                            '<div class="bg-slate-200"><img src="' + escape(recipe.image_url) + '" alt="' + escape(recipe.title) + '" class="w-full h-auto object-cover aspect-video"/></div>' :
-                            '<div class="aspect-video bg-slate-200 flex items-center justify-center"><p class="text-slate-500">Kein Bild vorhanden</p></div>';
+                        const imageUrlHtml = recipe.image_url 
+                            ? \`<div class="bg-slate-200"><img src="\${escape(recipe.image_url)}" alt="\${escape(recipe.title)}" class="w-full h-auto object-cover aspect-video"/></div>\`
+                            : \`<div class="aspect-video bg-slate-200 flex items-center justify-center"><p class="text-slate-500">Kein Bild vorhanden</p></div>\`;
 
-                        const macrosHtml = (recipe.protein !== undefined && recipe.protein !== null) ?
-                            '<div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-slate-600 p-3 bg-slate-50 rounded-lg">' +
-                            '<span class="flex items-center gap-1.5 text-sm">' + Icons.protein + '<div><span class="font-bold">' + recipe.protein + 'g</span><span class="text-slate-500 text-xs block">Protein</span></div></span>' +
-                            '<span class="flex items-center gap-1.5 text-sm">' + Icons.carbs + '<div><span class="font-bold">' + recipe.carbs + 'g</span><span class="text-slate-500 text-xs block">Kohlenh.</span></div></span>' +
-                            '<span class="flex items-center gap-1.5 text-sm">' + Icons.fat + '<div><span class="font-bold">' + recipe.fat + 'g</span><span class="text-slate-500 text-xs block">Fett</span></div></span>' +
-                            '</div>' : '';
+                        const macrosHtml = (recipe.protein != null) ? \`
+                            <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-slate-600 p-3 bg-slate-50 rounded-lg">
+                                <span class="flex items-center gap-1.5 text-sm">\${Icons.protein}<div><span class="font-bold">\${recipe.protein}g</span><span class="text-slate-500 text-xs block">Protein</span></div></span>
+                                <span class="flex items-center gap-1.5 text-sm">\${Icons.carbs}<div><span class="font-bold">\${recipe.carbs}g</span><span class="text-slate-500 text-xs block">Kohlenh.</span></div></span>
+                                <span class="flex items-center gap-1.5 text-sm">\${Icons.fat}<div><span class="font-bold">\${recipe.fat}g</span><span class="text-slate-500 text-xs block">Fett</span></div></span>
+                            </div>\` : '';
                         
-                        const ingredientItems = [];
-                        (recipe.ingredients || []).forEach(ing => {
-                            const formatted = formatIngredient(ing, recipe.base_persons, plan.settings.persons);
-                            if (formatted) {
-                                ingredientItems.push('<li>' + formatted + '</li>');
-                            }
-                        });
-                        const ingredientsHtml = '<ul class="space-y-2 list-disc list-inside text-slate-600">' + ingredientItems.join('') + '</ul>';
+                        const ingredientsListHtml = (recipe.ingredients || [])
+                            .map(ing => {
+                                const formatted = formatIngredient(ing, recipe.base_persons, persons);
+                                return formatted ? \`<li>\${formatted}</li>\` : null;
+                            })
+                            .filter(Boolean)
+                            .join('');
+                        const ingredientsHtml = \`<ul class="space-y-2 list-disc list-inside text-slate-600">\${ingredientsListHtml}</ul>\`;
                         
-                        const instructionsHtml = '<ol class="space-y-3 list-decimal list-inside text-slate-600">' + (recipe.instructions || []).map(step => '<li>' + escape(step) + '</li>').join('') + '</ol>';
+                        const instructionsHtml = \`<ol class="space-y-3 list-decimal list-inside text-slate-600">\${(recipe.instructions || []).map(step => \`<li>\${escape(step)}</li>\`).join('')}</ol>\`;
 
-                        return '<div id="recipe-day-' + escape(dayPlan.day) + '-' + escape(meal.mealType) + '" class="bg-white rounded-lg shadow-lg overflow-hidden">' +
-                            imageUrlHtml +
-                            '<div class="p-6">' +
-                            '<div class="flex flex-wrap items-center justify-between gap-2">' +
-                            '<span class="text-sm font-semibold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">' + (MealCategoryLabels[meal.mealType] || meal.mealType) + '</span>' +
-                            '<div class="flex items-center gap-1 text-sm text-slate-600 bg-slate-100 px-3 py-1 rounded-full">' + Icons.fire + '<span>ca. ' + recipe.totalCalories + ' kcal</span></div>' +
-                            '</div>' +
-                            '<h3 class="text-2xl font-bold text-slate-800 mt-3">' + escape(recipe.title) + '</h3>' +
-                            macrosHtml +
-                            '<div class="mt-6 grid grid-cols-1 md:grid-cols-5 gap-x-8 gap-y-6">' +
-                            '<div class="md:col-span-2"><h4 class="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Zutaten:</h4>' + ingredientsHtml + '</div>' +
-                            '<div class="md:col-span-3 md:border-l md:border-slate-200 md:pl-8"><h4 class="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Anleitung:</h4>' + instructionsHtml + '</div>' +
-                            '</div>' +
-                            '</div>' +
-                            '</div>';
+                        return \`
+                            <div id="recipe-day-\${escape(dayPlan.day)}-\${escape(meal.mealType)}" class="bg-white rounded-lg shadow-lg overflow-hidden">
+                                \${imageUrlHtml}
+                                <div class="p-6">
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <span class="text-sm font-semibold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">\${MealCategoryLabels[meal.mealType] || meal.mealType}</span>
+                                        <div class="flex items-center gap-1 text-sm text-slate-600 bg-slate-100 px-3 py-1 rounded-full">\${Icons.fire}<span>ca. \${recipe.totalCalories} kcal</span></div>
+                                    </div>
+                                    <h3 class="text-2xl font-bold text-slate-800 mt-3">\${escape(recipe.title)}</h3>
+                                    \${macrosHtml}
+                                    <div class="mt-6 grid grid-cols-1 md:grid-cols-5 gap-x-8 gap-y-6">
+                                        <div class="md:col-span-2"><h4 class="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Zutaten:</h4>\${ingredientsHtml}</div>
+                                        <div class="md:col-span-3 md:border-l md:border-slate-200 md:pl-8"><h4 class="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Anleitung:</h4>\${instructionsHtml}</div>
+                                    </div>
+                                </div>
+                            </div>\`;
                     }).join('');
-                    
+
                     if (mealsHtml.trim() === '') return '';
 
-                    return '<div>' +
-                        '<h2 class="text-3xl font-bold text-slate-700 border-b-2 border-slate-200 pb-3 mb-6 sm:sticky top-20 z-20 bg-slate-100/80 backdrop-blur-sm py-2">' + escape(dayPlan.day) + '</h2>' +
-                        '<div class="space-y-8">' + mealsHtml + '</div>' +
-                        '</div>';
+                    return \`
+                        <div>
+                            <h2 class="text-3xl font-bold text-slate-700 border-b-2 border-slate-200 pb-3 mb-6 sm:sticky top-20 z-20 bg-slate-100/80 backdrop-blur-sm py-2">\${escape(dayPlan.day)}</h2>
+                            <div class="space-y-8">\${mealsHtml}</div>
+                        </div>\`;
                 }).join('');
 
-                return '<div class="space-y-8">' + mainTitle + '<div class="space-y-12">' + weeklyPlanHtml + '</div></div>';
+                return \`<div class="space-y-8">\${mainTitle}<div class="space-y-12">\${weeklyPlanHtml}</div></div>\`;
             }
-
 
             function setupEventListeners() {
                 const views = { plan: document.getElementById('view-plan'), shopping: document.getElementById('view-shopping'), recipes: document.getElementById('view-recipes') };
@@ -202,7 +224,14 @@ async function generateShareableHtml(plan) {
                     resetButton.addEventListener('click', () => {
                         if (window.confirm('Möchten Sie den Status der gesamten Einkaufsliste wirklich zurücksetzen? Alle Haken werden entfernt.')) {
                             localStorage.removeItem(storageKey);
-                            location.reload();
+                            document.querySelectorAll('.shopping-item-checkbox').forEach(cb => {
+                                const checkbox = cb;
+                                if (checkbox.checked) {
+                                    checkbox.checked = false;
+                                    const event = new Event('change', { bubbles: true });
+                                    checkbox.dispatchEvent(event);
+                                }
+                            });
                         }
                     });
                 }
