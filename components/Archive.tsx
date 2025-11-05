@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { ArchiveEntry, DietType, Diet, DishComplexity, PlanSettings } from '../types';
 import { HideIcon, TrashIcon } from './IconComponents';
 
@@ -39,6 +39,8 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
   const [hiddenIds, setHiddenIds] = useState<Set<number>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 60;
+  const archiveContainerRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     const cookieValue = document.cookie
@@ -153,7 +155,7 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" ref={archiveContainerRef}>
       <div className="space-y-6 bg-white/50 p-6 rounded-lg shadow-sm">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <h2 className="text-2xl font-bold text-slate-700">Plan Archiv</h2>
@@ -328,7 +330,10 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
           {totalPages > 1 && (
             <div className="flex justify-center items-center gap-4 pt-4 border-t border-slate-200">
               <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                onClick={() => {
+                  setCurrentPage(prev => Math.max(1, prev - 1));
+                  archiveContainerRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }}
                 disabled={currentPage === 1}
                 className="px-4 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg shadow-sm hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
@@ -338,7 +343,10 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
                 Seite {currentPage} von {totalPages}
               </span>
               <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                onClick={() => {
+                  setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                  archiveContainerRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }}
                 disabled={currentPage === totalPages}
                 className="px-4 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg shadow-sm hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >

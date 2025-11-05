@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import type { Recipe, Diet, MealCategory, DietType, DishComplexity } from '../types';
 import * as apiService from '../services/apiService';
 import { MealCategoryLabels } from '../types';
@@ -49,6 +49,8 @@ const RecipeArchiveComponent: React.FC = () => {
     const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 60;
+    const recipeArchiveContainerRef = useRef<HTMLDivElement>(null);
+
 
     const fetchRecipes = useCallback(() => {
         apiService.getAllRecipes()
@@ -127,7 +129,7 @@ const RecipeArchiveComponent: React.FC = () => {
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8" ref={recipeArchiveContainerRef}>
             <div className="space-y-6 bg-white/50 p-6 rounded-lg shadow-sm">
                  <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                     <h2 className="text-2xl font-bold text-slate-700">Rezepte Archiv</h2>
@@ -163,7 +165,10 @@ const RecipeArchiveComponent: React.FC = () => {
                     {totalPages > 1 && (
                         <div className="flex justify-center items-center gap-4 pt-4 border-t border-slate-200">
                             <button
-                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                onClick={() => {
+                                    setCurrentPage(prev => Math.max(1, prev - 1));
+                                    recipeArchiveContainerRef.current?.scrollIntoView({ behavior: 'smooth' });
+                                }}
                                 disabled={currentPage === 1}
                                 className="px-4 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg shadow-sm hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
@@ -173,7 +178,10 @@ const RecipeArchiveComponent: React.FC = () => {
                                 Seite {currentPage} von {totalPages}
                             </span>
                             <button
-                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                onClick={() => {
+                                    setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                                    recipeArchiveContainerRef.current?.scrollIntoView({ behavior: 'smooth' });
+                                }}
                                 disabled={currentPage === totalPages}
                                 className="px-4 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg shadow-sm hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
