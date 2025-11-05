@@ -47,6 +47,8 @@ const RecipeArchiveComponent: React.FC = () => {
     const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 60;
 
     const fetchRecipes = useCallback(() => {
         apiService.getAllRecipes()
@@ -86,6 +88,10 @@ const RecipeArchiveComponent: React.FC = () => {
     const [filterGlutenFree, setFilterGlutenFree] = useState(false);
     const [filterLactoseFree, setFilterLactoseFree] = useState(false);
     
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, selectedMealCategories, selectedPreferences, selectedDietTypes, selectedComplexities, filterGlutenFree, filterLactoseFree]);
+
     const handleFilterToggle = <T extends string>(value: T, currentFilters: Set<T>, setFilters: React.Dispatch<React.SetStateAction<Set<T>>>) => {
         const newFilters = new Set(currentFilters);
         newFilters.has(value) ? newFilters.delete(value) : newFilters.add(value);
@@ -105,6 +111,16 @@ const RecipeArchiveComponent: React.FC = () => {
             return matchesSearch && matchesCategory && matchesPreference && matchesDietType && matchesComplexity && matchesGlutenFree && matchesLactoseFree;
         });
     }, [allRecipes, searchTerm, selectedMealCategories, selectedPreferences, selectedDietTypes, selectedComplexities, filterGlutenFree, filterLactoseFree]);
+
+    const { paginatedRecipes, totalPages } = useMemo(() => {
+        const totalPages = Math.ceil(filteredRecipes.length / ITEMS_PER_PAGE);
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        const endIndex = startIndex + ITEMS_PER_PAGE;
+        return {
+          paginatedRecipes: filteredRecipes.slice(startIndex, endIndex),
+          totalPages,
+        };
+    }, [filteredRecipes, currentPage]);
     
     if (isLoading) {
         return <div className="text-center py-16">Lade Rezepte...</div>;
@@ -137,11 +153,35 @@ const RecipeArchiveComponent: React.FC = () => {
             </div>
 
             {filteredRecipes.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
-                    {filteredRecipes.map(recipe => (
-                        <RecipeCard key={recipe.id} recipe={recipe} onSelect={setSelectedRecipe} />
-                    ))}
-                </div>
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
+                        {paginatedRecipes.map(recipe => (
+                            <RecipeCard key={recipe.id} recipe={recipe} onSelect={setSelectedRecipe} />
+                        ))}
+                    </div>
+
+                    {totalPages > 1 && (
+                        <div className="flex justify-center items-center gap-4 pt-4 border-t border-slate-200">
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
+                                className="px-4 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg shadow-sm hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Zurück
+                            </button>
+                            <span className="text-slate-600 font-medium">
+                                Seite {currentPage} von {totalPages}
+                            </span>
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                disabled={currentPage === totalPages}
+                                className="px-4 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg shadow-sm hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Weiter
+                            </button>
+                        </div>
+                    )}
+                </>
             ) : (
                 <div className="text-center py-16 bg-white rounded-lg shadow-md">
                     <h2 className="text-xl font-bold text-slate-600 mb-2">Keine Rezepte gefunden</h2>

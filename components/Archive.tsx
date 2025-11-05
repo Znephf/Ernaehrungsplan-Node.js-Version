@@ -37,6 +37,8 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
   const [filterGlutenFree, setFilterGlutenFree] = useState(false);
   const [filterLactoseFree, setFilterLactoseFree] = useState(false);
   const [hiddenIds, setHiddenIds] = useState<Set<number>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 60;
 
   useEffect(() => {
     const cookieValue = document.cookie
@@ -48,6 +50,11 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
       setHiddenIds(new Set(ids));
     }
   }, []);
+  
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedPreferences, selectedDietTypes, selectedComplexities, filterGlutenFree, filterLactoseFree]);
+
 
   const handleHidePlan = (id: number) => {
     const newHiddenIds = new Set(hiddenIds);
@@ -105,6 +112,16 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
       return matchesSearch && matchesPreference && matchesDietType && matchesComplexity && matchesGlutenFree && matchesLactoseFree;
     });
   }, [archive, searchTerm, selectedPreferences, selectedDietTypes, selectedComplexities, filterGlutenFree, filterLactoseFree, hiddenIds]);
+
+  const { paginatedArchive, totalPages } = useMemo(() => {
+    const totalPages = Math.ceil(filteredArchive.length / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return {
+      paginatedArchive: filteredArchive.slice(startIndex, endIndex),
+      totalPages,
+    };
+  }, [filteredArchive, currentPage]);
 
 
   if (archive.length === 0) {
@@ -224,89 +241,112 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
       </div>
       
       {filteredArchive.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredArchive.map((entry) => {
-            // FIX: Cast settings to Partial<PlanSettings> to handle potentially missing properties on older archive entries.
-            const settings: Partial<PlanSettings> = entry.settings || {};
-            return (
-              <div key={entry.id} className="bg-white rounded-lg shadow-lg flex flex-col justify-between p-6 transition-shadow hover:shadow-xl">
-                <div>
-                  <p className="text-xs text-slate-400">
-                    {entry.createdAt} Uhr
-                  </p>
-                  <h3 className="text-xl font-bold text-slate-800 mt-2">
-                    {entry.name}
-                  </h3>
-                  <div className="text-sm text-slate-500 mt-2 flex flex-wrap gap-x-3 items-center">
-                        {/* FIX: Use nullish coalescing to provide defaults for optional settings properties. */}
-                        <span>{settings.persons ?? '?'} Pers.</span>
-                        <span className="text-slate-300">&bull;</span>
-                        <span>{settings.kcal ?? '?'} kcal</span>
-                        <span className="text-slate-300">&bull;</span>
-                        <span className="capitalize">{settings.dietaryPreference === 'omnivore' ? 'Alles' : (settings.dietaryPreference ?? 'Unbekannt')}</span>
-                    </div>
-                    <div className="text-xs text-emerald-700 font-semibold mt-2 flex flex-wrap gap-x-2">
-                      {/* FIX: Check for truthiness is sufficient for optional booleans. */}
-                      {settings.isGlutenFree && <span className="bg-emerald-50 px-2 py-0.5 rounded-full">Glutenfrei</span>}
-                      {settings.isLactoseFree && <span className="bg-emerald-50 px-2 py-0.5 rounded-full">Laktosefrei</span>}
-                    </div>
-                    <div className="mt-3 space-y-1 text-sm text-slate-600">
-                        <p>
-                            {/* FIX: Check for property existence before indexing into label maps. */}
-                            <span className="font-semibold">Diät-Typ:</span> {settings.dietType ? dietTypeLabels[settings.dietType] : 'Standard'}
-                        </p>
-                         <p>
-                            <span className="font-semibold">Niveau:</span> {settings.dishComplexity ? dishComplexityLabels[settings.dishComplexity] : 'Einfach'}
-                        </p>
-                        {/* FIX: Check for truthiness is sufficient for optional properties. */}
-                        {settings.breakfastOption && <p>
-                            <span className="font-semibold">Frühstück:</span> <span className="capitalize">{settings.breakfastOption === 'custom' ? 'Eigene Angabe' : settings.breakfastOption}</span>
-                        </p>}
-                    </div>
-                    {/* FIX: Check for truthiness is sufficient for optional properties. */}
-                    {settings.breakfastOption === 'custom' && settings.customBreakfast && (
-                        <p className="text-xs text-slate-400 mt-1 italic" title={settings.customBreakfast}>
-                            "{settings.customBreakfast.length > 40 ? `${settings.customBreakfast.substring(0, 40)}...` : settings.customBreakfast}"
-                        </p>
-                    )}
-                    {settings.desiredIngredients && (
-                        <p className="text-xs text-slate-400 mt-2" title={settings.desiredIngredients}>
-                            <span className="font-semibold">Mit:</span> {settings.desiredIngredients.length > 40 ? `${settings.desiredIngredients.substring(0, 40)}...` : settings.desiredIngredients}
-                        </p>
-                    )}
-                    {settings.excludedIngredients && (
-                        <p className="text-xs text-slate-400 mt-2" title={settings.excludedIngredients}>
-                            <span className="font-semibold">Ohne:</span> {settings.excludedIngredients.length > 40 ? `${settings.excludedIngredients.substring(0, 40)}...` : settings.excludedIngredients}
-                        </p>
-                    )}
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {paginatedArchive.map((entry) => {
+              // FIX: Cast settings to Partial<PlanSettings> to handle potentially missing properties on older archive entries.
+              const settings: Partial<PlanSettings> = entry.settings || {};
+              return (
+                <div key={entry.id} className="bg-white rounded-lg shadow-lg flex flex-col justify-between p-6 transition-shadow hover:shadow-xl">
+                  <div>
+                    <p className="text-xs text-slate-400">
+                      {entry.createdAt} Uhr
+                    </p>
+                    <h3 className="text-xl font-bold text-slate-800 mt-2">
+                      {entry.name}
+                    </h3>
+                    <div className="text-sm text-slate-500 mt-2 flex flex-wrap gap-x-3 items-center">
+                          {/* FIX: Use nullish coalescing to provide defaults for optional settings properties. */}
+                          <span>{settings.persons ?? '?'} Pers.</span>
+                          <span className="text-slate-300">&bull;</span>
+                          <span>{settings.kcal ?? '?'} kcal</span>
+                          <span className="text-slate-300">&bull;</span>
+                          <span className="capitalize">{settings.dietaryPreference === 'omnivore' ? 'Alles' : (settings.dietaryPreference ?? 'Unbekannt')}</span>
+                      </div>
+                      <div className="text-xs text-emerald-700 font-semibold mt-2 flex flex-wrap gap-x-2">
+                        {/* FIX: Check for truthiness is sufficient for optional booleans. */}
+                        {settings.isGlutenFree && <span className="bg-emerald-50 px-2 py-0.5 rounded-full">Glutenfrei</span>}
+                        {settings.isLactoseFree && <span className="bg-emerald-50 px-2 py-0.5 rounded-full">Laktosefrei</span>}
+                      </div>
+                      <div className="mt-3 space-y-1 text-sm text-slate-600">
+                          <p>
+                              {/* FIX: Check for property existence before indexing into label maps. */}
+                              <span className="font-semibold">Diät-Typ:</span> {settings.dietType ? dietTypeLabels[settings.dietType] : 'Standard'}
+                          </p>
+                           <p>
+                              <span className="font-semibold">Niveau:</span> {settings.dishComplexity ? dishComplexityLabels[settings.dishComplexity] : 'Einfach'}
+                          </p>
+                          {/* FIX: Check for truthiness is sufficient for optional properties. */}
+                          {settings.breakfastOption && <p>
+                              <span className="font-semibold">Frühstück:</span> <span className="capitalize">{settings.breakfastOption === 'custom' ? 'Eigene Angabe' : settings.breakfastOption}</span>
+                          </p>}
+                      </div>
+                      {/* FIX: Check for truthiness is sufficient for optional properties. */}
+                      {settings.breakfastOption === 'custom' && settings.customBreakfast && (
+                          <p className="text-xs text-slate-400 mt-1 italic" title={settings.customBreakfast}>
+                              "{settings.customBreakfast.length > 40 ? `${settings.customBreakfast.substring(0, 40)}...` : settings.customBreakfast}"
+                          </p>
+                      )}
+                      {settings.desiredIngredients && (
+                          <p className="text-xs text-slate-400 mt-2" title={settings.desiredIngredients}>
+                              <span className="font-semibold">Mit:</span> {settings.desiredIngredients.length > 40 ? `${settings.desiredIngredients.substring(0, 40)}...` : settings.desiredIngredients}
+                          </p>
+                      )}
+                      {settings.excludedIngredients && (
+                          <p className="text-xs text-slate-400 mt-2" title={settings.excludedIngredients}>
+                              <span className="font-semibold">Ohne:</span> {settings.excludedIngredients.length > 40 ? `${settings.excludedIngredients.substring(0, 40)}...` : settings.excludedIngredients}
+                          </p>
+                      )}
+                  </div>
+                  <div className="flex items-center justify-end gap-2 mt-6">
+                    <button
+                      onClick={() => handleHidePlan(entry.id)}
+                      aria-label={`Plan vom ${entry.createdAt} ausblenden`}
+                      className="p-2 text-slate-500 hover:bg-amber-100 hover:text-amber-600 rounded-full transition-colors"
+                    >
+                      <HideIcon />
+                    </button>
+                    <button
+                      onClick={() => onDeletePlan(entry.id)}
+                      aria-label={`Plan ${entry.name} löschen`}
+                      className="p-2 text-slate-500 hover:bg-red-100 hover:text-red-600 rounded-full transition-colors"
+                      title="Diesen Plan löschen"
+                    >
+                      <TrashIcon />
+                    </button>
+                    <button
+                      onClick={() => onLoadPlan(entry.id)}
+                      className="px-4 py-2 bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-700 transition-colors"
+                    >
+                      Laden
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center justify-end gap-2 mt-6">
-                  <button
-                    onClick={() => handleHidePlan(entry.id)}
-                    aria-label={`Plan vom ${entry.createdAt} ausblenden`}
-                    className="p-2 text-slate-500 hover:bg-amber-100 hover:text-amber-600 rounded-full transition-colors"
-                  >
-                    <HideIcon />
-                  </button>
-                  <button
-                    onClick={() => onDeletePlan(entry.id)}
-                    aria-label={`Plan ${entry.name} löschen`}
-                    className="p-2 text-slate-500 hover:bg-red-100 hover:text-red-600 rounded-full transition-colors"
-                    title="Diesen Plan löschen"
-                  >
-                    <TrashIcon />
-                  </button>
-                  <button
-                    onClick={() => onLoadPlan(entry.id)}
-                    className="px-4 py-2 bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-700 transition-colors"
-                  >
-                    Laden
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center gap-4 pt-4 border-t border-slate-200">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg shadow-sm hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Zurück
+              </button>
+              <span className="text-slate-600 font-medium">
+                Seite {currentPage} von {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg shadow-sm hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Weiter
+              </button>
+            </div>
+          )}
+        </>
       ) : (
         <div className="text-center py-16 bg-white rounded-lg shadow-md col-span-1 md:col-span-2 lg:col-span-3">
           <h2 className="text-xl font-bold text-slate-600 mb-2">Keine Treffer</h2>
