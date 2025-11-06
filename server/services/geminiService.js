@@ -143,7 +143,8 @@ Reminder: All recipes and their nutritional info must be for ONE person. The use
 Please generate the full plan in the specified JSON format.
 `;
 
-    console.log('Generating plan with Gemini...');
+    const randomTemperature = Math.random() * 0.5 + 0.5; // Random value between 0.5 and 1.0
+    console.log(`Generating plan with Gemini... (temperature: ${randomTemperature.toFixed(2)})`);
     
     const response = await generateWithFallback({
         model: 'gemini-2.5-flash',
@@ -151,6 +152,7 @@ Please generate the full plan in the specified JSON format.
         config: {
             systemInstruction: systemInstruction,
             responseMimeType: 'application/json',
+            temperature: randomTemperature,
         }
     });
 
