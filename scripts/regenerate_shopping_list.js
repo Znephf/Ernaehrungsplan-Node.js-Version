@@ -1,4 +1,5 @@
 
+
 const path = require('path');
 const dotenv = require('dotenv');
 const { generateShoppingListOnly } = require('../server/services/geminiService');
@@ -45,7 +46,7 @@ async function regenerateShoppingLists() {
             try {
                 // 1. Get all recipes for this plan
                 const [recipes] = await pool.query(
-                    `SELECT r.* FROM recipes r JOIN plan_recipes pr ON r.id = pr.recipe_id WHERE pr.plan_id = ?`,
+                    `SELECT r.ingredients, r.base_persons FROM recipes r JOIN plan_recipes pr ON r.id = pr.recipe_id WHERE pr.plan_id = ?`,
                     [plan.id]
                 );
 
@@ -54,11 +55,33 @@ async function regenerateShoppingLists() {
                     continue;
                 }
                 
-                console.log(`  - Found ${recipes.length} recipes. Asking AI to generate a shopping list.`);
+                const settings = JSON.parse(plan.settings);
+                const persons = settings.persons || 1;
+                const scaledIngredients = [];
+
+                recipes.forEach(recipe => {
+                    const ingredients = JSON.parse(recipe.ingredients || '[]');
+                    const basePersons = recipe.base_persons || 1;
+                    ingredients.forEach(ing => {
+                        const quantity = typeof ing.quantity === 'number' ? ing.quantity : 0;
+                        const scaledQuantity = (quantity / basePersons) * persons;
+                        scaledIngredients.push({
+                            ingredient: ing.ingredient,
+                            quantity: scaledQuantity,
+                            unit: ing.unit
+                        });
+                    });
+                });
+
+                if (scaledIngredients.length === 0) {
+                    console.warn(`  - No ingredients found for Plan ID ${plan.id}. Skipping.`);
+                    continue;
+                }
+                
+                console.log(`  - Found ${recipes.length} recipes with ingredients. Asking AI to generate a shopping list for ${persons} person(s).`);
 
                 // 2. Generate the shopping list using the Gemini service
-                const settings = JSON.parse(plan.settings);
-                const newShoppingList = await generateShoppingListOnly(settings, recipes);
+                const { shoppingList: newShoppingList } = await generateShoppingListOnly(scaledIngredients);
                 
                 if (!newShoppingList || newShoppingList.length === 0) {
                      throw new Error("AI returned an empty or invalid shopping list.");

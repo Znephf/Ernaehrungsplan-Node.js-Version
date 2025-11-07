@@ -15,6 +15,11 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
             try {
                 const { apiResponse, debug } = await apiService.generateImage(recipe, attempt);
 
+                if (debug.keyUsed) {
+                    const keyName = debug.keyUsed === 'primary' ? 'API_KEY' : 'API_KEY_FALLBACK';
+                    console.log(`[API-Info] Bild für "${recipe.title}" wurde mit ${keyName} generiert (Versuch ${attempt}).`);
+                }
+
                 console.groupCollapsed(`[DEBUG] Bild-Generierung für: "${recipe.title}" (Versuch ${attempt})`);
                 console.log(debug.imagePrompt);
                 console.groupEnd();

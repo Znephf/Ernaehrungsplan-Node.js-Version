@@ -82,14 +82,14 @@ export const startPlanGenerationJob = async (data: { settings: PlanSettings; pre
 };
 
 // Fix: Converted to async/await to fix type inference issues.
-export const getJobStatus = async (jobId: string): Promise<{ status: string; plan?: ArchiveEntry; error?: string }> => {
+export const getJobStatus = async (jobId: string): Promise<{ status: string; plan?: ArchiveEntry; error?: string; keyUsed?: 'primary' | 'fallback' }> => {
     const response = await fetch(`/api/generate-plan-job/status/${jobId}`);
     return handleResponse(response);
 };
 
 // Image Generation
 // Fix: Converted to async/await to fix type inference issues.
-export const generateImage = async (recipe: Recipe, attempt: number): Promise<{ apiResponse: any, debug: any }> => {
+export const generateImage = async (recipe: Recipe, attempt: number): Promise<{ apiResponse: any, debug: { imagePrompt: string, keyUsed?: 'primary' | 'fallback' } }> => {
     const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

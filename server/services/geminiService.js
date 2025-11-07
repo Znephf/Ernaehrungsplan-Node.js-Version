@@ -8,7 +8,7 @@ const { API_KEY, API_KEY_FALLBACK } = process.env;
  * Wenn alle Versuche fehlschlagen, wird ein einmaliger Versuch mit dem Fallback-API-Schlüssel unternommen.
  * Loggt detaillierte Informationen über Versuche und verwendete Schlüssel in der Konsole.
  * @param {object} requestPayload - Das Objekt, das an `ai.models.generateContent` übergeben wird.
- * @returns {Promise<any>} Die erfolgreiche Antwort von der API.
+ * @returns {Promise<{response: any, keyUsed: 'primary' | 'fallback'}>} Die erfolgreiche Antwort von der API und der verwendete Schlüssel.
  * @throws {Error} Wirft einen Fehler, wenn alle Versuche mit allen verfügbaren Schlüsseln fehlschlagen.
  */
 async function generateWithFallback(requestPayload) {
@@ -24,13 +24,13 @@ async function generateWithFallback(requestPayload) {
     if (API_KEY) {
         for (let versuch = 1; versuch <= MAX_VERSUCHE; versuch++) {
             try {
-                console.log(`[API] Versuch ${versuch}/${MAX_VERSUCHE} mit primärem API_KEY.`);
+                console.log(`[API-Info] Versuch ${versuch}/${MAX_VERSUCHE} mit primärem API_KEY.`);
                 const ai = new GoogleGenAI({ apiKey: API_KEY });
                 const response = await ai.models.generateContent(requestPayload);
-                console.log(`[API] Erfolg bei Versuch ${versuch} mit primärem API_KEY.`);
-                return response; // Erfolg, Funktion beenden
+                console.log(`[API-Info] Erfolg bei Versuch ${versuch} mit primärem API_KEY.`);
+                return { response, keyUsed: 'primary' }; // Erfolg, Funktion beenden
             } catch (error) {
-                console.warn(`[API] Versuch ${versuch}/${MAX_VERSUCHE} mit primärem API_KEY fehlgeschlagen: ${error.message}`);
+                console.warn(`[API-Warnung] Versuch ${versuch}/${MAX_VERSUCHE} mit primärem API_KEY fehlgeschlagen: ${error.message}`);
                 lastError = error; // Letzten Fehler speichern
                 if (versuch < MAX_VERSUCHE) {
                     // Optionale Verzögerung vor dem nächsten Versuch
@@ -38,25 +38,25 @@ async function generateWithFallback(requestPayload) {
                 }
             }
         }
-        console.error(`[API] Alle ${MAX_VERSUCHE} Versuche mit dem primären API_KEY sind fehlgeschlagen. Wechsle zum Fallback.`);
+        console.error(`[API-Fehler] Alle ${MAX_VERSUCHE} Versuche mit dem primären API_KEY sind fehlgeschlagen. Wechsle zum Fallback.`);
     } else {
-        console.log('[API] Primärer API_KEY nicht gesetzt. Wechsle direkt zum Fallback.');
+        console.log('[API-Info] Primärer API_KEY nicht gesetzt. Wechsle direkt zum Fallback.');
     }
 
     // 3. Wenn der primäre Schlüssel fehlgeschlagen ist oder nicht vorhanden war, versuche es mit dem Fallback-Schlüssel.
     if (API_KEY_FALLBACK) {
         try {
-            console.log('[API] Versuche API-Aufruf mit API_KEY_FALLBACK...');
+            console.log('[API-Info] Versuche API-Aufruf mit API_KEY_FALLBACK...');
             const ai = new GoogleGenAI({ apiKey: API_KEY_FALLBACK });
             const response = await ai.models.generateContent(requestPayload);
-            console.log('[API] Erfolg mit Fallback-Schlüssel API_KEY_FALLBACK.');
-            return response;
+            console.log('[API-Info] Erfolg mit Fallback-Schlüssel API_KEY_FALLBACK.');
+            return { response, keyUsed: 'fallback' };
         } catch (error) {
-            console.error(`[API] Fallback-Schlüssel API_KEY_FALLBACK ebenfalls fehlgeschlagen: ${error.message}`);
+            console.error(`[API-Fehler] Fallback-Schlüssel API_KEY_FALLBACK ebenfalls fehlgeschlagen: ${error.message}`);
             lastError = error; // Fehler mit dem neuesten Fehlschlag aktualisieren.
         }
     } else {
-        console.log('[API] Fallback-Schlüssel API_KEY_FALLBACK nicht gesetzt.');
+        console.log('[API-Info] Fallback-Schlüssel API_KEY_FALLBACK nicht gesetzt.');
     }
 
     // 4. Wenn alle Versuche fehlgeschlagen sind, werfe den zuletzt aufgezeichneten Fehler.
@@ -156,7 +156,7 @@ Please generate the full plan in the specified JSON format.
     const randomTemperature = Math.random() * 0.5 + 0.5; // Random value between 0.5 and 1.0
     console.log(`Generating plan with Gemini... (temperature: ${randomTemperature.toFixed(2)})`);
     
-    const response = await generateWithFallback({
+    const { response, keyUsed } = await generateWithFallback({
         model: 'gemini-2.5-flash',
         contents: userPrompt,
         config: {
@@ -171,7 +171,7 @@ Please generate the full plan in the specified JSON format.
         const planData = JSON.parse(text);
         
         // Return data as is, AI provides per-person values now.
-        return planData;
+        return { planData, keyUsed };
     } catch (e) {
         console.error("Failed to parse Gemini response as JSON.", e);
         console.error("Raw response text:", response.text);
@@ -185,9 +185,9 @@ const generateImageForRecipe = async (recipe, attempt) => {
     if (attempt > 1) detailLevel = "A delicious looking, vibrant, professional food photograph of the dish, top-down view.";
     if (attempt > 3) detailLevel = "A hyper-realistic, appetizing food photograph of the dish, showing texture and detail, minimalist background.";
 
-    const imagePrompt = `${detailLevel} The dish is called "${recipe.title}". It contains: ${recipe.ingredients.join(', ')}. Do not show any text or branding.`;
+    const imagePrompt = `${detailLevel} The dish is called "${recipe.title}". It contains: ${recipe.ingredients.map(i => i.ingredient).join(', ')}. Do not show any text or branding.`;
 
-    const response = await generateWithFallback({
+    const { response, keyUsed } = await generateWithFallback({
         model: 'gemini-2.5-flash-image',
         contents: { parts: [{ text: imagePrompt }] },
         config: {
@@ -195,7 +195,7 @@ const generateImageForRecipe = async (recipe, attempt) => {
         }
     });
 
-    return { apiResponse: response, debug: { imagePrompt } };
+    return { apiResponse: response, debug: { imagePrompt }, keyUsed };
 };
 
 const generateShoppingListOnly = async (ingredientsList) => {
@@ -224,7 +224,7 @@ Please provide only the "shoppingList" part of the response in the specified JSO
 
     console.log('Generating shopping list with Gemini...');
     
-    const response = await generateWithFallback({
+    const { response, keyUsed } = await generateWithFallback({
         model: 'gemini-2.5-flash',
         contents: userPrompt,
         config: {
@@ -236,7 +236,7 @@ Please provide only the "shoppingList" part of the response in the specified JSO
     try {
         const text = response.text.trim();
         const shoppingListData = JSON.parse(text);
-        return shoppingListData.shoppingList;
+        return { shoppingList: shoppingListData.shoppingList, keyUsed };
     } catch (e) {
         console.error("Failed to parse Gemini response for shopping list as JSON.", e);
         console.error("Raw response text:", response.text);
@@ -267,7 +267,7 @@ OUTPUT SCHEMA: [{ "recipeId": number, "structuredIngredients": [{ "ingredient": 
     Return ONLY the JSON array matching the specified output schema.
     `;
     
-    const response = await generateWithFallback({
+    const { response } = await generateWithFallback({
         model: 'gemini-2.5-flash',
         contents: userPrompt,
         config: {

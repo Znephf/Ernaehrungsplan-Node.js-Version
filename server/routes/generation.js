@@ -15,7 +15,7 @@ router.post('/generate-plan-job', async (req, res) => {
     const { settings, previousPlanRecipes } = req.body;
     const jobId = crypto.randomBytes(16).toString('hex');
     
-    jobs[jobId] = { status: 'pending', plan: null, error: null };
+    jobs[jobId] = { status: 'pending', plan: null, error: null, keyUsed: null };
     
     res.status(202).json({ jobId });
 
@@ -24,7 +24,8 @@ router.post('/generate-plan-job', async (req, res) => {
         try {
             // --- SCHRITT 1: Plan und Rezepte generieren ---
             jobs[jobId].status = 'generating_plan';
-            const generatedPlan = await generatePlan(settings, previousPlanRecipes);
+            const { planData: generatedPlan, keyUsed: planKeyUsed } = await generatePlan(settings, previousPlanRecipes);
+            jobs[jobId].keyUsed = planKeyUsed; // Store which key was used
             
             // Plan mit leerer Einkaufsliste speichern, um IDs zu erhalten
             const savedPlanWithRecipes = await savePlanToDatabase(generatedPlan, settings);
@@ -57,7 +58,7 @@ router.post('/generate-plan-job', async (req, res) => {
             });
 
             // Rufen Sie die KI mit der vollständigen, skalierten Zutatenliste auf, damit sie eine intelligente Konsolidierung durchführen kann.
-            const shoppingList = await generateShoppingListOnly(scaledIngredients);
+            const { shoppingList } = await generateShoppingListOnly(scaledIngredients);
             
             // Plan in der DB mit der neuen Einkaufsliste aktualisieren
             await pool.query(
@@ -100,8 +101,8 @@ router.get('/generate-plan-job/status/:jobId', (req, res) => {
 router.post('/generate-image', async (req, res) => {
     const { recipe, attempt } = req.body;
     try {
-        const result = await generateImageForRecipe(recipe, attempt);
-        res.json(result);
+        const { apiResponse, debug, keyUsed } = await generateImageForRecipe(recipe, attempt);
+        res.json({ apiResponse, debug: { ...debug, keyUsed } });
     } catch (error) {
         console.error('Fehler bei der Bildgenerierung:', error);
         res.status(500).json({ error: error.message });

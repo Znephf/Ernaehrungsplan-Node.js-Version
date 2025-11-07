@@ -53,11 +53,15 @@ export const useMealPlanGenerator = () => {
             }
 
             try {
-                const { status, plan: newPlanData, error: jobError } = await apiService.getJobStatus(jobId);
+                const { status, plan: newPlanData, error: jobError, keyUsed } = await apiService.getJobStatus(jobId);
                 consecutiveErrors = 0;
                 setGenerationStatus(status);
 
                 if (status === 'complete') {
+                    if (keyUsed) {
+                        const keyName = keyUsed === 'primary' ? 'API_KEY' : 'API_KEY_FALLBACK';
+                        console.log(`[API-Info] Der Ernährungsplan wurde mit dem Schlüssel ${keyName} generiert.`);
+                    }
                     if (newPlanData) {
                         setPlan(newPlanData);
                     } else {

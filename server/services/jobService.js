@@ -191,7 +191,7 @@ async function saveCustomPlanToDatabase({ name, persons, mealsByDay }) {
                     }
                 }
                 
-                const shoppingList = await generateShoppingListOnly(scaledIngredients);
+                const { shoppingList } = await generateShoppingListOnly(scaledIngredients);
                 
                 await connection.query(
                     'UPDATE plans SET shoppingList = ? WHERE id = ?',
