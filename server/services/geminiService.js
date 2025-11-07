@@ -4,49 +4,59 @@ const { pool } = require('./database');
 const { API_KEY, API_KEY_FALLBACK } = process.env;
 
 /**
- * Führt eine API-Anfrage an Gemini aus und verwendet bei einem Fehler automatisch einen Fallback-API-Schlüssel.
+ * Führt eine API-Anfrage an Gemini aus. Versucht es bis zu 5 Mal mit dem primären API-Schlüssel.
+ * Wenn alle Versuche fehlschlagen, wird ein einmaliger Versuch mit dem Fallback-API-Schlüssel unternommen.
+ * Loggt detaillierte Informationen über Versuche und verwendete Schlüssel in der Konsole.
  * @param {object} requestPayload - Das Objekt, das an `ai.models.generateContent` übergeben wird.
  * @returns {Promise<any>} Die erfolgreiche Antwort von der API.
- * @throws {Error} Wirft einen Fehler, wenn beide API-Schlüssel fehlschlagen oder keiner verfügbar ist.
+ * @throws {Error} Wirft einen Fehler, wenn alle Versuche mit allen verfügbaren Schlüsseln fehlschlagen.
  */
 async function generateWithFallback(requestPayload) {
     let lastError = null;
+    const MAX_VERSUCHE = 5;
 
     // 1. Sicherstellen, dass mindestens ein Schlüssel verfügbar ist.
     if (!API_KEY && !API_KEY_FALLBACK) {
         throw new Error('FATAL: Es wurden keine API_KEY oder API_KEY_FALLBACK in den Umgebungsvariablen gefunden.');
     }
 
-    // 2. Versuche den API-Aufruf mit dem primären API_KEY.
+    // 2. Versuche den API-Aufruf mit dem primären API_KEY bis zu 5 Mal.
     if (API_KEY) {
-        try {
-            console.log('Versuche API-Aufruf mit primärem API_KEY...');
-            const ai = new GoogleGenAI({ apiKey: API_KEY });
-            const response = await ai.models.generateContent(requestPayload);
-            console.log('API-Aufruf mit primärem Schlüssel erfolgreich.');
-            return response;
-        } catch (error) {
-            console.warn(`API-Aufruf mit primärem API_KEY fehlgeschlagen: ${error.message}`);
-            lastError = error; // Speichere den Fehler und fahre mit dem Fallback fort.
+        for (let versuch = 1; versuch <= MAX_VERSUCHE; versuch++) {
+            try {
+                console.log(`[API] Versuch ${versuch}/${MAX_VERSUCHE} mit primärem API_KEY.`);
+                const ai = new GoogleGenAI({ apiKey: API_KEY });
+                const response = await ai.models.generateContent(requestPayload);
+                console.log(`[API] Erfolg bei Versuch ${versuch} mit primärem API_KEY.`);
+                return response; // Erfolg, Funktion beenden
+            } catch (error) {
+                console.warn(`[API] Versuch ${versuch}/${MAX_VERSUCHE} mit primärem API_KEY fehlgeschlagen: ${error.message}`);
+                lastError = error; // Letzten Fehler speichern
+                if (versuch < MAX_VERSUCHE) {
+                    // Optionale Verzögerung vor dem nächsten Versuch
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // 1 Sekunde Verzögerung
+                }
+            }
         }
+        console.error(`[API] Alle ${MAX_VERSUCHE} Versuche mit dem primären API_KEY sind fehlgeschlagen. Wechsle zum Fallback.`);
     } else {
-        console.log('Primärer API_KEY nicht gesetzt, gehe direkt zum Fallback-Schlüssel.');
+        console.log('[API] Primärer API_KEY nicht gesetzt. Wechsle direkt zum Fallback.');
     }
 
     // 3. Wenn der primäre Schlüssel fehlgeschlagen ist oder nicht vorhanden war, versuche es mit dem Fallback-Schlüssel.
     if (API_KEY_FALLBACK) {
         try {
-            console.log('Versuche API-Aufruf mit API_KEY_FALLBACK...');
+            console.log('[API] Versuche API-Aufruf mit API_KEY_FALLBACK...');
             const ai = new GoogleGenAI({ apiKey: API_KEY_FALLBACK });
             const response = await ai.models.generateContent(requestPayload);
-            console.log('API-Aufruf mit Fallback-Schlüssel erfolgreich.');
+            console.log('[API] Erfolg mit Fallback-Schlüssel API_KEY_FALLBACK.');
             return response;
         } catch (error) {
-            console.error(`API-Aufruf mit Fallback-Schlüssel API_KEY_FALLBACK ebenfalls fehlgeschlagen: ${error.message}`);
-            lastError = error; // Aktualisiere den Fehler mit dem neuesten Fehlschlag.
+            console.error(`[API] Fallback-Schlüssel API_KEY_FALLBACK ebenfalls fehlgeschlagen: ${error.message}`);
+            lastError = error; // Fehler mit dem neuesten Fehlschlag aktualisieren.
         }
     } else {
-        console.log('Fallback-Schlüssel API_KEY_FALLBACK nicht gesetzt.');
+        console.log('[API] Fallback-Schlüssel API_KEY_FALLBACK nicht gesetzt.');
     }
 
     // 4. Wenn alle Versuche fehlgeschlagen sind, werfe den zuletzt aufgezeichneten Fehler.
