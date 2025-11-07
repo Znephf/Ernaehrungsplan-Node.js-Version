@@ -70,7 +70,7 @@ const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, 
             aria-labelledby="recipe-modal-title"
         >
             <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                <header className="p-4 border-b flex justify-between items-center flex-shrink-0">
+                <header className="p-4 border-b flex flex-wrap justify-between items-start sm:items-center gap-y-3 gap-x-4 flex-shrink-0">
                     <h2 className="text-xl font-bold text-slate-800" id="recipe-modal-title">{recipe.title}</h2>
                     <div className="flex items-center gap-2">
                         {onAddToPlan && (
