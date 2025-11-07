@@ -232,6 +232,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
         <label htmlFor="excludedIngredients" className="block text-sm font-medium text-slate-700">Ausgeschlossene Zutaten</label>
         <textarea name="excludedIngredients" id="excludedIngredients" value={settings.excludedIngredients} onChange={handleChange} rows={2} placeholder="z.B. Pilze, Nüsse, Koriander" className={inputStyles}></textarea>
       </div>
+       <div>
+        <label htmlFor="creativeInspiration" className="block text-sm font-medium text-slate-700">Küchenstil / Inspiration (Optional)</label>
+        <p className="text-xs text-slate-500 mt-1">Gib der KI eine kreative Richtung, z.B. "Italienische Woche", "Leichte asiatische Gerichte" oder "Fokus auf Kürbis".</p>
+        <textarea name="creativeInspiration" id="creativeInspiration" value={settings.creativeInspiration || ''} onChange={handleChange} rows={2} placeholder="z.B. Mediterrane Küche, schnelle Feierabendgerichte..." className={inputStyles}></textarea>
+      </div>
 
       <div className="flex justify-end">
         <button type="submit" disabled={isLoading} className="inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:bg-slate-400 disabled:cursor-not-allowed">

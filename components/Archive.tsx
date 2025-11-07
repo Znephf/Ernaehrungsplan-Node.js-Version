@@ -299,6 +299,11 @@ const ArchiveComponent: React.FC<ArchiveComponentProps> = ({ archive, onLoadPlan
                               <span className="font-semibold">Ohne:</span> {settings.excludedIngredients.length > 40 ? `${settings.excludedIngredients.substring(0, 40)}...` : settings.excludedIngredients}
                           </p>
                       )}
+                       {settings.creativeInspiration && (
+                          <p className="text-xs text-emerald-600 bg-emerald-50 rounded px-2 py-1 mt-2" title={settings.creativeInspiration}>
+                              <span className="font-semibold">Stil:</span> {settings.creativeInspiration.length > 40 ? `${settings.creativeInspiration.substring(0, 40)}...` : settings.creativeInspiration}
+                          </p>
+                      )}
                   </div>
                   <div className="flex items-center justify-end gap-2 mt-6">
                     <button

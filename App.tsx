@@ -22,6 +22,7 @@ const initialSettings: PlanSettings = {
     dishComplexity: 'simple',
     excludedIngredients: '',
     desiredIngredients: '',
+    creativeInspiration: '',
     isGlutenFree: false,
     isLactoseFree: false,
     includedMeals: ['breakfast', 'dinner'],

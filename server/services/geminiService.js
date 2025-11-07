@@ -75,7 +75,8 @@ const generatePlan = async (settings, previousPlanRecipes = []) => {
     const {
         persons, kcal, dietaryPreference, dietType, dishComplexity,
         excludedIngredients, desiredIngredients, isGlutenFree, isLactoseFree, includedMeals,
-        mainMealFocus, useSameBreakfast, customBreakfastText, useSameSnack, customSnackText
+        mainMealFocus, useSameBreakfast, customBreakfastText, useSameSnack, customSnackText,
+        creativeInspiration
     } = settings;
 
     const includedMealsText = includedMeals && includedMeals.length > 0
@@ -104,6 +105,10 @@ const generatePlan = async (settings, previousPlanRecipes = []) => {
         ? `IMPORTANT FOR SNACKS: The user wants the exact same snack every single day of the week. This meal is: "${customSnackText}". If snacks are included in the plan, you MUST generate only ONE recipe object for this snack and use its recipeId for the snack meal on all seven days in the weeklyPlan.`
         : '';
         
+    const creativeInspirationText = creativeInspiration
+        ? `The user has provided a specific creative theme/inspiration: "${creativeInspiration}". Please base the plan's style and recipes on this theme.`
+        : '';
+
     const systemInstruction = `You are an expert nutritionist and chef specializing in creating balanced, delicious, and practical weekly meal plans. Your responses must be in valid JSON format. Do not include any text outside the JSON structure.
 The JSON must strictly follow this schema:
 {
@@ -122,6 +127,12 @@ CRITICAL RULES FOR RECIPES AND CALORIES:
 1. ALL RECIPES and their nutritional values (calories, protein, carbs, fat) MUST be calculated for a single serving (for ONE PERSON). This is the most important rule.
 2. The 'ingredients' array MUST be in the structured format: { "ingredient", "quantity", "unit" }.
 3. The "totalCalories" in each day's "weeklyPlan" is the sum of calories for all meals for ONE PERSON and must be very close (+/- 50 kcal) to the user's target.
+
+RULES FOR VARIETY AND CREATIVITY:
+1. Strive for the greatest possible variety of dishes within the week.
+2. Use different preparation methods (e.g., frying, baking, stewing, raw).
+3. Integrate inspiration from various international cuisines (e.g., Mediterranean, Asian, Oriental), as long as it fits the user's settings.
+4. Avoid repeating main ingredients on consecutive days.
 
 RULES FOR MEALS:
 1. Strictly adhere to the user's list of 'includedMeals'. Generate recipes ONLY for these meal types.
@@ -145,6 +156,7 @@ Create a new weekly meal plan based on these settings:
 - Lactose-free: ${isLactoseFree ? 'Yes' : 'No'}
 ${mainMealFocusText}
 ${previousRecipesText}
+${creativeInspirationText}
 
 ${breakfastInstruction}
 ${snackInstruction}

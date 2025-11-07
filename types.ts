@@ -75,6 +75,7 @@ export interface PlanSettings {
     isLactoseFree: boolean;
     includedMeals: MealCategory[];
     mainMealFocus?: 'lunch' | 'dinner' | 'none';
+    creativeInspiration?: string;
     
     // New fields for recurring meals
     useSameBreakfast?: boolean;
