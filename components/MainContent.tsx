@@ -101,7 +101,13 @@ const MainContent: React.FC<MainContentProps> = (props) => {
       case 'recipe-archive':
         return <RecipeArchiveComponent />;
       case 'planner':
-        return <PlannerComponent onPlanSaved={onPlanSaved} />;
+        return <PlannerComponent 
+            onPlanSaved={onPlanSaved} 
+            imageUrls={imageUrls}
+            loadingImages={loadingImages}
+            imageErrors={imageErrors}
+            generateImage={generateImage}
+        />;
       default:
         return (
              <div className="bg-white/50 p-6 rounded-lg shadow-sm space-y-6">

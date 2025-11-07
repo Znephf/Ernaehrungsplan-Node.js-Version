@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { Recipe, StructuredIngredient } from '../types';
 import { MealCategoryLabels } from '../types';
-import { PrintIcon, CloseIcon, ProteinIcon, CarbsIcon, FatIcon, FireIcon } from './IconComponents';
+import { PrintIcon, CloseIcon, ProteinIcon, CarbsIcon, FatIcon, FireIcon, PlusIcon } from './IconComponents';
 import GeneratedRecipeImage from './GeneratedRecipeImage';
 
 interface RecipeDetailModalProps {
@@ -11,9 +11,10 @@ interface RecipeDetailModalProps {
     isLoading: boolean;
     error: string | null;
     onGenerate: (recipe: Recipe) => void;
+    onAddToPlan?: (recipe: Recipe) => void;
 }
 
-const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, imageUrl, isLoading, error, onGenerate }) => {
+const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, imageUrl, isLoading, error, onGenerate, onAddToPlan }) => {
     const [persons, setPersons] = useState(2);
 
     const formatIngredient = (ing: StructuredIngredient, basePersons = 1, targetPersons: number) => {
@@ -72,6 +73,15 @@ const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, 
                 <header className="p-4 border-b flex justify-between items-center flex-shrink-0">
                     <h2 className="text-xl font-bold text-slate-800" id="recipe-modal-title">{recipe.title}</h2>
                     <div className="flex items-center gap-2">
+                        {onAddToPlan && (
+                            <button 
+                                onClick={() => onAddToPlan(recipe)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-md shadow-sm transition-colors"
+                            >
+                                <PlusIcon />
+                                Hinzufügen
+                            </button>
+                        )}
                         <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-md transition-colors"><PrintIcon /> Drucken</button>
                         <button onClick={onClose} className="p-2 text-slate-500 hover:text-slate-800 rounded-full hover:bg-slate-100 transition-colors" aria-label="Schließen"><CloseIcon /></button>
                     </div>

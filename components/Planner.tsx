@@ -2,8 +2,9 @@ import React, { useState, useMemo, DragEvent, useEffect } from 'react';
 import type { Recipe, Diet, DietType, DishComplexity, MealCategory } from '../types';
 import { MealCategoryLabels, MEAL_ORDER } from '../types';
 import * as apiService from '../services/apiService';
-import { LoadingSpinnerIcon, CloseIcon } from './IconComponents';
+import { LoadingSpinnerIcon, CloseIcon, PlusIcon } from './IconComponents';
 import LoadingOverlay from './LoadingOverlay';
+import RecipeDetailModal from './RecipeDetailModal';
 
 const useMediaQuery = (query: string): boolean => {
     const isClient = typeof window === 'object';
@@ -21,6 +22,10 @@ const useMediaQuery = (query: string): boolean => {
 
 interface PlannerComponentProps {
   onPlanSaved: () => void;
+  imageUrls: { [id: number]: string };
+  loadingImages: Set<number>;
+  imageErrors: { [id: number]: string | null };
+  generateImage: (recipe: Recipe) => Promise<void>;
 }
 
 const dietPreferenceLabels: Record<Diet, string> = { omnivore: 'Alles', vegetarian: 'Vegetarisch', vegan: 'Vegan' };
@@ -34,7 +39,7 @@ const WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Sa
 
 type WeeklySlots = { [day: string]: { recipe: Recipe; mealType: MealCategory; uniqueId: string }[] };
 
-const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
+const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageUrls, loadingImages, imageErrors, generateImage }) => {
     const isDesktop = useMediaQuery('(min-width: 1024px)');
     const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
     
@@ -64,6 +69,7 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
     const [addingMealToDay, setAddingMealToDay] = useState<string | null>(null);
     
     const [visibleMeals, setVisibleMeals] = useState<Set<MealCategory>>(new Set(MEAL_ORDER));
+    const [previewRecipe, setPreviewRecipe] = useState<Recipe | null>(null);
 
     const handleMealVisibilityChange = (mealType: MealCategory, checked: boolean) => {
         const newVisibleMeals = new Set(visibleMeals);
@@ -167,13 +173,17 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
         setAddingMealToDay(null);
     };
 
-    const handleSelectRecipeForDay = (recipe: Recipe) => {
+    const handleAddRecipeFromPreview = (recipeToAdd: Recipe) => {
         if (modalDay && modalMealType) {
-            setWeeklySlots(prev => ({
-                ...prev,
-                [modalDay]: [...prev[modalDay], { recipe, mealType: modalMealType, uniqueId: `${modalDay}-${Date.now()}` }]
-            }));
+            // Ensure recipe category matches the slot's meal type before adding
+            if (recipeToAdd.category === modalMealType) {
+                setWeeklySlots(prev => ({
+                    ...prev,
+                    [modalDay]: [...prev[modalDay], { recipe: recipeToAdd, mealType: modalMealType, uniqueId: `${modalDay}-${Date.now()}` }]
+                }));
+            }
         }
+        setPreviewRecipe(null);
         setIsModalOpen(false);
         setModalDay(null);
         setModalMealType(null);
@@ -215,16 +225,27 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
       </div>
     );
 
-    const recipeList = (onSelect: (recipe: Recipe) => void, mealTypeFilter?: MealCategory | null) => (
+    const recipeList = (mealTypeFilter?: MealCategory | null) => (
       <div className="space-y-3">
         {filteredRecipes.length > 0 ? filteredRecipes
             .filter(recipe => !mealTypeFilter || recipe.category === mealTypeFilter)
             .map(recipe => (
-          <div key={recipe.id} draggable={isDesktop} onDragStart={e => handleDragStart(e, recipe)} onClick={() => !isDesktop && onSelect(recipe)} className="bg-white p-3 rounded-lg shadow hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-grab active:cursor-grabbing flex items-center gap-4">
-            {recipe.image_url && <img src={recipe.image_url} alt={recipe.title} className="w-12 h-12 rounded-md object-cover flex-shrink-0" />}
-            <div className="flex-grow"><p className="font-semibold text-slate-700">{recipe.title}</p><p className="text-xs text-slate-400">{MealCategoryLabels[recipe.category]} &bull; {recipe.totalCalories} kcal</p></div>
-          </div>
-        )) : <div className="text-center py-8 text-slate-500">Keine Gerichte für diese Filter gefunden.</div>}
+              <div 
+                key={recipe.id} 
+                draggable={isDesktop} 
+                onDragStart={e => handleDragStart(e, recipe)} 
+                onClick={() => setPreviewRecipe(recipe)} 
+                className="bg-white p-3 rounded-lg shadow hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer active:cursor-grabbing flex items-center gap-4"
+                role="button"
+                aria-label={`Vorschau für ${recipe.title} öffnen`}
+              >
+                {recipe.image_url && <img src={recipe.image_url} alt={recipe.title} className="w-12 h-12 rounded-md object-cover flex-shrink-0" />}
+                <div className="flex-grow">
+                  <p className="font-semibold text-slate-700">{recipe.title}</p>
+                  <p className="text-xs text-slate-400">{MealCategoryLabels[recipe.category]} &bull; {recipe.totalCalories} kcal</p>
+                </div>
+              </div>
+            )) : <div className="text-center py-8 text-slate-500">Keine Gerichte für diese Filter gefunden.</div>}
       </div>
     );
 
@@ -265,7 +286,7 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
                                <h2 className="text-2xl font-bold text-slate-700">Verfügbare Gerichte</h2>
                            </div>
                            <div className="overflow-y-auto p-6 flex-grow">
-                               {recipeList(() => {})}
+                               {recipeList()}
                            </div>
                         </div>
                     </div>
@@ -356,10 +377,22 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved }) => {
                         </header>
                         <div className="flex-grow overflow-y-auto p-4 space-y-4">
                             {filterControls}
-                            <div className="pt-4">{recipeList(handleSelectRecipeForDay, modalMealType)}</div>
+                            <div className="pt-4">{recipeList(modalMealType)}</div>
                         </div>
                     </div>
                 </div>
+            )}
+
+            {previewRecipe && (
+                <RecipeDetailModal
+                    recipe={previewRecipe}
+                    onClose={() => setPreviewRecipe(null)}
+                    imageUrl={imageUrls[previewRecipe.id] || previewRecipe.image_url || null}
+                    isLoading={loadingImages.has(previewRecipe.id)}
+                    error={imageErrors[previewRecipe.id] || null}
+                    onGenerate={generateImage}
+                    onAddToPlan={isModalOpen ? handleAddRecipeFromPreview : undefined}
+                />
             )}
         </div>
     );
