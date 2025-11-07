@@ -66,7 +66,7 @@ const MainContent: React.FC<MainContentProps> = (props) => {
             isLactoseFree={plan.settings.isLactoseFree}
           />
         ) : (
-          <div className="bg-white/50 p-6 rounded-lg shadow-sm space-y-6">
+          <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
             <div className="text-center">
                 <h2 className="text-2xl font-bold text-slate-700">Neuen Ernährungsplan erstellen</h2>
                 <p className="text-slate-500 mt-2 max-w-2xl mx-auto">
@@ -110,7 +110,7 @@ const MainContent: React.FC<MainContentProps> = (props) => {
         />;
       default:
         return (
-             <div className="bg-white/50 p-6 rounded-lg shadow-sm space-y-6">
+             <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
                 <div className="text-center">
                     <h2 className="text-2xl font-bold text-slate-700">Neuen Ernährungsplan erstellen</h2>
                     <p className="text-slate-500 mt-2 max-w-2xl mx-auto">
