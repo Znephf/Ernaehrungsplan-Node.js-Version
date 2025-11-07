@@ -1,6 +1,7 @@
 import React from 'react';
 import type { PlanSettings, MealCategory } from '../types';
 import { MealCategoryLabels } from '../types';
+import CustomSelect from './CustomSelect';
 
 interface SettingsPanelProps {
   settings: PlanSettings;
@@ -11,7 +12,7 @@ interface SettingsPanelProps {
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChange, onGeneratePlan, isLoading }) => {
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     const isCheckbox = type === 'checkbox';
     const target = e.target as HTMLInputElement;
@@ -25,6 +26,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                 : value,
     });
   };
+  
+  const handleSelectChange = (name: keyof PlanSettings, value: string | number) => {
+      onSettingsChange({ ...settings, [name]: value });
+  };
+
 
   const handleMealTypeChange = (mealType: MealCategory) => {
     const currentMeals = settings.includedMeals || [];
@@ -76,34 +82,46 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
         {/* Column 2 */}
         <div className="space-y-4">
           <div>
-            <label htmlFor="dietaryPreference" className="block text-sm font-medium text-slate-700">Ernährungsweise</label>
-            <select name="dietaryPreference" id="dietaryPreference" value={settings.dietaryPreference} onChange={handleChange} className={`${inputStyles} capitalize`}>
-              <option value="omnivore">Alles</option>
-              <option value="vegetarian">Vegetarisch</option>
-              <option value="vegan">Vegan</option>
-            </select>
+            <label className="block text-sm font-medium text-slate-700">Ernährungsweise</label>
+            <CustomSelect
+              value={settings.dietaryPreference}
+              onChange={(value) => handleSelectChange('dietaryPreference', value)}
+              options={[
+                { value: 'omnivore', label: 'Alles' },
+                { value: 'vegetarian', label: 'Vegetarisch' },
+                { value: 'vegan', label: 'Vegan' },
+              ]}
+            />
           </div>
           <div>
-            <label htmlFor="dishComplexity" className="block text-sm font-medium text-slate-700">Koch-Niveau</label>
-            <select name="dishComplexity" id="dishComplexity" value={settings.dishComplexity} onChange={handleChange} className={inputStyles}>
-              <option value="simple">Einfache Gerichte</option>
-              <option value="advanced">Fortgeschrittene Gerichte</option>
-              <option value="fancy">Pfiffige Gerichte</option>
-            </select>
+            <label className="block text-sm font-medium text-slate-700">Koch-Niveau</label>
+             <CustomSelect
+              value={settings.dishComplexity}
+              onChange={(value) => handleSelectChange('dishComplexity', value)}
+              options={[
+                { value: 'simple', label: 'Einfache Gerichte' },
+                { value: 'advanced', label: 'Fortgeschrittene Gerichte' },
+                { value: 'fancy', label: 'Pfiffige Gerichte' },
+              ]}
+            />
           </div>
         </div>
         
         {/* Column 3 */}
         <div className="space-y-4">
           <div>
-            <label htmlFor="dietType" className="block text-sm font-medium text-slate-700">Diät-Typ</label>
-            <select name="dietType" id="dietType" value={settings.dietType} onChange={handleChange} className={`${inputStyles} capitalize`}>
-              <option value="balanced">Ausgewogen</option>
-              <option value="low-carb">Low-Carb</option>
-              <option value="keto">Ketogen</option>
-              <option value="high-protein">High-Protein</option>
-              <option value="mediterranean">Mediterran</option>
-            </select>
+            <label className="block text-sm font-medium text-slate-700">Diät-Typ</label>
+             <CustomSelect
+              value={settings.dietType}
+              onChange={(value) => handleSelectChange('dietType', value)}
+              options={[
+                 { value: 'balanced', label: 'Ausgewogen' },
+                 { value: 'low-carb', label: 'Low-Carb' },
+                 { value: 'keto', label: 'Ketogen' },
+                 { value: 'high-protein', label: 'High-Protein' },
+                 { value: 'mediterranean', label: 'Mediterran' },
+              ]}
+            />
           </div>
           <div className="pt-1">
             <span className="block text-sm font-medium text-slate-700">Optionen</span>
