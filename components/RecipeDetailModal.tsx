@@ -63,28 +63,30 @@ const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, 
     
     return (
         <div 
-            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" 
+            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" 
             onClick={onClose}
             role="dialog" 
             aria-modal="true" 
             aria-labelledby="recipe-modal-title"
         >
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                <header className="p-4 border-b flex flex-wrap justify-between items-start sm:items-center gap-y-3 gap-x-4 flex-shrink-0">
-                    <h2 className="text-xl font-bold text-slate-800" id="recipe-modal-title">{recipe.title}</h2>
-                    <div className="flex items-center gap-2">
-                        {onAddToPlan && (
-                            <button 
-                                onClick={() => onAddToPlan(recipe)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-md shadow-sm transition-colors"
-                            >
-                                <PlusIcon />
-                                Hinzufügen
-                            </button>
-                        )}
-                        <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-md transition-colors"><PrintIcon /> Drucken</button>
-                        <button onClick={onClose} className="p-2 text-slate-500 hover:text-slate-800 rounded-full hover:bg-slate-100 transition-colors" aria-label="Schließen"><CloseIcon /></button>
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col m-4" onClick={e => e.stopPropagation()}>
+                <header className="p-4 border-b flex flex-col gap-2 flex-shrink-0">
+                    <div className="flex w-full items-center justify-end">
+                        <div className="flex items-center gap-2">
+                            {onAddToPlan && (
+                                <button 
+                                    onClick={() => onAddToPlan(recipe)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-md shadow-sm transition-colors"
+                                >
+                                    <PlusIcon />
+                                    Hinzufügen
+                                </button>
+                            )}
+                            <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-md transition-colors"><PrintIcon /> Drucken</button>
+                            <button onClick={onClose} className="p-2 text-slate-500 hover:text-slate-800 rounded-full hover:bg-slate-100 transition-colors" aria-label="Schließen"><CloseIcon /></button>
+                        </div>
                     </div>
+                    <h2 className="text-xl font-bold text-slate-800" id="recipe-modal-title">{recipe.title}</h2>
                 </header>
                 <main className="overflow-y-auto">
                     <div id="printable-recipe-area">
