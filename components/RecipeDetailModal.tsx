@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Recipe, StructuredIngredient } from '../types';
 import { MealCategoryLabels } from '../types';
 import { PrintIcon, CloseIcon, ProteinIcon, CarbsIcon, FatIcon, FireIcon, PlusIcon } from './IconComponents';
@@ -16,6 +16,15 @@ interface RecipeDetailModalProps {
 
 const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, imageUrl, isLoading, error, onGenerate, onAddToPlan }) => {
     const [persons, setPersons] = useState(2);
+
+    useEffect(() => {
+        // Verhindert das Scrollen der Hauptseite, während das Modal geöffnet ist
+        const originalStyle = window.getComputedStyle(document.body).overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = originalStyle;
+        };
+    }, []);
 
     const formatIngredient = (ing: StructuredIngredient, basePersons = 1, targetPersons: number) => {
         let scaledQuantity = (ing.quantity / basePersons) * targetPersons;
@@ -63,13 +72,13 @@ const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, 
     
     return (
         <div 
-            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" 
+            className="fixed inset-0 bg-black bg-opacity-75 z-50 overflow-y-auto" 
             onClick={onClose}
             role="dialog" 
             aria-modal="true" 
             aria-labelledby="recipe-modal-title"
         >
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-full flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl my-8 mx-auto flex flex-col" onClick={e => e.stopPropagation()}>
                 <header className="p-4 border-b flex flex-col gap-2 flex-shrink-0">
                     <div className="flex w-full items-center justify-end">
                         <div className="flex items-center gap-2">
@@ -88,7 +97,7 @@ const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, 
                     </div>
                     <h2 className="text-xl font-bold text-slate-800" id="recipe-modal-title">{recipe.title}</h2>
                 </header>
-                <main className="overflow-y-auto">
+                <main>
                     <div id="printable-recipe-area">
                         <GeneratedRecipeImage
                             recipeTitle={recipe.title}
