@@ -13,11 +13,11 @@ interface RecipesComponentProps {
   weeklyPlan: WeeklyPlan;
   recipes: Recipes;
   persons: number;
-  imageUrls: { [id: number]: string };
+  imageUrls: { [id: number]: { full: string; thumb: string; } };
   loadingImages: Set<number>;
   imageErrors: { [id: number]: string | null };
   generateImage: (recipe: Recipe) => Promise<void>;
-  generateMissingImages: (weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
+  generateMissingImages: (weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: number]: { full: string; thumb: string; } }>;
   isBulkImageGenerating: boolean;
   onGenerateAllImages: () => void;
 }
@@ -171,7 +171,7 @@ const RecipesComponent: React.FC<RecipesComponentProps> = ({ weeklyPlan, recipes
                     <div>
                       <GeneratedRecipeImage 
                         recipeTitle={recipe.title}
-                        imageUrl={imageUrls[recipe.id] || recipe.image_url || null}
+                        imageUrl={imageUrls[recipe.id]?.full || recipe.image_url || null}
                         isLoading={loadingImages.has(recipe.id)}
                         error={imageErrors[recipe.id] || null}
                         onGenerate={() => generateImage(recipe)}

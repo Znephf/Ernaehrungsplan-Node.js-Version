@@ -22,7 +22,7 @@ const useMediaQuery = (query: string): boolean => {
 
 interface PlannerComponentProps {
   onPlanSaved: () => void;
-  imageUrls: { [id: number]: string };
+  imageUrls: { [id: number]: { full: string; thumb: string; } };
   loadingImages: Set<number>;
   imageErrors: { [id: number]: string | null };
   generateImage: (recipe: Recipe) => Promise<void>;
@@ -239,7 +239,7 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
                 role="button"
                 aria-label={`Vorschau für ${recipe.title} öffnen`}
               >
-                {recipe.image_url && <img src={recipe.image_url} alt={recipe.title} className="w-12 h-12 rounded-md object-cover flex-shrink-0" />}
+                {(recipe.thumbnail_url || recipe.image_url) && <img src={recipe.thumbnail_url || recipe.image_url} alt={recipe.title} className="w-12 h-12 rounded-md object-cover flex-shrink-0" />}
                 <div className="flex-grow">
                   <p className="font-semibold text-slate-700">{recipe.title}</p>
                   <p className="text-xs text-slate-400">{MealCategoryLabels[recipe.category]} &bull; {recipe.totalCalories} kcal</p>
@@ -387,7 +387,7 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
                 <RecipeDetailModal
                     recipe={previewRecipe}
                     onClose={() => setPreviewRecipe(null)}
-                    imageUrl={imageUrls[previewRecipe.id] || previewRecipe.image_url || null}
+                    imageUrl={imageUrls[previewRecipe.id]?.full || previewRecipe.image_url || null}
                     isLoading={loadingImages.has(previewRecipe.id)}
                     error={imageErrors[previewRecipe.id] || null}
                     onGenerate={generateImage}

@@ -3,7 +3,7 @@ import type { Recipe, WeeklyPlan } from '../types';
 import * as apiService from '../services/apiService';
 
 export const useImageGenerator = (onImageSaved?: () => void) => {
-    const [imageUrls, setImageUrls] = useState<{ [id: number]: string }>({});
+    const [imageUrls, setImageUrls] = useState<{ [id: number]: { full: string; thumb: string; } }>({});
     const [loadingImages, setLoadingImages] = useState<Set<number>>(new Set());
     const [imageErrors, setImageErrors] = useState<{ [id: number]: string | null }>({});
     
@@ -72,9 +72,9 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
                 const base64Data = base64ImageUrl.split(';base64,').pop();
                 if (!base64Data) throw new Error("Konnte Bilddaten nicht extrahieren.");
                 
-                const { imageUrl: fileUrl } = await apiService.saveRecipeImage(recipe.id, base64Data);
+                const { imageUrl: fileUrl, thumbnailUrl: thumbUrl } = await apiService.saveRecipeImage(recipe.id, base64Data);
                 
-                setImageUrls(prev => ({ ...prev, [recipe.id]: fileUrl }));
+                setImageUrls(prev => ({ ...prev, [recipe.id]: { full: fileUrl, thumb: thumbUrl } }));
                 
                 if (onImageSaved) onImageSaved();
 
@@ -88,7 +88,7 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
 
     }, [loadingImages, executeImageGeneration, onImageSaved]);
 
-    const generateMissingImages = useCallback(async (weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void): Promise<{ [id: number]: string }> => {
+    const generateMissingImages = useCallback(async (weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void): Promise<{ [id: number]: { full: string; thumb: string; } }> => {
         const recipesToGenerate = weeklyPlan
             .flatMap(dp => dp.meals.map(m => m.recipe))
             .filter(recipe => recipe && !imageUrls[recipe.id] && !loadingImages.has(recipe.id));
@@ -113,9 +113,9 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
                     const base64Data = base64Url.split(';base64,').pop();
                     if (!base64Data) throw new Error("Konnte Bilddaten nicht extrahieren.");
 
-                    const { imageUrl: fileUrl } = await apiService.saveRecipeImage(recipe.id, base64Data);
-                    finalUrls[recipe.id] = fileUrl;
-                    setImageUrls(prev => ({ ...prev, [recipe.id]: fileUrl }));
+                    const { imageUrl: fileUrl, thumbnailUrl: thumbUrl } = await apiService.saveRecipeImage(recipe.id, base64Data);
+                    finalUrls[recipe.id] = { full: fileUrl, thumb: thumbUrl };
+                    setImageUrls(prev => ({ ...prev, [recipe.id]: { full: fileUrl, thumb: thumbUrl } }));
                 } catch (e) {
                     console.error(`Konnte Bild für Rezept ${recipe.id} nicht speichern:`, e);
                 }
@@ -141,7 +141,7 @@ export const useImageGenerator = (onImageSaved?: () => void) => {
         setImageErrors({});
     }, []);
 
-    const setImageUrlsFromArchive = useCallback((urls: { [id: number]: string }) => {
+    const setImageUrlsFromArchive = useCallback((urls: { [id: number]: { full: string; thumb: string; } }) => {
         setImageUrls(urls);
         setLoadingImages(new Set());
         setImageErrors({});

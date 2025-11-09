@@ -44,7 +44,8 @@ async function initializeDatabase() {
           CREATE TABLE IF NOT EXISTS recipe_images (
             id INT AUTO_INCREMENT PRIMARY KEY,
             recipe_title VARCHAR(255) NOT NULL UNIQUE,
-            image_url VARCHAR(1024) NOT NULL
+            image_url VARCHAR(1024) NOT NULL,
+            thumbnail_url VARCHAR(1024)
           );
         `);
 
@@ -97,6 +98,7 @@ async function initializeDatabase() {
         await checkAndAlterTable(connection, 'recipes', 'isLactoseFree', 'ALTER TABLE recipes ADD COLUMN isLactoseFree BOOLEAN');
         await checkAndAlterTable(connection, 'plans', 'shoppingList', 'ALTER TABLE plans ADD COLUMN shoppingList JSON');
         await checkAndAlterTable(connection, 'recipes', 'base_persons', 'ALTER TABLE recipes ADD COLUMN base_persons INT DEFAULT 1');
+        await checkAndAlterTable(connection, 'recipe_images', 'thumbnail_url', 'ALTER TABLE recipe_images ADD COLUMN thumbnail_url VARCHAR(1024)');
 
 
     } catch (error) {

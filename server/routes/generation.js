@@ -4,6 +4,7 @@ const router = express.Router();
 const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
+const sharp = require('sharp');
 const { pool } = require('../services/database');
 const { generatePlan, generateShoppingListOnly, generateImageForRecipe } = require('../services/geminiService');
 const { savePlanToDatabase } = require('../services/jobService');
@@ -121,22 +122,36 @@ router.post('/save-image', async (req, res) => {
         }
         const recipeTitle = recipe.title;
 
-        // 2. Speichere die Bilddatei
         const imageBuffer = Buffer.from(base64Data, 'base64');
-        const fileName = `${crypto.randomBytes(16).toString('hex')}.jpg`;
+        const randomName = crypto.randomBytes(16).toString('hex');
         const imagesDir = path.join(__dirname, '..', '..', 'public', 'images', 'recipes');
-        const filePath = path.join(imagesDir, fileName);
-        const fileUrl = `/images/recipes/${fileName}`;
-        await fs.writeFile(filePath, imageBuffer);
 
-        // 3. Füge das Bild in die `recipe_images`-Tabelle ein oder aktualisiere es.
-        // Die Verknüpfung erfolgt über den Titel.
+        // Dateipfade und URLs für Vollbild und Thumbnail
+        const fullImagePath = path.join(imagesDir, `${randomName}.webp`);
+        const thumbImagePath = path.join(imagesDir, `${randomName}-thumb.webp`);
+        const fullImageUrl = `/images/recipes/${randomName}.webp`;
+        const thumbImageUrl = `/images/recipes/${randomName}-thumb.webp`;
+
+        // 2. Bilder mit Sharp verarbeiten und speichern
+        // Vollbild (max 1024px breit, WebP-Format)
+        await sharp(imageBuffer)
+            .resize({ width: 1024, withoutEnlargement: true })
+            .webp({ quality: 80 })
+            .toFile(fullImagePath);
+            
+        // Thumbnail (max 400px breit, WebP-Format)
+        await sharp(imageBuffer)
+            .resize({ width: 400, withoutEnlargement: true })
+            .webp({ quality: 75 })
+            .toFile(thumbImagePath);
+
+        // 3. Füge beide Bild-URLs in die `recipe_images`-Tabelle ein oder aktualisiere sie.
         await pool.query(
-            'INSERT INTO recipe_images (recipe_title, image_url) VALUES (?, ?) ON DUPLICATE KEY UPDATE image_url = VALUES(image_url)',
-            [recipeTitle, fileUrl]
+            'INSERT INTO recipe_images (recipe_title, image_url, thumbnail_url) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE image_url = VALUES(image_url), thumbnail_url = VALUES(thumbnail_url)',
+            [recipeTitle, fullImageUrl, thumbImageUrl]
         );
 
-        res.json({ imageUrl: fileUrl });
+        res.json({ imageUrl: fullImageUrl, thumbnailUrl: thumbImageUrl });
 
     } catch (error) {
         console.error('Fehler beim Speichern des Bildes:', error);

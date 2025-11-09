@@ -29,6 +29,7 @@ router.get('/archive', async (req, res) => {
                     r.id, r.title, r.ingredients, r.instructions, r.totalCalories, r.protein, r.carbs, r.fat, r.category,
                     r.dietaryPreference, r.dietType, r.dishComplexity, r.isGlutenFree, r.isLactoseFree,
                     ri.image_url,
+                    ri.thumbnail_url,
                     pr.day_of_week,
                     pr.meal_type
                 FROM plan_recipes pr
@@ -60,6 +61,7 @@ router.get('/archive', async (req, res) => {
                         isGlutenFree: link.isGlutenFree,
                         isLactoseFree: link.isLactoseFree,
                         image_url: link.image_url,
+                        thumbnail_url: link.thumbnail_url,
                     };
                     recipeMap.set(link.id, recipe);
                     recipes.push(recipe);

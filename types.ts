@@ -38,6 +38,7 @@ export interface Recipe {
     isGlutenFree?: boolean;
     isLactoseFree?: boolean;
     image_url?: string | null;
+    thumbnail_url?: string | null;
     base_persons?: number;
 }
 

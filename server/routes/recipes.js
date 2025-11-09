@@ -11,7 +11,8 @@ router.get('/', async (req, res) => {
                 r.protein, r.carbs, r.fat, r.category,
                 r.dietaryPreference, r.dietType, r.dishComplexity, r.isGlutenFree, r.isLactoseFree,
                 r.base_persons,
-                ri.image_url
+                ri.image_url,
+                ri.thumbnail_url
             FROM recipes r
             LEFT JOIN recipe_images ri ON r.title = ri.recipe_title
             ORDER BY r.title ASC

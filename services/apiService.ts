@@ -99,7 +99,7 @@ export const generateImage = async (recipe: Recipe, attempt: number): Promise<{ 
 };
 
 // Fix: Converted to async/await to fix type inference issues.
-export const saveRecipeImage = async (recipeId: number, base64Data: string): Promise<{ imageUrl: string }> => {
+export const saveRecipeImage = async (recipeId: number, base64Data: string): Promise<{ imageUrl: string, thumbnailUrl: string }> => {
     const response = await fetch('/api/save-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

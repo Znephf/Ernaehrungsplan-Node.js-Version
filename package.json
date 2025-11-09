@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "migrate:images": "node scripts/migrate_images.js",
+    "convert:images": "node scripts/convert_existing_images.js",
     "migrate:complexity": "node scripts/migrate_complexity.js",
     "migrate:persons": "node scripts/migrate_persons.js",
     "migrate:to-images-table": "node scripts/migrate_to_recipe_images.js",
@@ -40,7 +41,8 @@
     "express": "^4.19.2",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
-    "mysql2": "^3.11.0"
+    "mysql2": "^3.11.0",
+    "sharp": "^0.33.4"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

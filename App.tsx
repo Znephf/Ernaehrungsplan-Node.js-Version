@@ -113,10 +113,10 @@ const App: React.FC = () => {
             // After generation, refetch archive to include the new plan
             fetchArchive();
             // set image urls from new plan
-            const newImageUrls: { [id: number]: string } = {};
+            const newImageUrls: { [id: number]: { full: string; thumb: string; } } = {};
             generatedPlan.recipes.forEach(r => {
-                if (r.image_url) {
-                    newImageUrls[r.id] = r.image_url;
+                if (r.image_url && r.thumbnail_url) {
+                    newImageUrls[r.id] = { full: r.image_url, thumb: r.thumbnail_url };
                 }
             });
             setImageUrlsFromArchive(newImageUrls);
@@ -135,10 +135,10 @@ const App: React.FC = () => {
             setActivePlan(planToLoad);
             setSettings(planToLoad.settings);
 
-            const loadedImageUrls: { [id: number]: string } = {};
+            const loadedImageUrls: { [id: number]: { full: string; thumb: string; } } = {};
             planToLoad.recipes.forEach(recipe => {
-                if (recipe.image_url) {
-                    loadedImageUrls[recipe.id] = recipe.image_url;
+                if (recipe.image_url && recipe.thumbnail_url) {
+                    loadedImageUrls[recipe.id] = { full: recipe.image_url, thumb: recipe.thumbnail_url };
                 }
             });
             setImageUrlsFromArchive(loadedImageUrls);
@@ -269,7 +269,7 @@ const App: React.FC = () => {
                 generateImage={generateImage}
                 isBulkImageGenerating={isBulkImageGenerating}
                 onGenerateAllImages={handleGenerateAllImages}
-                generateMissingImages={(weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void): Promise<{ [key: string]: string; }> => generateMissingImages(weeklyPlan, activePlan?.id || null, onProgress)}
+                generateMissingImages={(weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void): Promise<{ [key: number]: { full: string; thumb: string; } }> => generateMissingImages(weeklyPlan, activePlan?.id || null, onProgress)}
             />
         </div>
     );

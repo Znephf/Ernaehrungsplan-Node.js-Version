@@ -16,7 +16,7 @@ interface MainContentProps {
   settings: PlanSettings;
   allRecipes: Recipe[];
   archive: ArchiveEntry[];
-  imageUrls: { [id: number]: string };
+  imageUrls: { [id: number]: { full: string; thumb: string; } };
   loadingImages: Set<number>;
   imageErrors: { [id: number]: string | null };
   isLoading: boolean;
@@ -27,7 +27,7 @@ interface MainContentProps {
   onSelectRecipe: (day: string, mealType: MealCategory) => void;
   onPlanSaved: () => void;
   generateImage: (recipe: Recipe) => Promise<void>;
-  generateMissingImages: (weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: string]: string }>;
+  generateMissingImages: (weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: number]: { full: string; thumb: string; } }>;
   isBulkImageGenerating: boolean;
   onGenerateAllImages: () => void;
 }
