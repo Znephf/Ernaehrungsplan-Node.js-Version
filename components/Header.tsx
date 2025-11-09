@@ -50,7 +50,7 @@ const Header: React.FC<HeaderProps> = ({
                     <NavButton view="plan" label="Wochenplan" currentView={currentView} onClick={onSetView} />
                     <NavButton view="shopping" label="Einkauf" currentView={currentView} onClick={onSetView} disabled={!planExists} />
                     <NavButton view="recipes" label="Rezepte" currentView={currentView} onClick={onSetView} disabled={!planExists} />
-                    <NavButton view="archive" label="Archiv" currentView={currentView} onClick={onSetView} />
+                    <NavButton view="archive" label="Pläne" currentView={currentView} onClick={onSetView} />
                     <NavButton view="recipe-archive" label="Bibliothek" currentView={currentView} onClick={onSetView} />
                     <NavButton view="planner" label="Planer" currentView={currentView} onClick={onSetView} />
                 </nav>

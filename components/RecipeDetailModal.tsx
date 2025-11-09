@@ -29,19 +29,16 @@ const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, 
     const formatIngredient = (ing: StructuredIngredient, basePersons = 1, targetPersons: number) => {
         let scaledQuantity = (ing.quantity / basePersons) * targetPersons;
 
-        // Avoid tiny decimal places for things like pieces or pinches
         if (['Stück', 'Prise', 'Bund', 'Zehe'].includes(ing.unit)) {
-            scaledQuantity = Math.round(scaledQuantity * 10) / 10; // Round to one decimal place
+            scaledQuantity = Math.round(scaledQuantity * 10) / 10;
         } else {
-            scaledQuantity = Math.round(scaledQuantity); // Round other units to whole numbers
+            scaledQuantity = Math.round(scaledQuantity);
         }
 
-        // Don't show quantity if it's 1 and unit is "Stück"
         if (ing.unit === 'Stück' && scaledQuantity === 1) {
             return ing.ingredient;
         }
         
-        // Handle pluralization for "Stück"
         const unit = (ing.unit === 'Stück' && scaledQuantity > 1) ? 'Stücke' : ing.unit;
         
         if (scaledQuantity === 0) return null;
@@ -72,32 +69,33 @@ const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, 
     
     return (
         <div 
-            className="fixed inset-0 bg-black bg-opacity-75 z-50 overflow-y-auto" 
+            className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4 sm:p-6 lg:p-8" 
             onClick={onClose}
             role="dialog" 
             aria-modal="true" 
             aria-labelledby="recipe-modal-title"
         >
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl my-8 mx-auto flex flex-col" onClick={e => e.stopPropagation()}>
-                <header className="p-4 border-b flex flex-col gap-2 flex-shrink-0">
-                    <div className="flex w-full items-center justify-end">
-                        <div className="flex items-center gap-2">
-                            {onAddToPlan && (
-                                <button 
-                                    onClick={() => onAddToPlan(recipe)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-md shadow-sm transition-colors"
-                                >
-                                    <PlusIcon />
-                                    Hinzufügen
-                                </button>
-                            )}
-                            <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-md transition-colors"><PrintIcon /> Drucken</button>
-                            <button onClick={onClose} className="p-2 text-slate-500 hover:text-slate-800 rounded-full hover:bg-slate-100 transition-colors" aria-label="Schließen"><CloseIcon /></button>
-                        </div>
-                    </div>
+            <div 
+                className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-full flex flex-col overflow-hidden" 
+                onClick={e => e.stopPropagation()}
+            >
+                <header className="p-4 border-b flex-shrink-0 flex justify-between items-center gap-4">
                     <h2 className="text-xl font-bold text-slate-800" id="recipe-modal-title">{recipe.title}</h2>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        {onAddToPlan && (
+                            <button 
+                                onClick={() => onAddToPlan(recipe)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-md shadow-sm transition-colors"
+                            >
+                                <PlusIcon />
+                                Hinzufügen
+                            </button>
+                        )}
+                        <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-md transition-colors"><PrintIcon /> Drucken</button>
+                        <button onClick={onClose} className="p-2 text-slate-500 hover:text-slate-800 rounded-full hover:bg-slate-100 transition-colors" aria-label="Schließen"><CloseIcon /></button>
+                    </div>
                 </header>
-                <main>
+                <main className="overflow-y-auto">
                     <div id="printable-recipe-area">
                         <GeneratedRecipeImage
                             recipeTitle={recipe.title}
