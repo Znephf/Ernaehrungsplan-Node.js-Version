@@ -129,7 +129,7 @@ const RecipeArchiveComponent: React.FC = () => {
     }
 
     return (
-        <div className="space-y-6" ref={recipeArchiveContainerRef}>
+        <div className="space-y-0" ref={recipeArchiveContainerRef}>
             <div className="space-y-6 bg-white/50 p-6 rounded-lg shadow-sm">
                  <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                     <h2 className="text-2xl font-bold text-slate-700">Rezepte Archiv</h2>
