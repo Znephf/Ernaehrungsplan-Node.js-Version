@@ -39,20 +39,24 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
     return (
         <header className="bg-white shadow-md sticky top-0 z-30">
-            <div className="container mx-auto px-2 sm:px-4 py-2 flex flex-wrap justify-between items-center gap-x-4 gap-y-2">
+            <div className="container mx-auto px-2 sm:px-4 py-2 relative flex flex-wrap justify-between items-center gap-x-4 gap-y-2">
+                {/* Item 1: Title */}
                 <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-800 shrink-0">
                     KI Ernährungsplaner
                 </h1>
-                <div className="flex flex-nowrap items-center justify-end gap-1 sm:gap-2 grow">
-                    <nav className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
-                        <NavButton view="plan" label="Wochenplan" currentView={currentView} onClick={onSetView} />
-                        <NavButton view="shopping" label="Einkauf" currentView={currentView} onClick={onSetView} disabled={!planExists} />
-                        <NavButton view="recipes" label="Rezepte" currentView={currentView} onClick={onSetView} disabled={!planExists} />
-                        <NavButton view="archive" label="Archiv" currentView={currentView} onClick={onSetView} />
-                        <NavButton view="recipe-archive" label="Bibliothek" currentView={currentView} onClick={onSetView} />
-                        <NavButton view="planner" label="Planer" currentView={currentView} onClick={onSetView} />
-                    </nav>
-                    <div className="hidden sm:block h-6 border-l border-slate-300 mx-1"></div>
+
+                {/* Item 2: Nav - will wrap on mobile, be centered on desktop */}
+                <nav className="w-full lg:w-auto order-last lg:order-none lg:absolute lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2 flex items-center justify-center gap-1 p-1 bg-slate-100 rounded-lg">
+                    <NavButton view="plan" label="Wochenplan" currentView={currentView} onClick={onSetView} />
+                    <NavButton view="shopping" label="Einkauf" currentView={currentView} onClick={onSetView} disabled={!planExists} />
+                    <NavButton view="recipes" label="Rezepte" currentView={currentView} onClick={onSetView} disabled={!planExists} />
+                    <NavButton view="archive" label="Archiv" currentView={currentView} onClick={onSetView} />
+                    <NavButton view="recipe-archive" label="Bibliothek" currentView={currentView} onClick={onSetView} />
+                    <NavButton view="planner" label="Planer" currentView={currentView} onClick={onSetView} />
+                </nav>
+
+                {/* Item 3: Actions */}
+                <div className="flex items-center gap-1 sm:gap-2">
                      <button
                         onClick={onShowPlanner}
                         className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-md shadow-sm transition-colors"
