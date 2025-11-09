@@ -86,6 +86,21 @@ async function savePlanToDatabase(planData, settings) {
     try {
         await connection.beginTransaction();
         
+        // Create a map to find a recipe's category from the weeklyPlan if the AI omits it.
+        const recipeCategoryMap = new Map();
+        if (planData.weeklyPlan && Array.isArray(planData.weeklyPlan)) {
+            for (const day of planData.weeklyPlan) {
+                if (day.meals && Array.isArray(day.meals)) {
+                    for (const meal of day.meals) {
+                        const recipeId = meal.recipeId;
+                        if (recipeId && meal.mealType && !recipeCategoryMap.has(recipeId)) {
+                            recipeCategoryMap.set(recipeId, meal.mealType);
+                        }
+                    }
+                }
+            }
+        }
+        
         const now = new Date();
         const [planResult] = await connection.query(
             'INSERT INTO plans (name, createdAt, settings, shoppingList) VALUES (?, ?, ?, ?)',
@@ -94,6 +109,12 @@ async function savePlanToDatabase(planData, settings) {
         const newPlanId = planResult.insertId;
 
         for (const recipe of planData.recipes) {
+            // Use the map as a fallback for the category. Default to 'dinner' as a last resort.
+            const recipeCategory = recipe.category || recipeCategoryMap.get(recipe.id) || 'dinner';
+            if (!recipe.category) {
+                console.warn(`[DB-FIX] Recipe "${recipe.title}" (ID: ${recipe.id}) was missing a category. Inferred "${recipeCategory}" from plan usage.`);
+            }
+
             const [recipeResult] = await connection.query(
                 `INSERT INTO recipes (title, ingredients, instructions, totalCalories, protein, carbs, fat, category, dietaryPreference, dietType, dishComplexity, isGlutenFree, isLactoseFree, base_persons) 
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -101,7 +122,8 @@ async function savePlanToDatabase(planData, settings) {
                 [
                     recipe.title, JSON.stringify(recipe.ingredients), JSON.stringify(recipe.instructions),
                     recipe.totalCalories,
-                    recipe.protein, recipe.carbs, recipe.fat, recipe.category,
+                    recipe.protein, recipe.carbs, recipe.fat, 
+                    recipeCategory, // Use the guaranteed category value
                     settings.dietaryPreference, settings.dietType, settings.dishComplexity, 
                     settings.isGlutenFree, settings.isLactoseFree,
                     1 // All new recipes are generated for a base of 1 person
