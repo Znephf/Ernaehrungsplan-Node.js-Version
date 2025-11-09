@@ -63,13 +63,13 @@ const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, 
     
     return (
         <div 
-            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" 
+            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" 
             onClick={onClose}
             role="dialog" 
             aria-modal="true" 
             aria-labelledby="recipe-modal-title"
         >
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col m-4" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-full flex flex-col" onClick={e => e.stopPropagation()}>
                 <header className="p-4 border-b flex flex-col gap-2 flex-shrink-0">
                     <div className="flex w-full items-center justify-end">
                         <div className="flex items-center gap-2">
