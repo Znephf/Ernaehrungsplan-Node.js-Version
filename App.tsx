@@ -28,13 +28,19 @@ const initialSettings: PlanSettings = {
     includedMeals: ['breakfast', 'dinner'],
     useSameBreakfast: false,
     customBreakfastText: '',
+    selectedBreakfastRecipeId: null,
     useSameSnack: false,
     customSnackText: '',
+    selectedSnackRecipeId: null,
+    useSameCoffee: false,
+    customCoffeeText: '',
+    selectedCoffeeRecipeId: null,
 };
 
 const App: React.FC = () => {
     const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
     const [currentView, setCurrentView] = useState<View>('plan');
+    const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
     
     // Hooks for different functionalities
     const { archive, loadPlanFromArchive, fetchArchive, removePlan } = useArchive();
@@ -92,6 +98,9 @@ const App: React.FC = () => {
     useEffect(() => {
         if (isLoggedIn) {
             fetchArchive();
+            apiService.getAllRecipes()
+                .then(setAllRecipes)
+                .catch(err => console.error("Could not fetch all recipes for planner:", err));
         }
     }, [isLoggedIn, fetchArchive]);
 
@@ -245,6 +254,7 @@ const App: React.FC = () => {
                 onSetView={setCurrentView}
                 plan={activePlan}
                 settings={settings}
+                allRecipes={allRecipes}
                 archive={archive}
                 imageUrls={imageUrls}
                 loadingImages={loadingImages}

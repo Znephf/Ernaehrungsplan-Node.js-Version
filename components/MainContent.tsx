@@ -14,6 +14,7 @@ interface MainContentProps {
   onSetView: (view: View) => void;
   plan: PlanData | null;
   settings: PlanSettings;
+  allRecipes: Recipe[];
   archive: ArchiveEntry[];
   imageUrls: { [id: number]: string };
   loadingImages: Set<number>;
@@ -37,6 +38,7 @@ const MainContent: React.FC<MainContentProps> = (props) => {
     onSetView,
     plan,
     settings,
+    allRecipes,
     archive,
     imageUrls,
     loadingImages,
@@ -75,7 +77,7 @@ const MainContent: React.FC<MainContentProps> = (props) => {
                 </p>
             </div>
             <div className="border-t border-slate-200 pt-6">
-                <SettingsPanel settings={settings} onSettingsChange={onSettingsChange} onGeneratePlan={onGeneratePlan} isLoading={isLoading} />
+                <SettingsPanel settings={settings} onSettingsChange={onSettingsChange} onGeneratePlan={onGeneratePlan} isLoading={isLoading} allRecipes={allRecipes} />
             </div>
           </div>
         );
@@ -119,7 +121,7 @@ const MainContent: React.FC<MainContentProps> = (props) => {
                     </p>
                 </div>
                 <div className="border-t border-slate-200 pt-6">
-                    <SettingsPanel settings={settings} onSettingsChange={onSettingsChange} onGeneratePlan={onGeneratePlan} isLoading={isLoading} />
+                    <SettingsPanel settings={settings} onSettingsChange={onSettingsChange} onGeneratePlan={onGeneratePlan} isLoading={isLoading} allRecipes={allRecipes} />
                 </div>
             </div>
         );

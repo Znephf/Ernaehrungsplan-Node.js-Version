@@ -80,8 +80,15 @@ export interface PlanSettings {
     // New fields for recurring meals
     useSameBreakfast?: boolean;
     customBreakfastText?: string;
+    selectedBreakfastRecipeId?: number | null;
+    
     useSameSnack?: boolean;
     customSnackText?: string;
+    selectedSnackRecipeId?: number | null;
+
+    useSameCoffee?: boolean;
+    customCoffeeText?: string;
+    selectedCoffeeRecipeId?: number | null;
 
     // Deprecated fields, kept for backward compatibility with old archive data
     breakfastOption?: 'beeren' | 'walnuss' | 'mandel' | 'custom';
