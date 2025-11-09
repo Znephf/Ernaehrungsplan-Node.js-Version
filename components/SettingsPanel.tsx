@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { PlanSettings, MealCategory, Recipe } from '../types';
+import type { PlanSettings, MealCategory, Recipe, Diet } from '../types';
 import { MealCategoryLabels } from '../types';
 import CustomSelect from './CustomSelect';
 import { CloseIcon } from './IconComponents';
@@ -12,17 +12,36 @@ interface RecipeSelectorModalProps {
     recipes: Recipe[];
     mealCategory: MealCategory;
     onSelect: (recipe: Recipe) => void;
+    dietaryPreference: Diet;
 }
 
-const RecipeSelectorModal: React.FC<RecipeSelectorModalProps> = ({ isOpen, onClose, recipes, mealCategory, onSelect }) => {
+const RecipeSelectorModal: React.FC<RecipeSelectorModalProps> = ({ isOpen, onClose, recipes, mealCategory, onSelect, dietaryPreference }) => {
     const [searchTerm, setSearchTerm] = useState('');
 
     const filteredRecipes = useMemo(() => {
-        return recipes.filter(r => 
-            r.category === mealCategory &&
-            r.title.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [recipes, mealCategory, searchTerm]);
+        return recipes.filter(r => {
+            const categoryMatch = r.category === mealCategory;
+            const searchMatch = r.title.toLowerCase().includes(searchTerm.toLowerCase());
+
+            if (!categoryMatch || !searchMatch) {
+                return false;
+            }
+
+            // Filter based on dietary preference
+            switch (dietaryPreference) {
+                case 'vegetarian':
+                    // Vegetarians can see vegetarian and vegan recipes
+                    return r.dietaryPreference === 'vegetarian' || r.dietaryPreference === 'vegan';
+                case 'vegan':
+                    // Vegans can only see vegan recipes
+                    return r.dietaryPreference === 'vegan';
+                case 'omnivore':
+                default:
+                    // Omnivores can see all recipes
+                    return true;
+            }
+        });
+    }, [recipes, mealCategory, searchTerm, dietaryPreference]);
 
     if (!isOpen) return null;
 
@@ -52,7 +71,7 @@ const RecipeSelectorModal: React.FC<RecipeSelectorModalProps> = ({ isOpen, onClo
                            </div>
                         </li>
                     )) : (
-                        <p className="text-center text-slate-500 p-8">Keine passenden Rezepte gefunden.</p>
+                        <p className="text-center text-slate-500 p-8">Keine passenden Rezepte für diese Ernährungsweise gefunden.</p>
                     )}
                 </ul>
             </div>
@@ -173,7 +192,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, allRecipes, onS
 
   return (
     <>
-    <RecipeSelectorModal isOpen={isSelectorOpen} onClose={() => setIsSelectorOpen(false)} recipes={allRecipes} mealCategory={selectorMealType} onSelect={handleRecipeSelect} />
+    <RecipeSelectorModal isOpen={isSelectorOpen} onClose={() => setIsSelectorOpen(false)} recipes={allRecipes} mealCategory={selectorMealType} onSelect={handleRecipeSelect} dietaryPreference={settings.dietaryPreference} />
     <form onSubmit={handleSubmit} className="space-y-6">
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
