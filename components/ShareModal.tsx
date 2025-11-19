@@ -25,14 +25,14 @@ const ShareModal: React.FC<ShareModalProps> = ({ url, onClose }) => {
 
     return (
         <div 
-            className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
             onClick={onClose}
             role="dialog"
             aria-modal="true"
             aria-labelledby="share-modal-title"
         >
             <div 
-                className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 max-w-md w-full relative"
+                className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 max-w-md w-full relative border border-slate-100 dark:border-slate-700"
                 onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the modal
             >
                 <button 
@@ -50,7 +50,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ url, onClose }) => {
                         type="text" 
                         value={url} 
                         readOnly 
-                        className="bg-transparent text-slate-700 dark:text-slate-300 text-sm focus:outline-none w-full mb-1"
+                        className="bg-transparent text-slate-700 dark:text-slate-300 text-sm focus:outline-none w-full mb-1 truncate"
                         aria-label="Teilbarer Link"
                     />
                     <div className="flex gap-2">
@@ -65,7 +65,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ url, onClose }) => {
                             href={url} 
                             target="_blank" 
                             rel="noopener noreferrer" 
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-md transition-colors"
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-md transition-colors shadow-sm"
                         >
                             <ExternalLinkIcon />
                             <span>Öffnen</span>
