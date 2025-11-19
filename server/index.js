@@ -65,27 +65,48 @@ const port = process.env.PORT || 3001;
 app.get('/shares/:filename', (req, res) => {
     const filename = req.params.filename;
     
-    // Validierung
+    // Validierung: Erlaubt nur normale Dateinamen mit .html Endung
     if (filename.includes('..') || filename.includes('/') || !filename.endsWith('.html')) {
+        console.warn(`[Shares] Ungültiger Zugriff versucht: ${filename}`);
         return res.status(400).send('Ungültiger Dateiname.');
     }
 
     // 1. Suche in public/shares (Primary)
     const publicPath = path.join(publicSharesDir, filename);
+    
+    // Check for file existence
     if (fs.existsSync(publicPath)) {
-        console.error(`[Shares] Sende aus PUBLIC: ${publicPath}`);
+        // Aggressive no-cache headers for share files
         res.setHeader('Content-Type', 'text/html; charset=UTF-8');
-        res.setHeader('Cache-Control', 'no-store');
-        return res.sendFile(publicPath);
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        
+        return res.sendFile(publicPath, (err) => {
+            if (err) {
+                console.error(`[Shares] Error sending file ${publicPath}:`, err);
+                if (!res.headersSent) {
+                    res.status(500).send('Error serving share file.');
+                }
+            }
+        });
     }
 
     // 2. Suche in dist/shares (Secondary/Fallback)
     const distPath = path.join(distSharesDir, filename);
     if (fs.existsSync(distPath)) {
-        console.error(`[Shares] Sende aus DIST: ${distPath}`);
         res.setHeader('Content-Type', 'text/html; charset=UTF-8');
-        res.setHeader('Cache-Control', 'no-store');
-        return res.sendFile(distPath);
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        return res.sendFile(distPath, (err) => {
+            if (err) {
+                console.error(`[Shares] Error sending file ${distPath}:`, err);
+                if (!res.headersSent) {
+                    res.status(500).send('Error serving share file.');
+                }
+            }
+        });
     }
 
     // 3. Nicht gefunden -> Detaillierte Fehlerseite (kein React-Fallback!)
@@ -113,9 +134,6 @@ app.get('/shares/:filename', (req, res) => {
                 <h3>Server Debug Info:</h3>
                 <pre>${JSON.stringify(debugInfo, null, 2)}</pre>
             </div>
-            <script>
-                console.error("SERVER DEBUG INFO:", ${JSON.stringify(debugInfo)});
-            </script>
         </body>
         </html>
     `);
@@ -142,6 +160,8 @@ app.use('/api/recipes', requireAuth, recipeRoutes);
 
 
 // --- Statische Dateien ---
+// WICHTIG: Statische Dateien kommen NACH der expliziten /shares/ Route, 
+// damit express.static nicht versehentlich eine falsche Datei ausliefert oder 404s verschluckt.
 app.use('/images', express.static(path.resolve(__dirname, '../public/images')));
 app.use(express.static(path.resolve(__dirname, '../public')));
 app.use(express.static(path.resolve(__dirname, '../dist')));

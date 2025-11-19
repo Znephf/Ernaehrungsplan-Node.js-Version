@@ -1,5 +1,4 @@
 
-
 const path = require('path');
 const fs = require('fs/promises');
 const dotenv = require('dotenv');
@@ -58,7 +57,13 @@ async function regenerateAllShareableHtmls() {
             try {
                 console.log(`  -> Regenerating Plan ID: ${plan.id} (${plan.shareId})`);
                 
-                const htmlContent = await generateShareableHtml(plan);
+                // Ensure clean output even if properties are missing
+                const safePlan = {
+                    ...plan,
+                    name: plan.name || 'Ernährungsplan'
+                };
+
+                const htmlContent = await generateShareableHtml(safePlan);
                 const fileName = `${plan.shareId}.html`;
                 const publicFilePath = path.join(publicSharesDir, fileName);
 

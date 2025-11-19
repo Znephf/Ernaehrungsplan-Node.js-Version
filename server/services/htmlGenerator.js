@@ -1,5 +1,4 @@
 
-
 const fs = require('fs');
 const path = require('path');
 
@@ -9,89 +8,13 @@ const escapeHtml = (unsafe) => {
 };
 
 async function generateShareableHtml(plan) {
-    // Die Funktion benötigt jetzt nur noch den Plannamen für den Titel.
-    // Der gesamte Inhalt wird client-seitig über die Share-ID geladen.
     const planName = plan.name || 'Ernährungsplan';
-
-    return `<!DOCTYPE html>
-<html lang="de" style="scroll-behavior: smooth;">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${escapeHtml(planName)}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      // PROACTIVE SERVICE WORKER CLEANUP
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for(let registration of registrations) {
-            console.log('Unregistering SW from shared page:', registration);
-            registration.unregister();
-          }
-        });
-      }
-    </script>
-    <style>
-        body { font-family: sans-serif; background-color: #f1f5f9; }
-        .view { display: none; }
-        .view.active { display: block; }
-        .nav-button.active { background-color: #047857; color: white; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); }
-        .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #10b981; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* Cooking Mode Styles */
-        #cooking-overlay { display: none; position: fixed; inset: 0; background: white; z-index: 100; flex-direction: column; }
-        #cooking-overlay.active { display: flex; }
-        .step-slide { display: none; height: 100%; flex-direction: column; justify-content: center; padding: 2rem; text-align: center; overflow-y: auto; }
-        .step-slide.active { display: flex; }
-    </style>
-</head>
-<body class="bg-slate-100 text-slate-800">
-    <header class="bg-white shadow-md sticky top-0 z-30">
-        <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <h1 class="text-2xl font-bold text-slate-800">KI Ernährungsplaner</h1>
-            <nav class="flex items-center justify-center gap-2 sm:gap-4 p-1 bg-slate-100 rounded-lg">
-                <button data-view="plan" class="nav-button active px-4 py-2 text-sm sm:text-base font-medium rounded-md text-slate-600 hover:bg-slate-200">Wochenplan</button>
-                <button data-view="shopping" class="nav-button px-4 py-2 text-sm sm:text-base font-medium rounded-md text-slate-600 hover:bg-slate-200">Einkaufsliste</button>
-                <button data-view="recipes" class="nav-button px-4 py-2 text-sm sm:text-base font-medium rounded-md text-slate-600 hover:bg-slate-200">Rezepte</button>
-            </nav>
-        </div>
-    </header>
-    <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div id="view-plan" class="view active"></div>
-        <div id="view-shopping" class="view"></div>
-        <div id="view-recipes" class="view"></div>
-        <div id="loading-state" class="text-center py-16 flex flex-col items-center justify-center">
-            <div class="loader mb-4"></div>
-            <p class="text-slate-600 font-semibold">Lade Ernährungsplan...</p>
-        </div>
-        <div id="error-state" class="text-center py-16 hidden bg-red-50 border border-red-200 rounded p-4">
-            <p class="text-red-600 font-bold text-xl mb-2">Fehler beim Laden</p>
-            <p class="text-slate-700 mb-2" id="error-message">Der Plan konnte nicht geladen werden.</p>
-            <p class="text-xs text-slate-500 font-mono" id="error-details"></p>
-            <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded text-slate-700 text-sm font-semibold">Seite neu laden</button>
-        </div>
-    </main>
     
-    <!-- Cooking Mode Overlay -->
-    <div id="cooking-overlay">
-        <div class="p-4 border-b flex justify-between items-center bg-white shadow-sm z-10 shrink-0">
-            <span id="cooking-title" class="font-bold text-lg truncate mr-2"></span>
-            <button id="close-cooking" class="p-2 rounded-full hover:bg-slate-100 text-slate-500">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-        </div>
-        <div id="cooking-steps-container" class="flex-grow overflow-hidden bg-slate-50 relative">
-            <!-- Steps injected here -->
-        </div>
-        <div class="p-4 border-t bg-white flex justify-between items-center gap-4 z-10 shrink-0">
-            <button id="prev-step" class="px-6 py-3 bg-slate-200 text-slate-700 rounded-lg font-bold disabled:opacity-50">Zurück</button>
-            <span id="step-indicator" class="font-medium text-slate-500"></span>
-            <button id="next-step" class="px-6 py-3 bg-emerald-600 text-white rounded-lg font-bold">Weiter</button>
-        </div>
-    </div>
-
-    <script>
+    // We use a function to build the script string.
+    // CRITICAL FIX: Using concatenation instead of template literals for the client-side script
+    // to strictly avoid Node.js trying to interpolate client-side variables like ${response.status}.
+    const buildClientScript = () => {
+        return `
         document.addEventListener('DOMContentLoaded', () => {
             const MealCategoryLabels = { breakfast: 'Frühstück', lunch: 'Mittagessen', coffee: 'Kaffee & Kuchen', dinner: 'Abendessen', snack: 'Snack' };
             const Icons = {
@@ -103,9 +26,7 @@ async function generateShareableHtml(plan) {
             const escape = (str) => String(str).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
             
             function formatIngredient(ing, basePersons, targetPersons) {
-                // Handle legacy string ingredients
                 if (typeof ing === 'string') return escape(ing);
-                
                 if (!ing || typeof ing.quantity === 'undefined' || ing.ingredient === null) return null;
                 
                 let scaledQuantity = (ing.quantity / (basePersons || 1)) * targetPersons;
@@ -147,6 +68,7 @@ async function generateShareableHtml(plan) {
                     '</div>' +
                 '</div>';
             }
+
             function renderShoppingList(plan) {
                  if (!plan.shoppingList || plan.shoppingList.length === 0) return '<p class="text-center text-slate-500">Keine Einkaufsliste verfügbar.</p>';
                  return '<div class="space-y-8">' +
@@ -164,6 +86,7 @@ async function generateShareableHtml(plan) {
                     '</div>' +
                 '</div>';
             }
+
             function renderRecipes(plan) {
                 const personsText = '<p class="text-slate-500">Alle Rezepte sind für ' + (plan.settings.persons || 2) + ' Personen ausgelegt.</p>';
                 const mainTitle = '<div class="text-center sm:text-left"><h2 class="text-3xl font-bold text-slate-700">Kochanleitungen</h2>' + personsText + '</div>';
@@ -196,9 +119,7 @@ async function generateShareableHtml(plan) {
                         
                         const instructionsHtml = '<ol class="space-y-3 list-decimal list-inside text-slate-600 instruction-list">' + (recipe.instructions || []).map(step => '<li>' + escape(step) + '</li>').join('') + '</ol>';
                         
-                        // Serialize steps for cooking mode safely
                         const stepsJson = JSON.stringify(recipe.instructions || []);
-                        // Properly escape double quotes for use in the HTML attribute
                         const stepsAttr = stepsJson.replace(/"/g, "&quot;");
 
                         return '<div id="recipe-day-' + escape(dayPlan.day) + '-' + escape(meal.mealType) + '" class="bg-white rounded-lg shadow-lg overflow-hidden recipe-card" data-title="' + escape(recipe.title) + '" data-steps="' + stepsAttr + '">' +
@@ -230,16 +151,14 @@ async function generateShareableHtml(plan) {
                 return '<div class="space-y-8">' + mainTitle + '<div class="space-y-12">' + weeklyPlanHtml + '</div></div>';
             }
             
-            // --- Cooking Mode Logic ---
             let wakeLock = null;
             async function requestWakeLock() {
                 try {
                     if ('wakeLock' in navigator) {
                         wakeLock = await navigator.wakeLock.request('screen');
                         wakeLock.addEventListener('release', () => { console.log('Wake Lock released'); });
-                        console.log('Wake Lock active');
                     }
-                } catch (err) { console.error(\`\${err.name}, \${err.message}\`); }
+                } catch (err) { console.error(err.name + ', ' + err.message); }
             }
             async function releaseWakeLock() {
                 if (wakeLock !== null) { await wakeLock.release(); wakeLock = null; }
@@ -261,7 +180,7 @@ async function generateShareableHtml(plan) {
                     slides.forEach((s, i) => {
                         s.classList.toggle('active', i === index);
                     });
-                    stepIndicator.textContent = \`Schritt \${index + 1} von \${currentSteps.length}\`;
+                    stepIndicator.textContent = 'Schritt ' + (index + 1) + ' von ' + currentSteps.length;
                     prevBtn.disabled = index === 0;
                     nextBtn.textContent = index === currentSteps.length - 1 ? 'Fertig' : 'Weiter';
                     currentStepIndex = index;
@@ -274,19 +193,17 @@ async function generateShareableHtml(plan) {
 
                 function startTimer(btn, minutes) {
                     let seconds = minutes * 60;
-                    const originalText = btn.innerText;
                     btn.disabled = true;
                     const interval = setInterval(() => {
                         seconds--;
                         const m = Math.floor(seconds / 60);
                         const s = seconds % 60;
-                        btn.innerText = \`\${m}:\${s.toString().padStart(2, '0')}\`;
+                        btn.innerText = m + ':' + s.toString().padStart(2, '0');
                         if (seconds <= 0) {
                             clearInterval(interval);
                             btn.innerText = "Fertig!";
                             btn.classList.remove('bg-slate-100', 'text-slate-800');
                             btn.classList.add('bg-green-500', 'text-white');
-                            // Optional: Audio beep
                         }
                     }, 1000);
                 }
@@ -349,7 +266,6 @@ async function generateShareableHtml(plan) {
                     }
                 };
             }
-
 
             function setupEventListeners() {
                 const views = { plan: document.getElementById('view-plan'), shopping: document.getElementById('view-shopping'), recipes: document.getElementById('view-recipes') };
@@ -433,7 +349,7 @@ async function generateShareableHtml(plan) {
                     const response = await fetch('/api/public/plan/' + shareId);
                     if (!response.ok) {
                         const errText = await response.text().catch(() => '');
-                        throw new Error(\`Serverfehler: \${response.status} \${response.statusText} (\${errText})\`);
+                        throw new Error('Serverfehler: ' + response.status + ' ' + response.statusText + ' (' + errText + ')');
                     }
                     const planData = await response.json();
                     console.log("Plan data loaded successfully:", planData);
@@ -454,6 +370,91 @@ async function generateShareableHtml(plan) {
             }
             loadPlan();
         });
+        `;
+    };
+    
+    const clientScript = buildClientScript();
+
+    return `<!DOCTYPE html>
+<html lang="de" style="scroll-behavior: smooth;">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${escapeHtml(planName)}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // PROACTIVE SERVICE WORKER CLEANUP
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            console.log('Unregistering SW from shared page:', registration);
+            registration.unregister();
+          }
+        });
+      }
+    </script>
+    <style>
+        body { font-family: sans-serif; background-color: #f1f5f9; }
+        .view { display: none; }
+        .view.active { display: block; }
+        .nav-button.active { background-color: #047857; color: white; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); }
+        .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #10b981; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Cooking Mode Styles */
+        #cooking-overlay { display: none; position: fixed; inset: 0; background: white; z-index: 100; flex-direction: column; }
+        #cooking-overlay.active { display: flex; }
+        .step-slide { display: none; height: 100%; flex-direction: column; justify-content: center; padding: 2rem; text-align: center; overflow-y: auto; }
+        .step-slide.active { display: flex; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+    <header class="bg-white shadow-md sticky top-0 z-30">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <h1 class="text-2xl font-bold text-slate-800">KI Ernährungsplaner</h1>
+            <nav class="flex items-center justify-center gap-2 sm:gap-4 p-1 bg-slate-100 rounded-lg">
+                <button data-view="plan" class="nav-button active px-4 py-2 text-sm sm:text-base font-medium rounded-md text-slate-600 hover:bg-slate-200">Wochenplan</button>
+                <button data-view="shopping" class="nav-button px-4 py-2 text-sm sm:text-base font-medium rounded-md text-slate-600 hover:bg-slate-200">Einkaufsliste</button>
+                <button data-view="recipes" class="nav-button px-4 py-2 text-sm sm:text-base font-medium rounded-md text-slate-600 hover:bg-slate-200">Rezepte</button>
+            </nav>
+        </div>
+    </header>
+    <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div id="view-plan" class="view active"></div>
+        <div id="view-shopping" class="view"></div>
+        <div id="view-recipes" class="view"></div>
+        <div id="loading-state" class="text-center py-16 flex flex-col items-center justify-center">
+            <div class="loader mb-4"></div>
+            <p class="text-slate-600 font-semibold">Lade Ernährungsplan...</p>
+        </div>
+        <div id="error-state" class="text-center py-16 hidden bg-red-50 border border-red-200 rounded p-4">
+            <p class="text-red-600 font-bold text-xl mb-2">Fehler beim Laden</p>
+            <p class="text-slate-700 mb-2" id="error-message">Der Plan konnte nicht geladen werden.</p>
+            <p class="text-xs text-slate-500 font-mono" id="error-details"></p>
+            <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded text-slate-700 text-sm font-semibold">Seite neu laden</button>
+        </div>
+    </main>
+    
+    <!-- Cooking Mode Overlay -->
+    <div id="cooking-overlay">
+        <div class="p-4 border-b flex justify-between items-center bg-white shadow-sm z-10 shrink-0">
+            <span id="cooking-title" class="font-bold text-lg truncate mr-2"></span>
+            <button id="close-cooking" class="p-2 rounded-full hover:bg-slate-100 text-slate-500">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+        <div id="cooking-steps-container" class="flex-grow overflow-hidden bg-slate-50 relative">
+            <!-- Steps injected here -->
+        </div>
+        <div class="p-4 border-t bg-white flex justify-between items-center gap-4 z-10 shrink-0">
+            <button id="prev-step" class="px-6 py-3 bg-slate-200 text-slate-700 rounded-lg font-bold disabled:opacity-50">Zurück</button>
+            <span id="step-indicator" class="font-medium text-slate-500"></span>
+            <button id="next-step" class="px-6 py-3 bg-emerald-600 text-white rounded-lg font-bold">Weiter</button>
+        </div>
+    </div>
+
+    <script>
+        ${clientScript}
     </script>
 </body>
 </html>`;

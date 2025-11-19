@@ -35,6 +35,7 @@ async function getFullPlanById(planId) {
     const weeklyPlan = [];
     const recipes = [];
     const recipeMap = new Map();
+    // Use safeParse with empty object as fallback for settings
     const planSettings = safeParse(plan.settings, {});
 
     const daysOrder = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
