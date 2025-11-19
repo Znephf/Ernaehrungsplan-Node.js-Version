@@ -14,6 +14,9 @@ export default defineConfig({
         short_name: 'Essensplaner',
         description: 'KI-gestützter Ernährungsplaner und Einkaufsliste',
         theme_color: '#10b981',
+        background_color: '#ffffff',
+        display: 'standalone',
+        orientation: 'portrait',
         icons: [
           {
             src: 'pwa-192x192.png',

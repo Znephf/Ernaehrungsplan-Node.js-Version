@@ -30,7 +30,7 @@ async function generateShareableHtml(plan) {
         /* Cooking Mode Styles */
         #cooking-overlay { display: none; position: fixed; inset: 0; background: white; z-index: 100; flex-direction: column; }
         #cooking-overlay.active { display: flex; }
-        .step-slide { display: none; height: 100%; flex-direction: column; justify-content: center; padding: 2rem; text-align: center; }
+        .step-slide { display: none; height: 100%; flex-direction: column; justify-content: center; padding: 2rem; text-align: center; overflow-y: auto; }
         .step-slide.active { display: flex; }
     </style>
 </head>
@@ -60,16 +60,16 @@ async function generateShareableHtml(plan) {
     
     <!-- Cooking Mode Overlay -->
     <div id="cooking-overlay">
-        <div class="p-4 border-b flex justify-between items-center bg-white shadow-sm z-10">
+        <div class="p-4 border-b flex justify-between items-center bg-white shadow-sm z-10 shrink-0">
             <span id="cooking-title" class="font-bold text-lg truncate mr-2"></span>
             <button id="close-cooking" class="p-2 rounded-full hover:bg-slate-100 text-slate-500">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
         </div>
-        <div id="cooking-steps-container" class="flex-grow overflow-y-auto bg-slate-50 relative">
+        <div id="cooking-steps-container" class="flex-grow overflow-hidden bg-slate-50 relative">
             <!-- Steps injected here -->
         </div>
-        <div class="p-4 border-t bg-white flex justify-between items-center gap-4 z-10">
+        <div class="p-4 border-t bg-white flex justify-between items-center gap-4 z-10 shrink-0">
             <button id="prev-step" class="px-6 py-3 bg-slate-200 text-slate-700 rounded-lg font-bold disabled:opacity-50">Zurück</button>
             <span id="step-indicator" class="font-medium text-slate-500"></span>
             <button id="next-step" class="px-6 py-3 bg-emerald-600 text-white rounded-lg font-bold">Weiter</button>
@@ -216,7 +216,7 @@ async function generateShareableHtml(plan) {
                         wakeLock.addEventListener('release', () => { console.log('Wake Lock released'); });
                         console.log('Wake Lock active');
                     }
-                } catch (err) { console.error(`${err.name}, ${err.message}`); }
+                } catch (err) { console.error(\`\${err.name}, \${err.message}\`); }
             }
             async function releaseWakeLock() {
                 if (wakeLock !== null) { await wakeLock.release(); wakeLock = null; }
@@ -238,7 +238,7 @@ async function generateShareableHtml(plan) {
                     slides.forEach((s, i) => {
                         s.classList.toggle('active', i === index);
                     });
-                    stepIndicator.textContent = `Schritt ${index + 1} von ${currentSteps.length}`;
+                    stepIndicator.textContent = \`Schritt \${index + 1} von \${currentSteps.length}\`;
                     prevBtn.disabled = index === 0;
                     nextBtn.textContent = index === currentSteps.length - 1 ? 'Fertig' : 'Weiter';
                     currentStepIndex = index;
@@ -257,7 +257,7 @@ async function generateShareableHtml(plan) {
                         seconds--;
                         const m = Math.floor(seconds / 60);
                         const s = seconds % 60;
-                        btn.innerText = `${m}:${s.toString().padStart(2, '0')}`;
+                        btn.innerText = \`\${m}:\${s.toString().padStart(2, '0')}\`;
                         if (seconds <= 0) {
                             clearInterval(interval);
                             btn.innerText = "Fertig!";
@@ -294,7 +294,7 @@ async function generateShareableHtml(plan) {
                             if (time) {
                                 const timerBtn = document.createElement('button');
                                 timerBtn.className = 'mx-auto flex items-center gap-2 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-full font-bold text-lg shadow transition-colors';
-                                timerBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Timer: ${time} Min`;
+                                timerBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Timer: ' + time + ' Min';
                                 timerBtn.onclick = () => startTimer(timerBtn, time);
                                 slide.appendChild(timerBtn);
                             }
