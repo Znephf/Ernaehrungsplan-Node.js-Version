@@ -21,7 +21,7 @@ async function getDbConnection() {
 
 async function regenerateAllShareableHtmls() {
     console.log('--- Starting Regeneration of All Shareable HTML Files ---');
-    console.log('This will update all existing shared plans to include the new Cooking Mode feature.');
+    console.log('This update includes the fix for legacy ingredient strings.');
     let pool;
     try {
         pool = await getDbConnection();
@@ -32,7 +32,7 @@ async function regenerateAllShareableHtmls() {
         );
 
         if (plansToUpdate.length === 0) {
-            console.log('No plans with existing share IDs found. Nothing to regenerate. Exiting.');
+            console.log('No plans with existing share IDs found. Nothing to regenerate.');
             await pool.end();
             return;
         }
@@ -41,66 +41,52 @@ async function regenerateAllShareableHtmls() {
         let regeneratedCount = 0;
         let errorCount = 0;
         
-        // Define output paths
         const appRoot = path.resolve(__dirname, '..');
         const publicSharesDir = path.join(appRoot, 'public', 'shares');
         const distSharesDir = path.join(appRoot, 'dist', 'shares');
 
-        console.log(`Target Directory (Public): ${publicSharesDir}`);
-        console.log(`Target Directory (Dist): ${distSharesDir}`);
-
-        // Ensure directories exist
         try {
             await fs.mkdir(publicSharesDir, { recursive: true });
-            
-            // Only create dist/shares if dist exists (indicating a built app)
             const distExists = await fs.stat(path.join(appRoot, 'dist')).then(() => true).catch(() => false);
             if (distExists) {
                  await fs.mkdir(distSharesDir, { recursive: true });
             }
-        } catch (e) {
-            console.warn("Could not create directory (might exist):", e.message);
-        }
+        } catch (e) { console.warn("Directory creation warning:", e.message); }
 
         for (const plan of plansToUpdate) {
             try {
-                console.log(`  -> Regenerating for Plan ID: ${plan.id} (Share ID: ${plan.shareId})`);
+                console.log(`  -> Regenerating Plan ID: ${plan.id} (${plan.shareId})`);
                 
                 const htmlContent = await generateShareableHtml(plan);
                 const fileName = `${plan.shareId}.html`;
                 const publicFilePath = path.join(publicSharesDir, fileName);
 
-                // Write to Public
                 await fs.writeFile(publicFilePath, htmlContent);
+                await fs.chmod(publicFilePath, 0o644);
                 
-                // Check and Write to Dist if applicable
                 const distExists = await fs.stat(path.join(appRoot, 'dist')).then(() => true).catch(() => false);
                 if (distExists) {
                     const distFilePath = path.join(distSharesDir, fileName);
                     await fs.writeFile(distFilePath, htmlContent);
+                    await fs.chmod(distFilePath, 0o644);
                 }
                 
-                console.log(`     ... Success: ${fileName} has been regenerated.`);
                 regeneratedCount++;
 
             } catch (err) {
-                console.error(`     ... FAILED to regenerate share file for Plan ID ${plan.id}:`, err.message);
+                console.error(`     ... FAILED Plan ID ${plan.id}:`, err.message);
                 errorCount++;
             }
         }
 
         console.log('\n--- Regeneration Complete ---');
-        console.log(`Successfully regenerated: ${regeneratedCount} files.`);
-        console.log(`Failed to regenerate: ${errorCount} files.`);
+        console.log(`Success: ${regeneratedCount}, Errors: ${errorCount}`);
 
     } catch (error) {
-        console.error('\n--- A CRITICAL SCRIPT ERROR OCCURRED! ---');
+        console.error('\n--- CRITICAL ERROR ---');
         console.error(error.message);
     } finally {
-        if (pool) {
-            await pool.end();
-            console.log('Database connection closed!');
-        }
+        if (pool) await pool.end();
     }
 }
 

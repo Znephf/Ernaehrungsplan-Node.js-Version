@@ -54,7 +54,8 @@ async function generateShareableHtml(plan) {
             <p class="text-slate-600 font-semibold">Lade Ernährungsplan...</p>
         </div>
         <div id="error-state" class="text-center py-16 hidden">
-            <p class="text-red-600 font-semibold">Fehler: Der Plan konnte nicht geladen werden.</p>
+            <p class="text-red-600 font-semibold text-xl mb-2">Fehler</p>
+            <p class="text-slate-500" id="error-message">Der Plan konnte nicht geladen werden.</p>
         </div>
     </main>
     
@@ -88,6 +89,9 @@ async function generateShareableHtml(plan) {
             const escape = (str) => String(str).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
             
             function formatIngredient(ing, basePersons, targetPersons) {
+                // Handle legacy string ingredients
+                if (typeof ing === 'string') return escape(ing);
+                
                 if (!ing || typeof ing.quantity === 'undefined' || ing.ingredient === null) return null;
                 
                 let scaledQuantity = (ing.quantity / (basePersons || 1)) * targetPersons;
@@ -109,6 +113,8 @@ async function generateShareableHtml(plan) {
             }
 
             function renderWeeklyPlan(plan) {
+                if (!plan || !plan.weeklyPlan) return '<p class="text-center text-slate-500">Keine Wochendaten vorhanden.</p>';
+                
                 return '<div class="space-y-8">' +
                     '<h2 class="text-3xl font-bold text-center text-slate-700">' + escape(plan.name) + '</h2>' +
                     '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">' +
@@ -128,6 +134,7 @@ async function generateShareableHtml(plan) {
                 '</div>';
             }
             function renderShoppingList(plan) {
+                 if (!plan.shoppingList || plan.shoppingList.length === 0) return '<p class="text-center text-slate-500">Keine Einkaufsliste verfügbar.</p>';
                  return '<div class="space-y-8">' +
                     '<div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">' +
                         '<h2 class="text-3xl font-bold text-slate-700">Wöchentliche Einkaufsliste</h2>' +
@@ -406,11 +413,15 @@ async function generateShareableHtml(plan) {
             async function loadPlan() {
                 const path = window.location.pathname;
                 const shareId = path.substring(path.lastIndexOf('/') + 1).replace('.html', '');
+                console.log("Loading plan for ShareID:", shareId);
                 
                 try {
                     const response = await fetch('/api/public/plan/' + shareId);
-                    if (!response.ok) throw new Error('Network response was not ok');
+                    if (!response.ok) {
+                        throw new Error('Netzwerk-Antwort war nicht ok: ' + response.status);
+                    }
                     const planData = await response.json();
+                    console.log("Plan data loaded successfully:", planData);
                     
                     document.getElementById('view-plan').innerHTML = renderWeeklyPlan(planData);
                     document.getElementById('view-shopping').innerHTML = renderShoppingList(planData);
@@ -422,6 +433,7 @@ async function generateShareableHtml(plan) {
                     console.error('Failed to load plan:', error);
                     document.getElementById('loading-state').style.display = 'none';
                     document.getElementById('error-state').style.display = 'block';
+                    document.getElementById('error-message').innerText = 'Fehler: ' + error.message;
                 }
             }
             loadPlan();
