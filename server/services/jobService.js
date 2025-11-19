@@ -1,4 +1,3 @@
-
 const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
@@ -253,22 +252,9 @@ async function processShareJob(jobId) {
         const htmlContent = await generateShareableHtml({ name: plan.name });
         
         const fileName = `${shareId}.html`;
+        const filePath = path.join(__dirname, '..', '..', 'public', 'shares', fileName);
         
-        // Revert: Save to public/shares using absolute path
-        const sharesDir = path.join(__dirname, '../../public/shares');
-        const filePath = path.join(sharesDir, fileName);
-        
-        console.log(`[Share Job] Schreibe HTML-Datei nach: ${filePath}`);
-        
-        // Ensure directory exists
-        try {
-            await fs.access(sharesDir);
-        } catch {
-            console.log(`[Share Job] Verzeichnis existiert nicht, erstelle: ${sharesDir}`);
-            await fs.mkdir(sharesDir, { recursive: true });
-        }
-
-        await fs.writeFile(filePath, htmlContent, 'utf8');
+        await fs.writeFile(filePath, htmlContent);
         
         await pool.query('UPDATE plans SET shareId = ? WHERE id = ?', [shareId, plan.id]);
         
