@@ -6,24 +6,27 @@
   <meta name="theme-color" content="#10b981" />
   <title>Ernährungsplan App</title>
   <script>
+    // CRITICAL FIX: Force unregistration of any existing Service Workers IMMEDIATELY.
+    // This prevents caching issues where the React app intercepts static share URLs.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+          console.log('Unregistering Service Worker:', registration);
+          registration.unregister().then(function() {
+            console.log('Service Worker unregistered successfully.');
+          });
+        }
+      }).catch(function(error) {
+          console.log('Service Worker unregistration failed: ', error);
+      });
+    }
+  </script>
+  <script>
     // On page load or when changing themes, best to add inline in `head` to avoid FOUC
     if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark')
     } else {
       document.documentElement.classList.remove('dark')
-    }
-  </script>
-  <script>
-    // CRITICAL FIX: Force unregistration of any existing Service Workers to prevent caching issues with shared plans.
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) {
-          console.log('Unregistering Service Worker:', registration);
-          registration.unregister();
-        }
-      }).catch(function(error) {
-          console.log('Service Worker unregistration failed: ', error);
-      });
     }
   </script>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8080690667651280"

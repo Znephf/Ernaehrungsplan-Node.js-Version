@@ -165,6 +165,10 @@ app.use(express.static(path.resolve(__dirname, '../dist')));
 app.get('*', (req, res) => {
     const distIndex = path.resolve(__dirname, '../dist/index.html');
     if (fs.existsSync(distIndex)) {
+        // Verhindert Caching der Hauptdatei, damit Updates (wie Service Worker Entfernung) sofort greifen
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         res.sendFile(distIndex);
     } else {
         res.status(404).send('React App Index nicht gefunden. Bitte npm run build ausführen.');

@@ -78,12 +78,31 @@ const App: React.FC = () => {
     const [isBulkImageGenerating, setIsBulkImageGenerating] = useState(false);
     const [bulkImageStatus, setBulkImageStatus] = useState('');
 
-    // --- Share Link Safety Check ---
+    // --- Share Link Safety Check & Auto-Repair ---
     useEffect(() => {
-        // If the app loads but the path implies we wanted a static share file,
-        // it means the static file load failed and fell back to React.
+        // Wenn die App unter /shares/ geladen wird, ist das falsch.
+        // Das bedeutet, ein Service Worker oder Browser-Cache hat die React-App (index.html)
+        // ausgeliefert statt der statischen Datei vom Server.
         if (window.location.pathname.startsWith('/shares/')) {
-            setShareLoadError(true);
+            console.warn("React App loaded on /shares/ path. This indicates a caching issue. Attempting auto-repair...");
+
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    if (registrations.length > 0) {
+                        console.log("Stale Service Worker found. Unregistering and reloading...");
+                        Promise.all(registrations.map(r => r.unregister())).then(() => {
+                            // Hartes Neuladen erzwingen, um Cache zu umgehen
+                            window.location.reload();
+                        });
+                    } else {
+                        // Kein SW, aber trotzdem hier? Dann ist es wahrscheinlich ein alter Browser-Cache
+                        // oder die Datei existiert wirklich nicht.
+                        setShareLoadError(true);
+                    }
+                });
+            } else {
+                setShareLoadError(true);
+            }
         }
     }, []);
 
@@ -230,13 +249,13 @@ const App: React.FC = () => {
                 <div className="bg-white dark:bg-slate-800 p-8 rounded-lg shadow-xl max-w-md text-center">
                     <h1 className="text-2xl font-bold text-red-600 mb-4">Plan nicht gefunden</h1>
                     <p className="text-slate-600 dark:text-slate-300 mb-6">
-                        Der gewünschte Plan konnte nicht geladen werden. Dies kann passieren, wenn der Link abgelaufen ist oder die Datei noch nicht vollständig generiert wurde.
+                        Der gewünschte Plan konnte nicht geladen werden. Dies kann passieren, wenn der Link abgelaufen ist oder der Cache ihres Browsers veraltet ist.
                     </p>
                     <button 
-                        onClick={() => window.location.href = '/'}
+                        onClick={() => window.location.reload()}
                         className="px-4 py-2 bg-emerald-600 text-white font-semibold rounded-md hover:bg-emerald-700 transition-colors"
                     >
-                        Zurück zur Startseite
+                        Seite neu laden
                     </button>
                 </div>
             </div>
