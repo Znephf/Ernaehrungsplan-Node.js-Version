@@ -252,9 +252,22 @@ async function processShareJob(jobId) {
         const htmlContent = await generateShareableHtml({ name: plan.name });
         
         const fileName = `${shareId}.html`;
-        const filePath = path.join(__dirname, '..', '..', 'public', 'shares', fileName);
         
-        await fs.writeFile(filePath, htmlContent);
+        // FIX: Use process.cwd() to reliably find the public directory relative to the app root
+        const publicSharesDir = path.join(process.cwd(), 'public', 'shares');
+        const filePath = path.join(publicSharesDir, fileName);
+        
+        console.log(`[Share Job] Schreibe HTML-Datei nach: ${filePath}`);
+        
+        // Ensure directory exists (redundant check but safe)
+        try {
+            await fs.access(publicSharesDir);
+        } catch {
+            console.log(`[Share Job] Verzeichnis existiert nicht, erstelle: ${publicSharesDir}`);
+            await fs.mkdir(publicSharesDir, { recursive: true });
+        }
+
+        await fs.writeFile(filePath, htmlContent, 'utf8');
         
         await pool.query('UPDATE plans SET shareId = ? WHERE id = ?', [shareId, plan.id]);
         
