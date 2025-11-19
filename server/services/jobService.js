@@ -6,6 +6,17 @@ const { pool } = require('./database');
 const { generateShareableHtml } = require('./htmlGenerator');
 const { generateShoppingListOnly } = require('./geminiService');
 
+// Helper for safe JSON parsing
+const safeParse = (jsonString, fallback = []) => {
+    if (!jsonString) return fallback;
+    try {
+        return JSON.parse(jsonString);
+    } catch (e) {
+        console.warn(`[WARN] JSON Parse Error for string: "${jsonString?.substring(0, 50)}..." - using fallback.`);
+        return fallback;
+    }
+};
+
 async function getFullPlanById(planId) {
     const [planRows] = await pool.query('SELECT * FROM plans WHERE id = ?', [planId]);
     if (planRows.length === 0) return null;
@@ -24,20 +35,20 @@ async function getFullPlanById(planId) {
     const weeklyPlan = [];
     const recipes = [];
     const recipeMap = new Map();
-    const planSettings = JSON.parse(plan.settings || '{}');
-
+    const planSettings = safeParse(plan.settings, {});
 
     const daysOrder = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 
     for (const link of recipeLinks) {
         let recipe = recipeMap.get(link.id);
         if (!recipe) {
-             const ingredients = JSON.parse(link.ingredients || '[]'); // Keep as structured ingredients
+             // Use safeParse to prevent crashes on bad DB data
+             const ingredients = safeParse(link.ingredients, []); 
              recipe = {
                 id: link.id,
                 title: link.title,
                 ingredients: ingredients,
-                instructions: JSON.parse(link.instructions || '[]'),
+                instructions: safeParse(link.instructions, []),
                 totalCalories: link.totalCalories,
                 protein: link.protein,
                 carbs: link.carbs,
@@ -76,7 +87,7 @@ async function getFullPlanById(planId) {
         id: plan.id,
         name: plan.name,
         settings: planSettings,
-        shoppingList: JSON.parse(plan.shoppingList || '[]'),
+        shoppingList: safeParse(plan.shoppingList, []),
         weeklyPlan,
         recipes,
     };

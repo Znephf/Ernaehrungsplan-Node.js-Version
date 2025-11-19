@@ -1,4 +1,5 @@
 
+
 const fs = require('fs');
 const path = require('path');
 
@@ -19,6 +20,17 @@ async function generateShareableHtml(plan) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${escapeHtml(planName)}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // PROACTIVE SERVICE WORKER CLEANUP
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            console.log('Unregistering SW from shared page:', registration);
+            registration.unregister();
+          }
+        });
+      }
+    </script>
     <style>
         body { font-family: sans-serif; background-color: #f1f5f9; }
         .view { display: none; }
@@ -53,9 +65,11 @@ async function generateShareableHtml(plan) {
             <div class="loader mb-4"></div>
             <p class="text-slate-600 font-semibold">Lade Ernährungsplan...</p>
         </div>
-        <div id="error-state" class="text-center py-16 hidden">
-            <p class="text-red-600 font-semibold text-xl mb-2">Fehler</p>
-            <p class="text-slate-500" id="error-message">Der Plan konnte nicht geladen werden.</p>
+        <div id="error-state" class="text-center py-16 hidden bg-red-50 border border-red-200 rounded p-4">
+            <p class="text-red-600 font-bold text-xl mb-2">Fehler beim Laden</p>
+            <p class="text-slate-700 mb-2" id="error-message">Der Plan konnte nicht geladen werden.</p>
+            <p class="text-xs text-slate-500 font-mono" id="error-details"></p>
+            <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded text-slate-700 text-sm font-semibold">Seite neu laden</button>
         </div>
     </main>
     
@@ -352,7 +366,7 @@ async function generateShareableHtml(plan) {
                 });
                 
                 const path = window.location.pathname;
-                const shareId = path.substring(path.lastIndexOf('/') + 1).replace('.html', '');
+                const shareId = path.substring(path.lastIndexOf('/') + 1).replace('.html', '').split('?')[0];
                 const storageKey = 'shoppingListState_' + shareId;
 
                 const resetButton = document.getElementById('reset-shopping-list');
@@ -412,13 +426,14 @@ async function generateShareableHtml(plan) {
 
             async function loadPlan() {
                 const path = window.location.pathname;
-                const shareId = path.substring(path.lastIndexOf('/') + 1).replace('.html', '');
+                const shareId = path.substring(path.lastIndexOf('/') + 1).replace('.html', '').split('?')[0];
                 console.log("Loading plan for ShareID:", shareId);
                 
                 try {
                     const response = await fetch('/api/public/plan/' + shareId);
                     if (!response.ok) {
-                        throw new Error('Netzwerk-Antwort war nicht ok: ' + response.status);
+                        const errText = await response.text().catch(() => '');
+                        throw new Error(`Serverfehler: ${response.status} ${response.statusText} (${errText})`);
                     }
                     const planData = await response.json();
                     console.log("Plan data loaded successfully:", planData);
@@ -433,7 +448,8 @@ async function generateShareableHtml(plan) {
                     console.error('Failed to load plan:', error);
                     document.getElementById('loading-state').style.display = 'none';
                     document.getElementById('error-state').style.display = 'block';
-                    document.getElementById('error-message').innerText = 'Fehler: ' + error.message;
+                    document.getElementById('error-message').innerText = 'Fehler: Der Plan konnte nicht geladen werden.';
+                    document.getElementById('error-details').innerText = error.message;
                 }
             }
             loadPlan();

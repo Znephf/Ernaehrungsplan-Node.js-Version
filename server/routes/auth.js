@@ -1,4 +1,5 @@
 
+
 const express = require('express');
 const unprotectedRouter = express.Router();
 const { pool } = require('../services/database');
@@ -50,22 +51,32 @@ unprotectedRouter.get('/api/check-auth', (req, res) => {
 // Neuer öffentlicher Endpunkt zum Abrufen von Plandaten über die Share-ID
 unprotectedRouter.get('/api/public/plan/:shareId', async (req, res) => {
     const { shareId } = req.params;
+    console.log(`[Public API] Request for plan with shareId: ${shareId}`);
+    
     try {
-        const [[planMeta]] = await pool.query('SELECT id FROM plans WHERE shareId = ?', [shareId]);
+        // Clean the shareId to prevent SQL issues, though parameterization handles most.
+        // Also strip potential extensions if frontend sent them erroneously (though client strips .html)
+        const cleanShareId = shareId.split('.')[0];
+
+        const [planRows] = await pool.query('SELECT id FROM plans WHERE shareId = ?', [cleanShareId]);
+        const planMeta = planRows[0];
+        
         if (!planMeta) {
+            console.warn(`[Public API] Plan not found for shareId: ${cleanShareId}`);
             return res.status(404).json({ error: 'Plan nicht gefunden.' });
         }
         
         const fullPlan = await getFullPlanById(planMeta.id);
         if (!fullPlan) {
+             console.error(`[Public API] Plan data incomplete/missing for ID: ${planMeta.id}`);
              return res.status(404).json({ error: 'Plandaten konnten nicht geladen werden.' });
         }
         
         res.json(fullPlan);
 
     } catch (error) {
-        console.error(`Fehler beim Abrufen des geteilten Plans ${shareId}:`, error);
-        res.status(500).json({ error: 'Interner Serverfehler' });
+        console.error(`[Public API] CRITICAL ERROR for shareId ${shareId}:`, error);
+        res.status(500).json({ error: 'Interner Serverfehler: ' + error.message });
     }
 });
 

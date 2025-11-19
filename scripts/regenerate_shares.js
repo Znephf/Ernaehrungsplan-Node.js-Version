@@ -1,4 +1,5 @@
 
+
 const path = require('path');
 const fs = require('fs/promises');
 const dotenv = require('dotenv');
@@ -21,7 +22,7 @@ async function getDbConnection() {
 
 async function regenerateAllShareableHtmls() {
     console.log('--- Starting Regeneration of All Shareable HTML Files ---');
-    console.log('This update includes the fix for legacy ingredient strings.');
+    console.log('This update includes improved error handling and SW cleanup.');
     let pool;
     try {
         pool = await getDbConnection();
