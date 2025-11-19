@@ -41,6 +41,7 @@ const App: React.FC = () => {
     const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
     const [currentView, setCurrentView] = useState<View>('plan');
     const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
+    const [shareLoadError, setShareLoadError] = useState(false);
     
     // Hooks for different functionalities
     const { archive, loadPlanFromArchive, fetchArchive, removePlan } = useArchive();
@@ -77,6 +78,14 @@ const App: React.FC = () => {
     const [isBulkImageGenerating, setIsBulkImageGenerating] = useState(false);
     const [bulkImageStatus, setBulkImageStatus] = useState('');
 
+    // --- Share Link Safety Check ---
+    useEffect(() => {
+        // If the app loads but the path implies we wanted a static share file,
+        // it means the static file load failed and fell back to React.
+        if (window.location.pathname.startsWith('/shares/')) {
+            setShareLoadError(true);
+        }
+    }, []);
 
     // --- Authentication ---
     useEffect(() => {
@@ -215,6 +224,24 @@ const App: React.FC = () => {
         }
     };
 
+    if (shareLoadError) {
+        return (
+            <div className="flex h-screen items-center justify-center bg-slate-100 dark:bg-slate-900 p-4">
+                <div className="bg-white dark:bg-slate-800 p-8 rounded-lg shadow-xl max-w-md text-center">
+                    <h1 className="text-2xl font-bold text-red-600 mb-4">Plan nicht gefunden</h1>
+                    <p className="text-slate-600 dark:text-slate-300 mb-6">
+                        Der gewünschte Plan konnte nicht geladen werden. Dies kann passieren, wenn der Link abgelaufen ist oder die Datei noch nicht vollständig generiert wurde.
+                    </p>
+                    <button 
+                        onClick={() => window.location.href = '/'}
+                        className="px-4 py-2 bg-emerald-600 text-white font-semibold rounded-md hover:bg-emerald-700 transition-colors"
+                    >
+                        Zurück zur Startseite
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     if (isLoggedIn === null) {
         return <div className="flex h-screen items-center justify-center bg-slate-100 dark:bg-slate-900 dark:text-white">Lade...</div>;

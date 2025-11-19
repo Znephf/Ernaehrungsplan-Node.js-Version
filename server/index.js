@@ -100,6 +100,10 @@ app.get('/shares/:filename', (req, res, next) => {
 
     if (fs.existsSync(filePath)) {
         console.log(`[Shares Debug] Datei gefunden. Sende...`);
+        // Verhindere Caching, damit Änderungen sofort sichtbar sind
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         return res.sendFile(filePath);
     } else {
         console.log(`[Shares Debug] Datei NICHT gefunden.`);

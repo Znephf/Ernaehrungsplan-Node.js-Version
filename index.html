@@ -13,6 +13,19 @@
       document.documentElement.classList.remove('dark')
     }
   </script>
+  <script>
+    // CRITICAL FIX: Force unregistration of any existing Service Workers to prevent caching issues with shared plans.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+          console.log('Unregistering Service Worker:', registration);
+          registration.unregister();
+        }
+      }).catch(function(error) {
+          console.log('Service Worker unregistration failed: ', error);
+      });
+    }
+  </script>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8080690667651280"
      crossorigin="anonymous"></script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -24,14 +37,14 @@
 <script type="importmap">
 {
   "imports": {
-    "html2canvas": "https://aistudiocdn.com/html2canvas@^1.4.1",
-    "mysql2/": "https://aistudiocdn.com/mysql2@^3.15.3/",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
-    "jspdf": "https://aistudiocdn.com/jspdf@^3.0.3",
-    "vite": "https://aistudiocdn.com/vite@^7.2.2",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0"
+    "jspdf": "https://aistudiocdn.com/jspdf@^3.0.3",
+    "html2canvas": "https://aistudiocdn.com/html2canvas@^1.4.1",
+    "vite": "https://aistudiocdn.com/vite@^7.2.2",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "mysql2/": "https://aistudiocdn.com/mysql2@^3.15.3/"
   }
 }
 </script>
