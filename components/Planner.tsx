@@ -32,7 +32,7 @@ const dietPreferenceLabels: Record<Diet, string> = { omnivore: 'Alles', vegetari
 const dietTypeLabels: Record<DietType, string> = { balanced: 'Ausgewogen', 'low-carb': 'Low-Carb', keto: 'Ketogen', 'high-protein': 'High-Protein', mediterranean: 'Mediterran' };
 const dishComplexityLabels: Record<DishComplexity, string> = { simple: 'Einfach', advanced: 'Fortgeschritten', fancy: 'Pfiffig' };
 const FilterToggleButton: React.FC<{ label: string; isSelected: boolean; onClick: () => void; }> = ({ label, isSelected, onClick }) => (
-    <button onClick={onClick} className={`px-3 py-1 text-sm rounded-full transition-colors font-medium whitespace-nowrap ${ isSelected ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-200 text-slate-700 hover:bg-slate-300' }`}>{label}</button>
+    <button onClick={onClick} className={`px-3 py-1 text-sm rounded-full transition-colors font-medium whitespace-nowrap ${ isSelected ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600' }`}>{label}</button>
 );
 
 const WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
@@ -160,11 +160,11 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
                 }));
             }
         }
-        e.currentTarget.classList.remove('bg-emerald-100', 'border-emerald-400');
+        e.currentTarget.classList.remove('bg-emerald-100', 'border-emerald-400', 'dark:bg-emerald-900/30', 'dark:border-emerald-600');
     };
     
-    const handleDragOver = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; e.currentTarget.classList.add('bg-emerald-100', 'border-emerald-400'); };
-    const handleDragLeave = (e: DragEvent<HTMLDivElement>) => { e.currentTarget.classList.remove('bg-emerald-100', 'border-emerald-400'); };
+    const handleDragOver = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; e.currentTarget.classList.add('bg-emerald-100', 'border-emerald-400', 'dark:bg-emerald-900/30', 'dark:border-emerald-600'); };
+    const handleDragLeave = (e: DragEvent<HTMLDivElement>) => { e.currentTarget.classList.remove('bg-emerald-100', 'border-emerald-400', 'dark:bg-emerald-900/30', 'dark:border-emerald-600'); };
     
     const openRecipeSelector = (day: string, mealType: MealCategory) => { 
         setModalDay(day); 
@@ -190,33 +190,33 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
     };
 
     const SavePlanUI = (
-         <div className="bg-white p-6 rounded-lg shadow-lg">
-             <h3 className="text-xl font-bold text-slate-700 mb-4">Plan speichern</h3>
+         <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-lg">
+             <h3 className="text-xl font-bold text-slate-700 dark:text-slate-100 mb-4">Plan speichern</h3>
              {error && <div className="bg-red-100 border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert">{error}</div>}
              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <div className="md:col-span-2"><label htmlFor="planName" className="block text-sm font-medium">Name des Plans</label><input type="text" id="planName" value={planName} onChange={e => setPlanName(e.target.value)} placeholder="z.B. Meine vegetarische Lieblingswoche" className="mt-1 block w-full rounded-md border-slate-300" /></div>
-                <div><label htmlFor="persons" className="block text-sm font-medium">Anzahl Personen</label><input type="number" id="persons" value={persons} onChange={e => setPersons(Math.max(1, parseInt(e.target.value,10)||1))} min="1" className="mt-1 block w-full rounded-md border-slate-300" /></div>
+                <div className="md:col-span-2"><label htmlFor="planName" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Name des Plans</label><input type="text" id="planName" value={planName} onChange={e => setPlanName(e.target.value)} placeholder="z.B. Meine vegetarische Lieblingswoche" className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white" /></div>
+                <div><label htmlFor="persons" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Anzahl Personen</label><input type="number" id="persons" value={persons} onChange={e => setPersons(Math.max(1, parseInt(e.target.value,10)||1))} min="1" className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white" /></div>
              </div>
              <div className="flex justify-end mt-4"><button onClick={handleSavePlan} disabled={isSaving} className="inline-flex items-center gap-2 px-6 py-3 text-base font-medium rounded-md text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400">{isSaving && <LoadingSpinnerIcon />}{isSaving ? 'Speichere...' : 'Plan speichern'}</button></div>
         </div>
     );
     
     const filterControls = (
-      <div className="bg-white p-6 rounded-lg shadow-lg">
-        <h2 className="text-2xl font-bold text-slate-700 mb-4">Gerichte-Bibliothek</h2>
-        <input type="text" placeholder="Suche..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full rounded-md border-slate-300 mb-4" />
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-lg">
+        <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-100 mb-4">Gerichte-Bibliothek</h2>
+        <input type="text" placeholder="Suche..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full rounded-md border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white mb-4" />
         <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Mahlzeit:</span>{(Object.keys(MealCategoryLabels) as MealCategory[]).map(key => <FilterToggleButton key={key} label={MealCategoryLabels[key]} isSelected={selectedMealCategories.has(key)} onClick={() => handleFilterToggle(key, selectedMealCategories, setSelectedMealCategories)} />)}</div>
-            <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Ernährung:</span>{(Object.keys(dietPreferenceLabels) as Diet[]).map(key => <FilterToggleButton key={key} label={dietPreferenceLabels[key]} isSelected={selectedPreferences.has(key)} onClick={() => handleFilterToggle(key,selectedPreferences,setSelectedPreferences)} />)}</div>
-            <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Diät-Typ:</span>{(Object.keys(dietTypeLabels) as DietType[]).map(key => <FilterToggleButton key={key} label={dietTypeLabels[key]} isSelected={selectedDietTypes.has(key)} onClick={() => handleFilterToggle(key,selectedDietTypes,setSelectedDietTypes)} />)}</div>
-            <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Niveau:</span>{(Object.keys(dishComplexityLabels) as DishComplexity[]).map(key => <FilterToggleButton key={key} label={dishComplexityLabels[key]} isSelected={selectedComplexities.has(key)} onClick={() => handleFilterToggle(key,selectedComplexities,setSelectedComplexities)} />)}</div>
+            <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 dark:text-slate-400 mr-2 shrink-0">Mahlzeit:</span>{(Object.keys(MealCategoryLabels) as MealCategory[]).map(key => <FilterToggleButton key={key} label={MealCategoryLabels[key]} isSelected={selectedMealCategories.has(key)} onClick={() => handleFilterToggle(key, selectedMealCategories, setSelectedMealCategories)} />)}</div>
+            <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 dark:text-slate-400 mr-2 shrink-0">Ernährung:</span>{(Object.keys(dietPreferenceLabels) as Diet[]).map(key => <FilterToggleButton key={key} label={dietPreferenceLabels[key]} isSelected={selectedPreferences.has(key)} onClick={() => handleFilterToggle(key,selectedPreferences,setSelectedPreferences)} />)}</div>
+            <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 dark:text-slate-400 mr-2 shrink-0">Diät-Typ:</span>{(Object.keys(dietTypeLabels) as DietType[]).map(key => <FilterToggleButton key={key} label={dietTypeLabels[key]} isSelected={selectedDietTypes.has(key)} onClick={() => handleFilterToggle(key,selectedDietTypes,setSelectedDietTypes)} />)}</div>
+            <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 dark:text-slate-400 mr-2 shrink-0">Niveau:</span>{(Object.keys(dishComplexityLabels) as DishComplexity[]).map(key => <FilterToggleButton key={key} label={dishComplexityLabels[key]} isSelected={selectedComplexities.has(key)} onClick={() => handleFilterToggle(key,selectedComplexities,setSelectedComplexities)} />)}</div>
             <div className="flex flex-wrap items-center gap-2 pt-2">
-                <span className="text-sm font-medium text-slate-600 mr-2 shrink-0">Optionen:</span>
-                <label className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700 bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded-full transition-colors has-[:checked]:bg-emerald-600 has-[:checked]:text-white has-[:checked]:shadow-sm">
+                <span className="text-sm font-medium text-slate-600 dark:text-slate-400 mr-2 shrink-0">Optionen:</span>
+                <label className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 px-3 py-1 rounded-full transition-colors has-[:checked]:bg-emerald-600 has-[:checked]:text-white has-[:checked]:shadow-sm">
                     <input type="checkbox" checked={filterGlutenFree} onChange={e => setFilterGlutenFree(e.target.checked)} className="h-0 w-0 absolute opacity-0" />
                     <span>Nur Glutenfrei</span>
                 </label>
-                 <label className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700 bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded-full transition-colors has-[:checked]:bg-emerald-600 has-[:checked]:text-white has-[:checked]:shadow-sm">
+                 <label className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 px-3 py-1 rounded-full transition-colors has-[:checked]:bg-emerald-600 has-[:checked]:text-white has-[:checked]:shadow-sm">
                     <input type="checkbox" checked={filterLactoseFree} onChange={e => setFilterLactoseFree(e.target.checked)} className="h-0 w-0 absolute opacity-0" />
                     <span>Nur Laktosefrei</span>
                 </label>
@@ -235,13 +235,13 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
                 draggable={isDesktop} 
                 onDragStart={e => handleDragStart(e, recipe)} 
                 onClick={() => setPreviewRecipe(recipe)} 
-                className="bg-white p-3 rounded-lg shadow hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer active:cursor-grabbing flex items-center gap-4"
+                className="bg-white dark:bg-slate-700 p-3 rounded-lg shadow hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer active:cursor-grabbing flex items-center gap-4"
                 role="button"
                 aria-label={`Vorschau für ${recipe.title} öffnen`}
               >
                 {(recipe.thumbnail_url || recipe.image_url) && <img src={recipe.thumbnail_url || recipe.image_url} alt={recipe.title} className="w-12 h-12 rounded-md object-cover flex-shrink-0" />}
                 <div className="flex-grow">
-                  <p className="font-semibold text-slate-700">{recipe.title}</p>
+                  <p className="font-semibold text-slate-700 dark:text-slate-200">{recipe.title}</p>
                   <p className="text-xs text-slate-400">{MealCategoryLabels[recipe.category]} &bull; {recipe.totalCalories} kcal</p>
                 </div>
               </div>
@@ -256,11 +256,11 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
                 onDrop={e => handleDrop(e, day, mealType)} 
                 onDragOver={handleDragOver} 
                 onDragLeave={handleDragLeave} 
-                className="border-2 border-dashed border-slate-300 rounded-lg p-3 min-h-[100px] transition-colors space-y-2"
+                className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-3 min-h-[100px] transition-colors space-y-2"
             >
-                <h4 className="font-bold text-slate-500 text-sm">{MealCategoryLabels[mealType]}</h4>
+                <h4 className="font-bold text-slate-500 dark:text-slate-400 text-sm">{MealCategoryLabels[mealType]}</h4>
                 {mealsInSlot.length > 0 ? mealsInSlot.map(slot => (
-                    <div key={slot.uniqueId} className="bg-emerald-50 p-2 rounded-md shadow-sm relative"><p className="font-semibold text-emerald-800 text-sm">{slot.recipe.title}</p><p className="text-xs text-emerald-600">{slot.recipe.totalCalories} kcal</p><button onClick={() => removeRecipeFromSlot(day, slot.uniqueId)} className="absolute top-1 right-1 h-5 w-5 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs hover:bg-red-300">&times;</button></div>
+                    <div key={slot.uniqueId} className="bg-emerald-50 dark:bg-emerald-900/50 p-2 rounded-md shadow-sm relative"><p className="font-semibold text-emerald-800 dark:text-emerald-300 text-sm">{slot.recipe.title}</p><p className="text-xs text-emerald-600 dark:text-emerald-400">{slot.recipe.totalCalories} kcal</p><button onClick={() => removeRecipeFromSlot(day, slot.uniqueId)} className="absolute top-1 right-1 h-5 w-5 bg-red-200 dark:bg-red-800 text-red-700 dark:text-red-200 rounded-full flex items-center justify-center text-xs hover:bg-red-300 dark:hover:bg-red-700">&times;</button></div>
                 )) : <p className="text-xs text-slate-400 text-center pt-4">Rezept hierher ziehen</p>}
             </div>
         );
@@ -281,9 +281,9 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
                     {/* ===== LEFT COLUMN: Recipe List ===== */}
                     <div className="lg:col-span-2 space-y-6 sticky top-24">
-                        <div className="bg-white rounded-lg shadow-lg flex flex-col h-[calc(100vh-8rem)]">
-                           <div className="p-6 border-b flex-shrink-0">
-                               <h2 className="text-2xl font-bold text-slate-700">Verfügbare Gerichte</h2>
+                        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg flex flex-col h-[calc(100vh-8rem)]">
+                           <div className="p-6 border-b dark:border-slate-700 flex-shrink-0">
+                               <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-100">Verfügbare Gerichte</h2>
                            </div>
                            <div className="overflow-y-auto p-6 flex-grow">
                                {recipeList()}
@@ -294,13 +294,13 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
                     {/* ===== RIGHT COLUMN: Filters & Plan ===== */}
                     <div className="lg:col-span-3 space-y-6">
                         {filterControls}
-                        <div className="bg-white p-6 rounded-lg shadow-lg">
-                          <h2 className="text-2xl font-bold text-slate-700 mb-4">Mein Wochenplan</h2>
-                          <div className="bg-slate-50 p-4 rounded-md mb-6">
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Mahlzeiten-Slots auswählen</label>
+                        <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-lg">
+                          <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-100 mb-4">Mein Wochenplan</h2>
+                          <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md mb-6">
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Mahlzeiten-Slots auswählen</label>
                             <div className="flex flex-wrap gap-4">
                               {(Object.keys(MealCategoryLabels) as MealCategory[]).map(mealType => (
-                                <label key={mealType} className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700">
+                                <label key={mealType} className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300">
                                     <input type="checkbox" checked={visibleMeals.has(mealType)} onChange={(e) => handleMealVisibilityChange(mealType, e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
                                     <span>{MealCategoryLabels[mealType]}</span>
                                 </label>
@@ -309,8 +309,8 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
                           </div>
                           <div className="grid grid-cols-1 gap-6">
                             {WEEKDAYS.map(day => (
-                                <div key={day} className="border border-slate-200 p-4 rounded-lg">
-                                    <h3 className="font-bold text-slate-600 mb-3 text-lg">{day}</h3>
+                                <div key={day} className="border border-slate-200 dark:border-slate-700 p-4 rounded-lg">
+                                    <h3 className="font-bold text-slate-600 dark:text-slate-300 mb-3 text-lg">{day}</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {sortedVisibleMeals.map(mealType => mealDropZone(day, mealType))}
                                     </div>
@@ -323,13 +323,13 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
                 </div>
             ) : (
                 <div className="space-y-6">
-                    <div className="bg-white p-6 rounded-lg shadow-lg">
-                      <h2 className="text-2xl font-bold text-slate-700 mb-4">Mein Wochenplan</h2>
-                       <div className="bg-slate-50 p-4 rounded-md mb-6">
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Mahlzeiten-Slots auswählen</label>
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-lg">
+                      <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-100 mb-4">Mein Wochenplan</h2>
+                       <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md mb-6">
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Mahlzeiten-Slots auswählen</label>
                             <div className="flex flex-wrap gap-x-4 gap-y-2">
                               {(Object.keys(MealCategoryLabels) as MealCategory[]).map(mealType => (
-                                <label key={mealType} className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700">
+                                <label key={mealType} className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300">
                                     <input type="checkbox" checked={visibleMeals.has(mealType)} onChange={(e) => handleMealVisibilityChange(mealType, e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
                                     <span>{MealCategoryLabels[mealType]}</span>
                                 </label>
@@ -338,20 +338,20 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
                         </div>
                       <div className="space-y-4">
                         {WEEKDAYS.map(day => (
-                          <div key={day} className="border border-slate-200 rounded-lg p-4">
-                              <h3 className="font-bold text-slate-600 mb-2">{day}</h3>
+                          <div key={day} className="border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                              <h3 className="font-bold text-slate-600 dark:text-slate-300 mb-2">{day}</h3>
                               <div className="space-y-2">
                                 {weeklySlots[day].length > 0 ? weeklySlots[day].sort((a,b) => MEAL_ORDER.indexOf(a.mealType) - MEAL_ORDER.indexOf(b.mealType)).map(slot => (
-                                  <div key={slot.uniqueId} className="bg-emerald-50 p-2 rounded-md relative"><p className="font-semibold text-emerald-800 text-sm">{slot.recipe.title}</p><p className="text-xs text-emerald-600">{MealCategoryLabels[slot.mealType]} &bull; {slot.recipe.totalCalories} kcal</p><button onClick={() => removeRecipeFromSlot(day, slot.uniqueId)} className="absolute top-1 right-1 h-6 w-6 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-sm">&times;</button></div>
+                                  <div key={slot.uniqueId} className="bg-emerald-50 dark:bg-emerald-900/50 p-2 rounded-md relative"><p className="font-semibold text-emerald-800 dark:text-emerald-300 text-sm">{slot.recipe.title}</p><p className="text-xs text-emerald-600 dark:text-emerald-400">{MealCategoryLabels[slot.mealType]} &bull; {slot.recipe.totalCalories} kcal</p><button onClick={() => removeRecipeFromSlot(day, slot.uniqueId)} className="absolute top-1 right-1 h-6 w-6 bg-red-200 dark:bg-red-800 text-red-700 dark:text-red-200 rounded-full flex items-center justify-center text-sm">&times;</button></div>
                                 )) : <p className="text-center text-xs text-slate-400 py-2">Noch keine Mahlzeiten für diesen Tag.</p>}
                                 <div className="relative">
-                                    <button onClick={() => setAddingMealToDay(addingMealToDay === day ? null : day)} className="w-full text-center text-sm text-emerald-600 font-semibold p-2 bg-emerald-50 hover:bg-emerald-100 rounded-md">+ Mahlzeit hinzufügen</button>
+                                    <button onClick={() => setAddingMealToDay(addingMealToDay === day ? null : day)} className="w-full text-center text-sm text-emerald-600 dark:text-emerald-400 font-semibold p-2 bg-emerald-50 dark:bg-emerald-900/50 hover:bg-emerald-100 dark:hover:bg-emerald-900 rounded-md">+ Mahlzeit hinzufügen</button>
                                     {addingMealToDay === day && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 p-2 bg-white border rounded-md shadow-lg z-10">
-                                            <p className="text-xs font-semibold text-slate-600 mb-2 px-1">Welche Mahlzeit?</p>
+                                        <div className="absolute top-full left-0 right-0 mt-1 p-2 bg-white dark:bg-slate-700 border dark:border-slate-600 rounded-md shadow-lg z-10">
+                                            <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2 px-1">Welche Mahlzeit?</p>
                                             <div className="flex flex-col items-start gap-1">
                                                 {sortedVisibleMeals.map(mealType => (
-                                                    <button key={mealType} onClick={() => openRecipeSelector(day, mealType)} className="w-full text-left px-3 py-1.5 text-sm text-slate-700 rounded hover:bg-slate-100">{MealCategoryLabels[mealType]}</button>
+                                                    <button key={mealType} onClick={() => openRecipeSelector(day, mealType)} className="w-full text-left px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 rounded hover:bg-slate-100 dark:hover:bg-slate-600">{MealCategoryLabels[mealType]}</button>
                                                 ))}
                                             </div>
                                         </div>
@@ -368,12 +368,12 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
             
             {!isDesktop && (
                 <div className={`fixed inset-0 bg-black bg-opacity-70 z-50 flex flex-col p-4 ${isModalOpen ? 'block' : 'hidden'}`}>
-                    <div className="bg-slate-100 rounded-lg shadow-xl flex flex-col h-full overflow-hidden">
-                        <header className="p-4 border-b bg-white flex justify-between items-center">
-                            <h2 className="text-xl font-bold">
+                    <div className="bg-slate-100 dark:bg-slate-800 rounded-lg shadow-xl flex flex-col h-full overflow-hidden">
+                        <header className="p-4 border-b dark:border-slate-700 bg-white dark:bg-slate-800 flex justify-between items-center">
+                            <h2 className="text-xl font-bold text-slate-800 dark:text-white">
                                 {modalMealType && MealCategoryLabels[modalMealType]} für {modalDay}
                             </h2>
-                            <button onClick={() => setIsModalOpen(false)} className="p-2 rounded-full hover:bg-slate-100"><CloseIcon /></button>
+                            <button onClick={() => setIsModalOpen(false)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400"><CloseIcon /></button>
                         </header>
                         <div className="flex-grow overflow-y-auto p-4 space-y-4">
                             {filterControls}

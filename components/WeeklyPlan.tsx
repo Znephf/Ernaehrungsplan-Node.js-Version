@@ -15,11 +15,11 @@ const WeeklyPlanComponent: React.FC<WeeklyPlanComponentProps> = ({ weeklyPlan, p
   return (
     <div className="space-y-8">
         <div className="text-center space-y-2">
-            <h2 className="text-3xl font-bold text-slate-700">{planName}</h2>
+            <h2 className="text-3xl font-bold text-slate-700 dark:text-slate-100">{planName}</h2>
             {(isGlutenFree || isLactoseFree) && (
                 <div className="flex justify-center flex-wrap gap-2">
-                    {isGlutenFree && <span className="text-xs text-emerald-700 font-semibold bg-emerald-50 px-3 py-1 rounded-full">Glutenfrei</span>}
-                    {isLactoseFree && <span className="text-xs text-emerald-700 font-semibold bg-emerald-50 px-3 py-1 rounded-full">Laktosefrei</span>}
+                    {isGlutenFree && <span className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold bg-emerald-50 dark:bg-emerald-900 px-3 py-1 rounded-full">Glutenfrei</span>}
+                    {isLactoseFree && <span className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold bg-emerald-50 dark:bg-emerald-900 px-3 py-1 rounded-full">Laktosefrei</span>}
                 </div>
             )}
         </div>
@@ -28,7 +28,7 @@ const WeeklyPlanComponent: React.FC<WeeklyPlanComponentProps> = ({ weeklyPlan, p
                 const sortedMeals = [...dayPlan.meals].sort((a, b) => MEAL_ORDER.indexOf(a.mealType) - MEAL_ORDER.indexOf(b.mealType));
                 
                 return (
-                    <div key={dayPlan.day} className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col transition-transform transform hover:scale-105">
+                    <div key={dayPlan.day} className="bg-white dark:bg-slate-800 rounded-lg shadow-lg overflow-hidden flex flex-col transition-transform transform hover:scale-105">
                         <div className="bg-emerald-600 text-white p-4 flex justify-between items-center">
                             <h3 className="text-xl font-bold">{dayPlan.day}</h3>
                             <div className="flex items-center gap-1 text-sm bg-emerald-700 px-2 py-1 rounded-full">
@@ -40,17 +40,17 @@ const WeeklyPlanComponent: React.FC<WeeklyPlanComponentProps> = ({ weeklyPlan, p
                             {sortedMeals.length > 0 ? (
                                 sortedMeals.map((meal, index) => (
                                     <div key={index}>
-                                        <p className="font-semibold text-emerald-800 flex justify-between">
+                                        <p className="font-semibold text-emerald-800 dark:text-emerald-400 flex justify-between">
                                             <span>{MealCategoryLabels[meal.mealType]}:</span>
-                                            <span className="font-normal text-slate-500">{meal.recipe.totalCalories} kcal</span>
+                                            <span className="font-normal text-slate-500 dark:text-slate-400">{meal.recipe.totalCalories} kcal</span>
                                         </p>
-                                        <button onClick={() => onSelectRecipe(dayPlan.day, meal.mealType)} className="text-left text-slate-600 hover:text-emerald-600 font-semibold transition-colors w-full">
+                                        <button onClick={() => onSelectRecipe(dayPlan.day, meal.mealType)} className="text-left text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 font-semibold transition-colors w-full">
                                             {meal.recipe.title}
                                         </button>
                                     </div>
                                 ))
                             ) : (
-                                <p className="text-slate-500 text-center italic">Keine Mahlzeiten für diesen Tag geplant.</p>
+                                <p className="text-slate-500 dark:text-slate-400 text-center italic">Keine Mahlzeiten für diesen Tag geplant.</p>
                             )}
                         </div>
                     </div>

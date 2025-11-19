@@ -217,14 +217,14 @@ const App: React.FC = () => {
 
 
     if (isLoggedIn === null) {
-        return <div className="flex h-screen items-center justify-center">Lade...</div>;
+        return <div className="flex h-screen items-center justify-center bg-slate-100 dark:bg-slate-900 dark:text-white">Lade...</div>;
     }
     if (!isLoggedIn) {
         return <LoginComponent onLoginSuccess={handleLoginSuccess} />;
     }
 
     return (
-        <div className="bg-slate-100 min-h-screen">
+        <div className="bg-slate-100 dark:bg-slate-900 min-h-screen transition-colors duration-300">
             <Header
                 currentView={currentView}
                 onSetView={setCurrentView}
@@ -246,8 +246,8 @@ const App: React.FC = () => {
 
             {shareUrl && <ShareModal url={shareUrl} onClose={() => setShareUrl(null)} />}
             
-            {generationError && <div className="container mx-auto p-4"><div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert"><p>{generationError}</p></div></div>}
-            {shareError && <div className="container mx-auto p-4"><div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert"><p>{shareError}</p></div></div>}
+            {generationError && <div className="container mx-auto p-4"><div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 dark:bg-red-900 dark:text-red-200 dark:border-red-700" role="alert"><p>{generationError}</p></div></div>}
+            {shareError && <div className="container mx-auto p-4"><div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 dark:bg-red-900 dark:text-red-200 dark:border-red-700" role="alert"><p>{shareError}</p></div></div>}
 
             <MainContent
                 currentView={currentView}

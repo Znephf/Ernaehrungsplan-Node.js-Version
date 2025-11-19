@@ -37,13 +37,20 @@ if (!process.env.API_KEY && !process.env.API_KEY_FALLBACK) {
 }
 
 
-// Erstelle notwendige öffentliche Verzeichnisse
-const publicSharesDir = path.join(__dirname, '..', 'public', 'shares');
-const publicImagesDir = path.join(__dirname, '..', 'public', 'images', 'recipes');
-[publicSharesDir, publicImagesDir].forEach(dir => {
+// Erstelle notwendige öffentliche Verzeichnisse (sowohl Source als auch Build/Dist, falls vorhanden)
+const appRoot = path.resolve(__dirname, '..');
+const publicSharesDir = path.join(appRoot, 'public', 'shares');
+const distSharesDir = path.join(appRoot, 'dist', 'shares');
+const publicImagesDir = path.join(appRoot, 'public', 'images', 'recipes');
+
+[publicSharesDir, distSharesDir, publicImagesDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-        console.log(`Verzeichnis erstellt unter: ${dir}`);
+        try {
+            fs.mkdirSync(dir, { recursive: true });
+            console.log(`Verzeichnis erstellt unter: ${dir}`);
+        } catch (e) {
+            console.warn(`Konnte Verzeichnis ${dir} nicht erstellen (evtl. existiert 'dist' noch nicht):`, e.message);
+        }
     }
 });
 

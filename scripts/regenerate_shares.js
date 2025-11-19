@@ -21,6 +21,7 @@ async function getDbConnection() {
 
 async function regenerateAllShareableHtmls() {
     console.log('--- Starting Regeneration of All Shareable HTML Files ---');
+    console.log('This will update all existing shared plans to include the new Cooking Mode feature.');
     let pool;
     try {
         pool = await getDbConnection();
@@ -39,22 +40,31 @@ async function regenerateAllShareableHtmls() {
         console.log(`Found ${plansToUpdate.length} shared plans to regenerate.`);
         let regeneratedCount = 0;
         let errorCount = 0;
+        
+        // Define output paths
+        const appRoot = path.resolve(__dirname, '..');
+        const publicSharesDir = path.join(appRoot, 'public', 'shares');
+        const distSharesDir = path.join(appRoot, 'dist', 'shares');
+        const pathsToWrite = [publicSharesDir, distSharesDir];
 
         for (const plan of plansToUpdate) {
             try {
                 console.log(`  -> Regenerating for Plan ID: ${plan.id} (Share ID: ${plan.shareId})`);
                 
-                // Generate the new dynamic HTML shell.
-                // The generator now only needs meta-info like the name for the title.
                 const htmlContent = await generateShareableHtml(plan);
-
                 const fileName = `${plan.shareId}.html`;
-                const filePath = path.join(__dirname, '..', 'public', 'shares', fileName);
 
-                // Overwrite the old static file with the new dynamic one.
-                await fs.writeFile(filePath, htmlContent);
+                await Promise.all(pathsToWrite.map(async (dir) => {
+                    try {
+                        await fs.mkdir(dir, { recursive: true });
+                        const filePath = path.join(dir, fileName);
+                        await fs.writeFile(filePath, htmlContent);
+                    } catch (e) {
+                        // Ignore individual write errors (e.g. if dist doesn't exist in dev environment)
+                    }
+                }));
                 
-                console.log(`     ... Success: ${fileName} has been updated to the new dynamic format.`);
+                console.log(`     ... Success: ${fileName} has been regenerated.`);
                 regeneratedCount++;
 
             } catch (err) {
@@ -73,7 +83,7 @@ async function regenerateAllShareableHtmls() {
     } finally {
         if (pool) {
             await pool.end();
-            console.log('Database connection closed.');
+            console.log('Database connection closed!');
         }
     }
 }

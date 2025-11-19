@@ -1,3 +1,4 @@
+
 const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
@@ -250,11 +251,27 @@ async function processShareJob(jobId) {
         
         const shareId = crypto.randomBytes(8).toString('hex');
         const htmlContent = await generateShareableHtml({ name: plan.name });
-        
         const fileName = `${shareId}.html`;
-        const filePath = path.join(__dirname, '..', '..', 'public', 'shares', fileName);
         
-        await fs.writeFile(filePath, htmlContent);
+        // Robust path resolution: write to BOTH public and dist to handle all serving scenarios
+        const appRoot = path.resolve(__dirname, '../..');
+        const publicSharesDir = path.join(appRoot, 'public', 'shares');
+        const distSharesDir = path.join(appRoot, 'dist', 'shares');
+
+        console.log(`[Share Job] Generiere Datei: ${fileName}`);
+        
+        const writePromises = [publicSharesDir, distSharesDir].map(async (dir) => {
+            try {
+                await fs.mkdir(dir, { recursive: true });
+                await fs.writeFile(path.join(dir, fileName), htmlContent, 'utf8');
+                console.log(`[Share Job] Datei gespeichert in: ${dir}`);
+            } catch (e) {
+                console.warn(`[Share Job] Konnte Datei nicht in ${dir} speichern: ${e.message}`);
+                // We don't throw here, we try to save to as many locations as possible
+            }
+        });
+
+        await Promise.all(writePromises);
         
         await pool.query('UPDATE plans SET shareId = ? WHERE id = ?', [shareId, plan.id]);
         

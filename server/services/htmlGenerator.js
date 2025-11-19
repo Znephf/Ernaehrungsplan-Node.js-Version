@@ -26,9 +26,15 @@ async function generateShareableHtml(plan) {
         .nav-button.active { background-color: #047857; color: white; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); }
         .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #10b981; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Cooking Mode Styles */
+        #cooking-overlay { display: none; position: fixed; inset: 0; background: white; z-index: 100; flex-direction: column; }
+        #cooking-overlay.active { display: flex; }
+        .step-slide { display: none; height: 100%; flex-direction: column; justify-content: center; padding: 2rem; text-align: center; overflow-y: auto; }
+        .step-slide.active { display: flex; }
     </style>
 </head>
-<body class="bg-slate-100">
+<body class="bg-slate-100 text-slate-800">
     <header class="bg-white shadow-md sticky top-0 z-30">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
             <h1 class="text-2xl font-bold text-slate-800">KI Ernährungsplaner</h1>
@@ -51,6 +57,25 @@ async function generateShareableHtml(plan) {
             <p class="text-red-600 font-semibold">Fehler: Der Plan konnte nicht geladen werden.</p>
         </div>
     </main>
+    
+    <!-- Cooking Mode Overlay -->
+    <div id="cooking-overlay">
+        <div class="p-4 border-b flex justify-between items-center bg-white shadow-sm z-10 shrink-0">
+            <span id="cooking-title" class="font-bold text-lg truncate mr-2"></span>
+            <button id="close-cooking" class="p-2 rounded-full hover:bg-slate-100 text-slate-500">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+        <div id="cooking-steps-container" class="flex-grow overflow-hidden bg-slate-50 relative">
+            <!-- Steps injected here -->
+        </div>
+        <div class="p-4 border-t bg-white flex justify-between items-center gap-4 z-10 shrink-0">
+            <button id="prev-step" class="px-6 py-3 bg-slate-200 text-slate-700 rounded-lg font-bold disabled:opacity-50">Zurück</button>
+            <span id="step-indicator" class="font-medium text-slate-500"></span>
+            <button id="next-step" class="px-6 py-3 bg-emerald-600 text-white rounded-lg font-bold">Weiter</button>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const MealCategoryLabels = { breakfast: 'Frühstück', lunch: 'Mittagessen', coffee: 'Kaffee & Kuchen', dinner: 'Abendessen', snack: 'Snack' };
@@ -148,9 +173,14 @@ async function generateShareableHtml(plan) {
                         });
                         const ingredientsHtml = '<ul class="space-y-2 list-disc list-inside text-slate-600">' + ingredientItems.join('') + '</ul>';
                         
-                        const instructionsHtml = '<ol class="space-y-3 list-decimal list-inside text-slate-600">' + (recipe.instructions || []).map(step => '<li>' + escape(step) + '</li>').join('') + '</ol>';
+                        const instructionsHtml = '<ol class="space-y-3 list-decimal list-inside text-slate-600 instruction-list">' + (recipe.instructions || []).map(step => '<li>' + escape(step) + '</li>').join('') + '</ol>';
+                        
+                        // Serialize steps for cooking mode safely
+                        const stepsJson = JSON.stringify(recipe.instructions || []);
+                        // Properly escape double quotes for use in the HTML attribute
+                        const stepsAttr = stepsJson.replace(/"/g, "&quot;");
 
-                        return '<div id="recipe-day-' + escape(dayPlan.day) + '-' + escape(meal.mealType) + '" class="bg-white rounded-lg shadow-lg overflow-hidden">' +
+                        return '<div id="recipe-day-' + escape(dayPlan.day) + '-' + escape(meal.mealType) + '" class="bg-white rounded-lg shadow-lg overflow-hidden recipe-card" data-title="' + escape(recipe.title) + '" data-steps="' + stepsAttr + '">' +
                             imageUrlHtml +
                             '<div class="p-6">' +
                             '<div class="flex flex-wrap items-center justify-between gap-2">' +
@@ -159,6 +189,7 @@ async function generateShareableHtml(plan) {
                             '</div>' +
                             '<h3 class="text-2xl font-bold text-slate-800 mt-3">' + escape(recipe.title) + '</h3>' +
                             macrosHtml +
+                            '<div class="mt-6"><button class="start-cooking-btn w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded shadow-md flex items-center justify-center gap-2 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" /></svg> Koch-Modus starten</button></div>' +
                             '<div class="mt-6 grid grid-cols-1 md:grid-cols-5 gap-x-8 gap-y-6">' +
                             '<div class="md:col-span-2"><h4 class="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Zutaten:</h4>' + ingredientsHtml + '</div>' +
                             '<div class="md:col-span-3 md:border-l md:border-slate-200 md:pl-8"><h4 class="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Anleitung:</h4>' + instructionsHtml + '</div>' +
@@ -176,6 +207,126 @@ async function generateShareableHtml(plan) {
                 }).join('');
 
                 return '<div class="space-y-8">' + mainTitle + '<div class="space-y-12">' + weeklyPlanHtml + '</div></div>';
+            }
+            
+            // --- Cooking Mode Logic ---
+            let wakeLock = null;
+            async function requestWakeLock() {
+                try {
+                    if ('wakeLock' in navigator) {
+                        wakeLock = await navigator.wakeLock.request('screen');
+                        wakeLock.addEventListener('release', () => { console.log('Wake Lock released'); });
+                        console.log('Wake Lock active');
+                    }
+                } catch (err) { console.error(\`\${err.name}, \${err.message}\`); }
+            }
+            async function releaseWakeLock() {
+                if (wakeLock !== null) { await wakeLock.release(); wakeLock = null; }
+            }
+
+            function initCookingMode() {
+                const overlay = document.getElementById('cooking-overlay');
+                const container = document.getElementById('cooking-steps-container');
+                const titleEl = document.getElementById('cooking-title');
+                const closeBtn = document.getElementById('close-cooking');
+                const prevBtn = document.getElementById('prev-step');
+                const nextBtn = document.getElementById('next-step');
+                const stepIndicator = document.getElementById('step-indicator');
+                let currentSteps = [];
+                let currentStepIndex = 0;
+
+                function showStep(index) {
+                    const slides = container.querySelectorAll('.step-slide');
+                    slides.forEach((s, i) => {
+                        s.classList.toggle('active', i === index);
+                    });
+                    stepIndicator.textContent = \`Schritt \${index + 1} von \${currentSteps.length}\`;
+                    prevBtn.disabled = index === 0;
+                    nextBtn.textContent = index === currentSteps.length - 1 ? 'Fertig' : 'Weiter';
+                    currentStepIndex = index;
+                }
+
+                function parseTime(text) {
+                    const match = text.match(/(\d+)\s*(?:Minuten|Min|min)/);
+                    return match ? parseInt(match[1], 10) : null;
+                }
+
+                function startTimer(btn, minutes) {
+                    let seconds = minutes * 60;
+                    const originalText = btn.innerText;
+                    btn.disabled = true;
+                    const interval = setInterval(() => {
+                        seconds--;
+                        const m = Math.floor(seconds / 60);
+                        const s = seconds % 60;
+                        btn.innerText = \`\${m}:\${s.toString().padStart(2, '0')}\`;
+                        if (seconds <= 0) {
+                            clearInterval(interval);
+                            btn.innerText = "Fertig!";
+                            btn.classList.remove('bg-slate-100', 'text-slate-800');
+                            btn.classList.add('bg-green-500', 'text-white');
+                            // Optional: Audio beep
+                        }
+                    }, 1000);
+                }
+
+                document.body.addEventListener('click', e => {
+                    const startBtn = e.target.closest('.start-cooking-btn');
+                    if (startBtn) {
+                        const card = startBtn.closest('.recipe-card');
+                        const title = card.getAttribute('data-title');
+                        const steps = JSON.parse(card.getAttribute('data-steps') || '[]');
+                        
+                        if (steps.length === 0) return alert("Keine Anleitung vorhanden.");
+
+                        currentSteps = steps;
+                        titleEl.textContent = title;
+                        container.innerHTML = '';
+
+                        currentSteps.forEach((step, i) => {
+                            const slide = document.createElement('div');
+                            slide.className = 'step-slide' + (i === 0 ? ' active' : '');
+                            
+                            const textP = document.createElement('p');
+                            textP.className = 'text-xl sm:text-2xl font-medium leading-relaxed text-slate-800 mb-8';
+                            textP.innerText = step;
+                            slide.appendChild(textP);
+
+                            const time = parseTime(step);
+                            if (time) {
+                                const timerBtn = document.createElement('button');
+                                timerBtn.className = 'mx-auto flex items-center gap-2 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-full font-bold text-lg shadow transition-colors';
+                                timerBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Timer: ' + time + ' Min';
+                                timerBtn.onclick = () => startTimer(timerBtn, time);
+                                slide.appendChild(timerBtn);
+                            }
+
+                            container.appendChild(slide);
+                        });
+
+                        overlay.classList.add('active');
+                        requestWakeLock();
+                        showStep(0);
+                    }
+                });
+
+                closeBtn.onclick = () => {
+                    overlay.classList.remove('active');
+                    releaseWakeLock();
+                };
+
+                prevBtn.onclick = () => {
+                    if (currentStepIndex > 0) showStep(currentStepIndex - 1);
+                };
+
+                nextBtn.onclick = () => {
+                    if (currentStepIndex < currentSteps.length - 1) {
+                        showStep(currentStepIndex + 1);
+                    } else {
+                        overlay.classList.remove('active');
+                        releaseWakeLock();
+                    }
+                };
             }
 
 
@@ -248,6 +399,8 @@ async function generateShareableHtml(plan) {
                         setTimeout(() => { document.querySelector(recipeId)?.scrollIntoView({ behavior: 'smooth' }); }, 50);
                     });
                 });
+                
+                initCookingMode();
             }
 
             async function loadPlan() {
