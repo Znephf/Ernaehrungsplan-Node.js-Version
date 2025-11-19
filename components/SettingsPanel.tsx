@@ -152,7 +152,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, allRecipes, onS
   const showCoffeeOption = (settings.includedMeals || []).includes('coffee');
   const showMainMealFocus = (settings.includedMeals || []).includes('lunch') && (settings.includedMeals || []).includes('dinner');
 
-  const inputStyles = "mt-1 block w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-white rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm";
+  const inputStyles = "mt-1 block w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-white rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm placeholder-slate-400 dark:placeholder-slate-500";
   const stepButtonStyles = "px-4 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold border border-slate-300 dark:border-slate-600 hover:bg-slate-300 dark:hover:bg-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:z-10 transition-colors";
 
   const RoutineMealSettings: React.FC<{ mealType: MealCategory, label: string }> = ({ mealType, label }) => {
@@ -163,9 +163,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, allRecipes, onS
     const selectedRecipe = allRecipes.find(r => r.id === settings[selectedIdKey]);
 
     return (
-        <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
+        <div className="bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-700 p-4 rounded-lg">
             <label htmlFor={String(useSameKey)} className="flex items-center space-x-2 cursor-pointer font-medium text-slate-700 dark:text-slate-200">
-                <input type="checkbox" name={String(useSameKey)} id={String(useSameKey)} checked={!!settings[useSameKey]} onChange={handleChange} className="h-4 w-4 rounded" />
+                <input type="checkbox" name={String(useSameKey)} id={String(useSameKey)} checked={!!settings[useSameKey]} onChange={handleChange} className="h-4 w-4 rounded text-emerald-600 focus:ring-emerald-500 border-gray-300 dark:border-slate-600 dark:bg-slate-700" />
                 <span>Jeden Tag {label}</span>
             </label>
             {settings[useSameKey] && (
@@ -202,7 +202,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, allRecipes, onS
             <label htmlFor="persons" className="block text-sm font-medium text-slate-700 dark:text-slate-200">Anzahl Personen</label>
             <div className="flex items-center mt-1">
                   <button type="button" onClick={() => handlePersonStep(-1)} className={`${stepButtonStyles} rounded-l-md h-10`} aria-label="Anzahl Personen verringern">−</button>
-                  <input type="number" name="persons" id="persons" value={settings.persons} onChange={handleChange} min="1" className="w-full text-center h-10 border-t border-b border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white" />
+                  <input type="number" name="persons" id="persons" value={settings.persons} onChange={handleChange} min="1" className="w-full text-center h-10 border-t border-b border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-0" />
                   <button type="button" onClick={() => handlePersonStep(1)} className={`${stepButtonStyles} rounded-r-md h-10`} aria-label="Anzahl Personen erhöhen">+</button>
               </div>
           </div>
@@ -210,7 +210,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, allRecipes, onS
               <label htmlFor="kcal" className="block text-sm font-medium text-slate-700 dark:text-slate-200">Kcal pro Tag/Person</label>
               <div className="flex items-center mt-1">
                   <button type="button" onClick={() => handleKcalStep(-50)} className={`${stepButtonStyles} rounded-l-md h-10`} aria-label="Kalorien verringern">−</button>
-                  <input type="number" name="kcal" id="kcal" value={settings.kcal} onChange={handleChange} step="50" min="1000" className="w-full text-center h-10 border-t border-b border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white" />
+                  <input type="number" name="kcal" id="kcal" value={settings.kcal} onChange={handleChange} step="50" min="1000" className="w-full text-center h-10 border-t border-b border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-0" />
                   <button type="button" onClick={() => handleKcalStep(50)} className={`${stepButtonStyles} rounded-r-md h-10`} aria-label="Kalorien erhöhen">+</button>
               </div>
           </div>
@@ -263,8 +263,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, allRecipes, onS
           <div className="pt-1">
             <span className="block text-sm font-medium text-slate-700 dark:text-slate-200">Optionen</span>
             <div className="mt-2 flex items-center space-x-6">
-                <label htmlFor="isGlutenFree" className="flex items-center space-x-2 cursor-pointer text-slate-700 dark:text-slate-200"><input type="checkbox" name="isGlutenFree" id="isGlutenFree" checked={settings.isGlutenFree} onChange={handleChange} className="h-4 w-4 rounded" /><span>Glutenfrei</span></label>
-                <label htmlFor="isLactoseFree" className="flex items-center space-x-2 cursor-pointer text-slate-700 dark:text-slate-200"><input type="checkbox" name="isLactoseFree" id="isLactoseFree" checked={settings.isLactoseFree} onChange={handleChange} className="h-4 w-4 rounded" /><span>Laktosefrei</span></label>
+                <label htmlFor="isGlutenFree" className="flex items-center space-x-2 cursor-pointer text-slate-700 dark:text-slate-200"><input type="checkbox" name="isGlutenFree" id="isGlutenFree" checked={settings.isGlutenFree} onChange={handleChange} className="h-4 w-4 rounded text-emerald-600 focus:ring-emerald-500 border-gray-300 dark:border-slate-600 dark:bg-slate-700" /><span>Glutenfrei</span></label>
+                <label htmlFor="isLactoseFree" className="flex items-center space-x-2 cursor-pointer text-slate-700 dark:text-slate-200"><input type="checkbox" name="isLactoseFree" id="isLactoseFree" checked={settings.isLactoseFree} onChange={handleChange} className="h-4 w-4 rounded text-emerald-600 focus:ring-emerald-500 border-gray-300 dark:border-slate-600 dark:bg-slate-700" /><span>Laktosefrei</span></label>
             </div>
           </div>
         </div>
@@ -275,12 +275,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, allRecipes, onS
         <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">Enthaltene Mahlzeiten</label>
         <div className="flex flex-wrap gap-3">
           {(Object.keys(MealCategoryLabels) as MealCategory[]).map(mealType => (
-            <label key={mealType} className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-3 py-2 rounded-md transition-colors has-[:checked]:bg-emerald-100 dark:has-[:checked]:bg-emerald-900 has-[:checked]:text-emerald-800 dark:has-[:checked]:text-emerald-200 has-[:checked]:ring-1 has-[:checked]:ring-emerald-300 dark:has-[:checked]:ring-emerald-700">
+            <label key={mealType} className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 px-3 py-2 rounded-md transition-colors has-[:checked]:bg-emerald-100 dark:has-[:checked]:bg-emerald-900 has-[:checked]:text-emerald-800 dark:has-[:checked]:text-emerald-200 has-[:checked]:ring-1 has-[:checked]:ring-emerald-300 dark:has-[:checked]:ring-emerald-700">
                 <input
                     type="checkbox"
                     checked={(settings.includedMeals || []).includes(mealType)}
                     onChange={() => handleMealTypeChange(mealType)}
-                    className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                    className="h-4 w-4 rounded border-gray-300 dark:border-slate-500 text-emerald-600 focus:ring-emerald-500 dark:bg-slate-700"
                 />
                 <span>{MealCategoryLabels[mealType]}</span>
             </label>
@@ -313,7 +313,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, allRecipes, onS
                   value={focus}
                   checked={(settings.mainMealFocus || 'none') === focus}
                   onChange={handleChange}
-                  className="h-4 w-4 border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  className="h-4 w-4 border-gray-300 text-emerald-600 focus:ring-emerald-500 dark:bg-slate-700 dark:border-slate-600"
                 />
                 <span>{focus === 'none' ? 'Kein Fokus' : (focus === 'lunch' ? 'Mittagessen' : 'Abendessen')}</span>
               </label>
@@ -338,7 +338,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, allRecipes, onS
       </div>
 
       <div className="flex justify-end">
-        <button type="submit" disabled={isLoading} className="inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:bg-slate-400 disabled:cursor-not-allowed">
+        <button type="submit" disabled={isLoading} className="inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:bg-slate-400 disabled:dark:bg-slate-600 disabled:cursor-not-allowed transition-colors">
           {isLoading ? 'Generiere...' : 'Plan generieren'}
         </button>
       </div>

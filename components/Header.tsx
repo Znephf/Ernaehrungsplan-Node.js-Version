@@ -108,10 +108,10 @@ const Header: React.FC<HeaderProps> = ({
                         onClick={onShare}
                         disabled={isSharing || !planExists}
                         className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:text-slate-400 disabled:dark:text-slate-600 disabled:cursor-not-allowed rounded-md transition-colors"
-                        title="Aktuellen Plan als öffentlichen Link teilen"
+                        title="Öffentliche Ansicht erstellen & teilen"
                     >
                         <ShareIcon />
-                        <span className="hidden md:inline">{isSharing ? 'Teile...' : 'Teilen'}</span>
+                        <span className="hidden md:inline">{isSharing ? 'Erstelle...' : 'Planansicht'}</span>
                     </button>
                      <button
                         onClick={onLogout}
