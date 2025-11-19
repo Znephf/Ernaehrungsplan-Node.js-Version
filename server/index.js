@@ -77,40 +77,108 @@ app.use('/api/recipes', requireAuth, recipeRoutes);
 // --- BEREITSTELLUNG STATISCHER DATEIEN ---
 // ======================================================
 
-// MANUELLE ROUTE FÜR /shares/
+// MANUELLE ROUTE FÜR /shares/ MIT DEBUGGING
 app.get('/shares/:filename', (req, res, next) => {
     const filename = req.params.filename;
     
+    // Sicherheitscheck
     if (filename.includes('..') || filename.includes('/') || !filename.endsWith('.html')) {
         return res.status(400).send('Ungültiger Dateiname.');
     }
 
-    // Resolve absolute path to ensure correct lookup
+    // Pfade auflösen
+    // __dirname ist normalerweise .../server/
+    // Wir wollen .../public/shares/
     const sharesPath = path.resolve(__dirname, '../public/shares');
     const filePath = path.join(sharesPath, filename);
 
-    console.log(`[Shares Debug] Anfrage für: ${filename}`);
-    console.log(`[Shares Debug] Suche in (Absolut): ${filePath}`);
+    console.log(`[Shares Request] ${filename}`);
 
+    // Sammle Debug-Daten (wird im Fehlerfall ausgegeben)
+    const debugInfo = {
+        requestedFilename: filename,
+        serverDirname: __dirname,
+        resolvedSharesPath: sharesPath,
+        resolvedFilePath: filePath,
+        processCwd: process.cwd(),
+        fileExists: false,
+        folderContents: [],
+        stat: null
+    };
+
+    // Prüfe Existenz
     if (fs.existsSync(filePath)) {
-        console.log(`[Shares Debug] Datei gefunden. Sende...`);
-        res.setHeader('Content-Type', 'text/html; charset=UTF-8');
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        return res.sendFile(filePath, { root: '/' }); // explicit root for absolute paths
-    } else {
-        console.log(`[Shares Debug] Datei NICHT gefunden unter: ${filePath}`);
-        
-        // DEBUG: Log directory contents to verify what IS there
+        debugInfo.fileExists = true;
         try {
-            const files = fs.readdirSync(sharesPath);
-            console.log(`[Shares Debug] Inhalt von ${sharesPath}:`, files.join(', '));
-        } catch (e) {
-            console.error(`[Shares Debug] Konnte Verzeichnis nicht lesen: ${e.message}`);
+            const stat = fs.statSync(filePath);
+            debugInfo.stat = {
+                size: stat.size,
+                mode: stat.mode,
+                isFile: stat.isFile(),
+                uid: stat.uid,
+                gid: stat.gid
+            };
+
+            console.log(`[Shares Success] Sende Datei: ${filePath}`);
+            res.setHeader('Content-Type', 'text/html; charset=UTF-8');
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+            
+            // Explizit root setzen für absolute Pfade
+            return res.sendFile(filePath, { root: '/' }); 
+        } catch (err) {
+             console.error(`[Shares Error] Zugriff verweigert oder Fehler beim Lesen:`, err);
+             return res.status(500).send(`Serverfehler beim Zugriff auf Datei: ${err.message}`);
         }
+    } else {
+        // DATEI NICHT GEFUNDEN - DEBUG MODUS
+        console.warn(`[Shares Missing] Datei nicht gefunden: ${filePath}`);
         
-        next();
+        try {
+            if (fs.existsSync(sharesPath)) {
+                debugInfo.folderContents = fs.readdirSync(sharesPath);
+            } else {
+                debugInfo.folderError = "Ordner 'public/shares' existiert an diesem Pfad nicht.";
+            }
+        } catch (e) {
+            debugInfo.folderReadError = e.message;
+        }
+
+        // Wir senden KEIN next(), damit nicht die React-App geladen wird.
+        // Stattdessen senden wir eine HTML-Seite mit den Debug-Infos für den Browser.
+        const debugJson = JSON.stringify(debugInfo, null, 2);
+        const htmlResponse = `
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug: Datei nicht gefunden</title>
+    <style>
+        body { font-family: monospace; background-color: #fff1f2; color: #881337; padding: 2rem; }
+        h1 { color: #9f1239; }
+        pre { background: white; padding: 1rem; border: 1px solid #fecdd3; border-radius: 0.5rem; overflow-x: auto; }
+        .info { margin-bottom: 2rem; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <h1>404 - Datei nicht gefunden (Debug Modus)</h1>
+    <div class="info">
+        <p>Der Server konnte die angeforderte Share-Datei nicht finden.</p>
+        <p>Bitte prüfen Sie die Konsole (F12), dort wurden die Debug-Informationen ebenfalls ausgegeben.</p>
+    </div>
+    <h2>Server Diagnose:</h2>
+    <pre>${debugJson}</pre>
+    <script>
+        console.warn("SERVER DEBUG INFO:", ${debugJson});
+        console.log("Ordner-Inhalt:", ${JSON.stringify(debugInfo.folderContents)});
+    </script>
+</body>
+</html>
+        `;
+        
+        return res.status(404).send(htmlResponse);
     }
 });
 
