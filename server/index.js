@@ -78,16 +78,31 @@ app.use('/api/recipes', requireAuth, recipeRoutes); // Use recipe routes
 
 
 // ======================================================
-// --- BEREITSTELLUNG DER REACT-APP ---
+// --- BEREITSTELLUNG STATISCHER DATEIEN ---
 // ======================================================
-// Statische Dateien für die geteilten Pläne und Bilder bereitstellen
+
+// 1. Priorität: Geteilte Pläne explizit behandeln.
+// Wir prüfen sowohl public/shares als auch dist/shares.
+// Dies verhindert, dass der React-Router diese Anfragen abfängt.
+app.use('/shares', express.static(path.join(__dirname, '..', 'public', 'shares')));
+app.use('/shares', express.static(path.join(__dirname, '..', 'dist', 'shares')));
+
+// 2. Bilder bereitstellen
+app.use('/images', express.static(path.join(__dirname, '..', 'public', 'images')));
+
+// 3. Allgemeine statische Dateien (React App Assets)
 app.use(express.static(path.join(__dirname, '..', 'public')));
-// Statische Dateien für die gebaute React-App bereitstellen
 app.use(express.static(path.join(__dirname, '..', 'dist')));
 
-// Alle übrigen Anfragen an die React-App weiterleiten
+// Alle übrigen Anfragen an die React-App weiterleiten (SPA Catch-all)
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
+    // Versuche zuerst index.html aus dist, dann fallback
+    const distIndex = path.join(__dirname, '..', 'dist', 'index.html');
+    if (fs.existsSync(distIndex)) {
+        res.sendFile(distIndex);
+    } else {
+        res.status(404).send('React App noch nicht gebaut (dist/index.html fehlt). Bitte npm run build ausführen.');
+    }
 });
 
 // --- Server starten ---
