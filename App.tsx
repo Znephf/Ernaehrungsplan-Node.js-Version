@@ -159,6 +159,12 @@ const App: React.FC = () => {
     const handleLoadPlan = useCallback((id: number) => {
         const planToLoad = loadPlanFromArchive(id);
         if (planToLoad) {
+            // NEU: Wenn der Plan bereits geteilt wurde (shareId existiert), öffne direkt die statische Ansicht.
+            if (planToLoad.shareId) {
+                window.location.href = `/shares/${planToLoad.shareId}.html`;
+                return;
+            }
+
             resetImageState();
             setActivePlan(planToLoad);
             setSettings(planToLoad.settings);

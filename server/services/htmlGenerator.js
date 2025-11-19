@@ -131,7 +131,7 @@ async function generateShareableHtml(plan) {
                             '</div>' +
                             '<h3 class="text-2xl font-bold text-slate-800 mt-3">' + escape(recipe.title) + '</h3>' +
                             macrosHtml +
-                            '<div class="mt-6"><button class="start-cooking-btn w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded shadow-md flex items-center justify-center gap-2 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" /></svg> Koch-Modus starten</button></div>' +
+                            '<div class="mt-6"><button class="start-cooking-btn w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded shadow-md flex items-center justify-center gap-2 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l1.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" /></svg> Koch-Modus starten</button></div>' +
                             '<div class="mt-6 grid grid-cols-1 md:grid-cols-5 gap-x-8 gap-y-6">' +
                             '<div class="md:col-span-2"><h4 class="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Zutaten:</h4>' + ingredientsHtml + '</div>' +
                             '<div class="md:col-span-3 md:border-l md:border-slate-200 md:pl-8"><h4 class="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Anleitung:</h4>' + instructionsHtml + '</div>' +
@@ -411,7 +411,15 @@ async function generateShareableHtml(plan) {
 <body class="bg-slate-100 text-slate-800">
     <header class="bg-white shadow-md sticky top-0 z-30">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <h1 class="text-2xl font-bold text-slate-800">KI Ernährungsplaner</h1>
+            <div class="flex items-center gap-4 w-full sm:w-auto justify-center sm:justify-start">
+                <a href="/" class="flex items-center gap-2 text-slate-500 hover:text-emerald-600 transition-colors group" title="Zurück zum Planer">
+                    <div class="p-2 bg-slate-100 rounded-full group-hover:bg-emerald-100 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
+                    </div>
+                    <span class="font-medium text-sm sm:hidden md:inline">Planer</span>
+                </a>
+                <h1 class="text-2xl font-bold text-slate-800">KI Ernährungsplaner</h1>
+            </div>
             <nav class="flex items-center justify-center gap-2 sm:gap-4 p-1 bg-slate-100 rounded-lg">
                 <button data-view="plan" class="nav-button active px-4 py-2 text-sm sm:text-base font-medium rounded-md text-slate-600 hover:bg-slate-200">Wochenplan</button>
                 <button data-view="shopping" class="nav-button px-4 py-2 text-sm sm:text-base font-medium rounded-md text-slate-600 hover:bg-slate-200">Einkaufsliste</button>
