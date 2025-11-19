@@ -21,7 +21,6 @@ async function getDbConnection() {
 
 async function regenerateAllShareableHtmls() {
     console.log('--- Starting Regeneration of All Shareable HTML Files ---');
-    console.log('This will update all existing shared plans to include the new Cooking Mode feature.');
     let pool;
     try {
         pool = await getDbConnection();
@@ -74,7 +73,7 @@ async function regenerateAllShareableHtmls() {
     } finally {
         if (pool) {
             await pool.end();
-            console.log('Database connection closed!');
+            console.log('Database connection closed.');
         }
     }
 }

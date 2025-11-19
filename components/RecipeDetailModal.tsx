@@ -55,8 +55,6 @@ const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, 
                 printWindow.document.write('<script src="https://cdn.tailwindcss.com"></script>');
                 printWindow.document.write('<style>body { -webkit-print-color-adjust: exact; color-adjust: exact; } @page { size: auto; margin: 20mm; }</style>');
                 printWindow.document.write('</head><body class="font-sans">');
-                // Note: Dark mode classes will be present but typically ignored by print if not explicitly handled or if browser defaults to light for print.
-                // To ensure clean print, we could strip dark classes or force light mode, but tailwindcss script usually handles basics.
                 printWindow.document.write(printContent.innerHTML);
                 printWindow.document.write('</body></html>');
                 printWindow.document.close();
@@ -71,18 +69,18 @@ const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, 
     
     return (
         <div 
-            className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4 backdrop-blur-sm" 
+            className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4" 
             onClick={onClose}
             role="dialog" 
             aria-modal="true" 
             aria-labelledby="recipe-modal-title"
         >
             <div 
-                className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-3xl max-h-full flex flex-col overflow-hidden" 
+                className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-full flex flex-col overflow-hidden" 
                 onClick={e => e.stopPropagation()}
             >
-                <header className="p-4 border-b dark:border-slate-700 flex-shrink-0 flex justify-between items-center gap-4 bg-white dark:bg-slate-800">
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-white" id="recipe-modal-title">{recipe.title}</h2>
+                <header className="p-4 border-b flex-shrink-0 flex justify-between items-center gap-4">
+                    <h2 className="text-xl font-bold text-slate-800" id="recipe-modal-title">{recipe.title}</h2>
                     <div className="flex items-center gap-2 flex-shrink-0">
                         {onAddToPlan && (
                             <button 
@@ -93,11 +91,11 @@ const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, 
                                 Hinzufügen
                             </button>
                         )}
-                        <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-semibold rounded-md transition-colors"><PrintIcon /> Drucken</button>
-                        <button onClick={onClose} className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" aria-label="Schließen"><CloseIcon /></button>
+                        <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-md transition-colors"><PrintIcon /> Drucken</button>
+                        <button onClick={onClose} className="p-2 text-slate-500 hover:text-slate-800 rounded-full hover:bg-slate-100 transition-colors" aria-label="Schließen"><CloseIcon /></button>
                     </div>
                 </header>
-                <main className="overflow-y-auto bg-white dark:bg-slate-800">
+                <main className="overflow-y-auto">
                     <div id="printable-recipe-area">
                         <GeneratedRecipeImage
                             recipeTitle={recipe.title}
@@ -108,29 +106,29 @@ const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, 
                         />
                         <div className="p-6">
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                                <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-3 py-1 rounded-full">{MealCategoryLabels[recipe.category]}</span>
-                                <div className="flex items-center gap-1 text-sm text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full"><FireIcon /><span>ca. {recipe.totalCalories} kcal</span></div>
+                                <span className="text-sm font-semibold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">{MealCategoryLabels[recipe.category]}</span>
+                                <div className="flex items-center gap-1 text-sm text-slate-600 bg-slate-100 px-3 py-1 rounded-full"><FireIcon /><span>ca. {recipe.totalCalories} kcal</span></div>
                             </div>
 
                             {recipe.protein !== undefined && (
-                                <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-slate-600 dark:text-slate-300 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                                    <span className="flex items-center gap-1.5 text-sm"><ProteinIcon /><div><span className="font-bold">{recipe.protein}g</span><span className="text-slate-500 dark:text-slate-400 text-xs block">Protein</span></div></span>
-                                    <span className="flex items-center gap-1.5 text-sm"><CarbsIcon /><div><span className="font-bold">{recipe.carbs}g</span><span className="text-slate-500 dark:text-slate-400 text-xs block">Kohlenh.</span></div></span>
-                                    <span className="flex items-center gap-1.5 text-sm"><FatIcon /><div><span className="font-bold">{recipe.fat}g</span><span className="text-slate-500 dark:text-slate-400 text-xs block">Fett</span></div></span>
+                                <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-slate-600 p-3 bg-slate-50 rounded-lg">
+                                    <span className="flex items-center gap-1.5 text-sm"><ProteinIcon /><div><span className="font-bold">{recipe.protein}g</span><span className="text-slate-500 text-xs block">Protein</span></div></span>
+                                    <span className="flex items-center gap-1.5 text-sm"><CarbsIcon /><div><span className="font-bold">{recipe.carbs}g</span><span className="text-slate-500 text-xs block">Kohlenh.</span></div></span>
+                                    <span className="flex items-center gap-1.5 text-sm"><FatIcon /><div><span className="font-bold">{recipe.fat}g</span><span className="text-slate-500 text-xs block">Fett</span></div></span>
                                 </div>
                             )}
 
                             <div className="mt-6 grid grid-cols-1 md:grid-cols-5 gap-x-8 gap-y-6">
                                 <div className="md:col-span-2">
-                                    <div className="border-b-2 border-slate-200 dark:border-slate-700 pb-2 mb-3 flex justify-between items-center">
-                                        <h4 className="text-lg font-semibold text-slate-700 dark:text-slate-200">Zutaten:</h4>
+                                    <div className="border-b-2 border-slate-200 pb-2 mb-3 flex justify-between items-center">
+                                        <h4 className="text-lg font-semibold text-slate-700">Zutaten:</h4>
                                         <div className="flex items-center gap-1.5 text-sm">
-                                            <label htmlFor="persons-input" className="text-slate-600 dark:text-slate-400">Für</label>
+                                            <label htmlFor="persons-input" className="text-slate-600">Für</label>
                                             <div className="flex items-center">
                                                 <button 
                                                     type="button" 
                                                     onClick={() => setPersons(p => Math.max(1, p - 1))}
-                                                    className="px-3 h-8 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold border border-slate-300 dark:border-slate-600 rounded-l-md hover:bg-slate-300 dark:hover:bg-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:z-10 transition-colors" 
+                                                    className="px-3 h-8 bg-slate-200 text-slate-700 font-bold border border-slate-300 rounded-l-md hover:bg-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:z-10 transition-colors" 
                                                     aria-label="Anzahl Personen verringern"
                                                 >−</button>
                                                 <input
@@ -138,27 +136,27 @@ const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, onClose, 
                                                     type="text"
                                                     value={persons}
                                                     readOnly
-                                                    className="w-10 h-8 text-center bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-t border-b border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:z-10"
+                                                    className="w-10 h-8 text-center bg-white border-t border-b border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:z-10"
                                                     aria-label="Anzahl Personen"
                                                 />
                                                 <button 
                                                     type="button" 
                                                     onClick={() => setPersons(p => p + 1)}
-                                                    className="px-3 h-8 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold border border-slate-300 dark:border-slate-600 rounded-r-md hover:bg-slate-300 dark:hover:bg-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:z-10" 
+                                                    className="px-3 h-8 bg-slate-200 text-slate-700 font-bold border border-slate-300 rounded-r-md hover:bg-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:z-10" 
                                                     aria-label="Anzahl Personen erhöhen"
                                                 >+</button>
                                             </div>
-                                            <span className="text-slate-600 dark:text-slate-400">Pers.</span>
+                                            <span className="text-slate-600">Pers.</span>
                                         </div>
                                     </div>
-                                    <ul className="space-y-2 list-disc list-inside text-slate-600 dark:text-slate-300">{(recipe.ingredients || []).map((ingredient, index) => {
+                                    <ul className="space-y-2 list-disc list-inside text-slate-600">{(recipe.ingredients || []).map((ingredient, index) => {
                                         const formatted = formatIngredient(ingredient, recipe.base_persons, persons);
                                         return formatted ? <li key={index}>{formatted}</li> : null;
                                     }).filter(Boolean)}</ul>
                                 </div>
                                 <div className="md:col-span-3">
-                                    <h4 className="text-lg font-semibold text-slate-700 dark:text-slate-200 border-b-2 border-slate-200 dark:border-slate-700 pb-2 mb-3">Anleitung:</h4>
-                                    <ol className="space-y-3 list-decimal list-inside text-slate-600 dark:text-slate-300">{(recipe.instructions || []).map((step, index) => <li key={index}>{step}</li>)}</ol>
+                                    <h4 className="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Anleitung:</h4>
+                                    <ol className="space-y-3 list-decimal list-inside text-slate-600">{(recipe.instructions || []).map((step, index) => <li key={index}>{step}</li>)}</ol>
                                 </div>
                             </div>
                         </div>

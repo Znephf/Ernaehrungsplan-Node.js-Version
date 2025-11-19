@@ -68,15 +68,15 @@ const MainContent: React.FC<MainContentProps> = (props) => {
             isLactoseFree={plan.settings.isLactoseFree}
           />
         ) : (
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-sm space-y-6 transition-colors duration-300 border border-slate-100 dark:border-slate-700">
+          <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
             <div className="text-center">
-                <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-100">Neuen Ernährungsplan erstellen</h2>
-                <p className="text-slate-500 dark:text-slate-400 mt-2 max-w-2xl mx-auto">
+                <h2 className="text-2xl font-bold text-slate-700">Neuen Ernährungsplan erstellen</h2>
+                <p className="text-slate-500 mt-2 max-w-2xl mx-auto">
                     Passe die Einstellungen an und lass die KI einen individuellen Plan für dich erstellen. 
-                    Alternativ kannst du einen bestehenden Plan aus deinem <button onClick={() => onSetView('archive')} className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline">Archiv laden</button>.
+                    Alternativ kannst du einen bestehenden Plan aus deinem <button onClick={() => onSetView('archive')} className="text-emerald-600 font-semibold hover:underline">Archiv laden</button>.
                 </p>
             </div>
-            <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+            <div className="border-t border-slate-200 pt-6">
                 <SettingsPanel settings={settings} onSettingsChange={onSettingsChange} onGeneratePlan={onGeneratePlan} isLoading={isLoading} allRecipes={allRecipes} />
             </div>
           </div>
@@ -112,15 +112,15 @@ const MainContent: React.FC<MainContentProps> = (props) => {
         />;
       default:
         return (
-             <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-sm space-y-6 transition-colors duration-300 border border-slate-100 dark:border-slate-700">
+             <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
                 <div className="text-center">
-                    <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-100">Neuen Ernährungsplan erstellen</h2>
-                    <p className="text-slate-500 dark:text-slate-400 mt-2 max-w-2xl mx-auto">
+                    <h2 className="text-2xl font-bold text-slate-700">Neuen Ernährungsplan erstellen</h2>
+                    <p className="text-slate-500 mt-2 max-w-2xl mx-auto">
                         Passe die Einstellungen an und lass die KI einen individuellen Plan für dich erstellen. 
-                        Alternativ kannst du einen bestehenden Plan aus deinem <button onClick={() => onSetView('archive')} className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline">Archiv laden</button>.
+                        Alternativ kannst du einen bestehenden Plan aus deinem <button onClick={() => onSetView('archive')} className="text-emerald-600 font-semibold hover:underline">Archiv laden</button>.
                     </p>
                 </div>
-                <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+                <div className="border-t border-slate-200 pt-6">
                     <SettingsPanel settings={settings} onSettingsChange={onSettingsChange} onGeneratePlan={onGeneratePlan} isLoading={isLoading} allRecipes={allRecipes} />
                 </div>
             </div>
