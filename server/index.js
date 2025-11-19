@@ -11,15 +11,15 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 
 // --- Starup-Diagnose ---
-console.log('--- Starte Server und prüfe Umgebungsvariablen ---');
+console.error('--- Starte Server und prüfe Umgebungsvariablen ---');
 const requiredVars = ['COOKIE_SECRET', 'APP_PASSWORD', 'DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
 requiredVars.forEach(v => {
-    console.log(`Wert für ${v}:`, process.env[v] ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
+    console.error(`Wert für ${v}:`, process.env[v] ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
 });
-console.log(`Wert für API_KEY:`, process.env.API_KEY ? '*** (gesetzt)' : 'Nicht gesetzt');
-console.log(`Wert für API_KEY_FALLBACK:`, process.env.API_KEY_FALLBACK ? '*** (gesetzt, Fallback-Schlüssel aktiv)' : 'Nicht gesetzt');
-console.log(`Wert für DB_PORT:`, process.env.DB_PORT ? process.env.DB_PORT : 'Nicht gesetzt, Standard: 3306');
-console.log('--- Diagnose Ende ---');
+console.error(`Wert für API_KEY:`, process.env.API_KEY ? '*** (gesetzt)' : 'Nicht gesetzt');
+console.error(`Wert für API_KEY_FALLBACK:`, process.env.API_KEY_FALLBACK ? '*** (gesetzt, Fallback-Schlüssel aktiv)' : 'Nicht gesetzt');
+console.error(`Wert für DB_PORT:`, process.env.DB_PORT ? process.env.DB_PORT : 'Nicht gesetzt, Standard: 3306');
+console.error('--- Diagnose Ende ---');
 
 // --- Überprüfung der Umgebungsvariablen ---
 const missingVars = requiredVars.filter(v => !process.env[v]);
@@ -37,18 +37,47 @@ if (!process.env.API_KEY && !process.env.API_KEY_FALLBACK) {
 // Erstelle notwendige öffentliche Verzeichnisse
 const appRoot = path.resolve(__dirname, '..');
 const publicSharesDir = path.resolve(appRoot, 'public', 'shares');
+const distSharesDir = path.resolve(appRoot, 'dist', 'shares'); // WICHTIG: Auch im dist-Ordner erstellen
 const publicImagesDir = path.resolve(appRoot, 'public', 'images', 'recipes');
 
-[publicSharesDir, publicImagesDir].forEach(dir => {
+[publicSharesDir, distSharesDir, publicImagesDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
         try {
             fs.mkdirSync(dir, { recursive: true });
-            console.log(`Verzeichnis erstellt unter: ${dir}`);
+            console.error(`Verzeichnis erstellt unter: ${dir}`);
         } catch (e) {
-            console.warn(`Konnte Verzeichnis ${dir} nicht erstellen:`, e.message);
+            console.error(`Konnte Verzeichnis ${dir} nicht erstellen:`, e.message);
         }
     }
 });
+
+// --- SYNC FUNKTION: Public -> Dist ---
+// Dies behebt das Problem, dass Nginx statische Dateien aus 'dist' serviert und 404s auf die React-App umleitet,
+// bevor Node.js die Chance hat, die Datei aus 'public' zu servieren.
+function syncSharesToDist() {
+    console.error('--- Starte Synchronisation von public/shares nach dist/shares ---');
+    try {
+        if (!fs.existsSync(publicSharesDir)) return;
+        if (!fs.existsSync(distSharesDir)) fs.mkdirSync(distSharesDir, { recursive: true });
+
+        const files = fs.readdirSync(publicSharesDir);
+        let count = 0;
+        files.forEach(file => {
+            if (file.endsWith('.html')) {
+                const src = path.join(publicSharesDir, file);
+                const dest = path.join(distSharesDir, file);
+                // Kopiere nur, wenn Ziel nicht existiert oder Quelle neuer ist
+                if (!fs.existsSync(dest) || fs.statSync(src).mtime > fs.statSync(dest).mtime) {
+                    fs.copyFileSync(src, dest);
+                    count++;
+                }
+            }
+        });
+        console.error(`Synchronisation abgeschlossen: ${count} Dateien kopiert/aktualisiert.`);
+    } catch (error) {
+        console.error('Fehler bei der Share-Synchronisation:', error);
+    }
+}
 
 
 // --- App-Setup ---
@@ -62,7 +91,7 @@ app.use(cookieParser(process.env.COOKIE_SECRET));
 app.use((req, res, next) => {
     // Logge nur Requests, die Shares betreffen, um die Konsole nicht zu fluten
     if (req.url.startsWith('/shares/')) {
-        console.log(`[REQUEST] ${req.method} ${req.url}`);
+        console.error(`[REQUEST] ${req.method} ${req.url}`);
     }
     next();
 });
@@ -70,47 +99,45 @@ app.use((req, res, next) => {
 // ======================================================
 // --- PRIORITY ROUTE: SHARES ---
 // ======================================================
-// Diese Route MUSS vor allen anderen kommen, um Interferenzen zu vermeiden.
+// Dient als Fallback, falls die Datei nicht statisch von Nginx ausgeliefert wurde
 app.get('/shares/:filename', (req, res) => {
     const filename = req.params.filename;
     
     // 1. Validierung
     if (filename.includes('..') || filename.includes('/') || !filename.endsWith('.html')) {
-        console.warn(`[Shares Blocked] Ungültiger Dateiname: ${filename}`);
+        console.error(`[Shares Blocked] Ungültiger Dateiname: ${filename}`);
         return res.status(400).send('Ungültiger Dateiname.');
     }
 
-    // 2. Pfad-Auflösung
-    // __dirname ist .../server/. Wir gehen hoch zu .../public/shares/
-    const sharesPath = path.resolve(__dirname, '../public/shares');
-    const filePath = path.join(sharesPath, filename);
+    // Wir prüfen primär public/shares als "Source of Truth"
+    const filePath = path.join(publicSharesDir, filename);
 
     // 3. Existenz-Prüfung
     if (fs.existsSync(filePath)) {
-        console.log(`[Shares Found] Sende Datei: ${filePath}`);
+        console.error(`[Shares Found via Node] Sende Datei: ${filePath}`);
         
-        // WICHTIG: Caching deaktivieren, damit Browser nicht alte Versionen (z.B. 404s oder Index-Seiten) cachen
+        // Caching deaktivieren
         res.setHeader('Content-Type', 'text/html; charset=UTF-8');
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
         
-        return res.sendFile(filePath, { root: '/' });
+        return res.sendFile(filePath);
     } else {
-        console.warn(`[Shares Missing] Datei existiert physisch nicht: ${filePath}`);
+        console.error(`[Shares Missing] Datei existiert physisch nicht in public/shares: ${filePath}`);
         
         // Debug-Informationen sammeln
         let folderContents = [];
         try {
-            if (fs.existsSync(sharesPath)) {
-                folderContents = fs.readdirSync(sharesPath);
+            if (fs.existsSync(publicSharesDir)) {
+                folderContents = fs.readdirSync(publicSharesDir);
             }
         } catch (e) { folderContents = [`Error reading dir: ${e.message}`]; }
 
         const debugInfo = {
             requested: filename,
             fullPath: filePath,
-            dirExists: fs.existsSync(sharesPath),
+            dirExists: fs.existsSync(publicSharesDir),
             filesInDir: folderContents
         };
 
@@ -150,21 +177,18 @@ app.use(express.static(path.resolve(__dirname, '../dist')));
 
 // --- Debug Endpunkt für Datei-Listing ---
 app.get('/api/debug-shares', requireAuth, (req, res) => {
-    const sharesPath = path.resolve(__dirname, '../public/shares');
+    const sharesPath = publicSharesDir;
+    const distPath = distSharesDir;
     try {
-        if (!fs.existsSync(sharesPath)) {
-            return res.json({ error: 'Shares directory does not exist', path: sharesPath });
-        }
-        const files = fs.readdirSync(sharesPath).map(file => {
-            const stat = fs.statSync(path.join(sharesPath, file));
-            return {
-                name: file,
-                size: stat.size,
-                created: stat.birthtime,
-                mode: stat.mode.toString(8) // Zeigt Berechtigungen oktal an
-            };
+        const publicFiles = fs.existsSync(sharesPath) ? fs.readdirSync(sharesPath) : ['DIR MISSING'];
+        const distFiles = fs.existsSync(distPath) ? fs.readdirSync(distPath) : ['DIR MISSING'];
+        
+        res.json({ 
+            publicPath: sharesPath, 
+            publicFiles,
+            distPath: distPath,
+            distFiles
         });
-        res.json({ path: sharesPath, files });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -182,10 +206,12 @@ app.get('*', (req, res) => {
 
 // --- Server starten ---
 async function startServer() {
+    syncSharesToDist(); // Shares vor dem DB-Start synchronisieren
     await initializeDatabase();
     const server = app.listen(port, () => {
-        console.log(`Server läuft auf Port ${port}`);
-        console.log(`Shares Verzeichnis: ${publicSharesDir}`);
+        console.error(`Server läuft auf Port ${port}`);
+        console.error(`Shares Verzeichnis (Public): ${publicSharesDir}`);
+        console.error(`Shares Verzeichnis (Dist): ${distSharesDir}`);
     });
     server.setTimeout(600000); 
 }

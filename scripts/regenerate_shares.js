@@ -41,14 +41,23 @@ async function regenerateAllShareableHtmls() {
         let regeneratedCount = 0;
         let errorCount = 0;
         
-        // Define output path: explicitly public/shares
-        const publicSharesDir = path.join(__dirname, '../public/shares');
+        // Define output paths
+        const appRoot = path.resolve(__dirname, '..');
+        const publicSharesDir = path.join(appRoot, 'public', 'shares');
+        const distSharesDir = path.join(appRoot, 'dist', 'shares');
 
-        console.log(`Target Directory: ${publicSharesDir}`);
+        console.log(`Target Directory (Public): ${publicSharesDir}`);
+        console.log(`Target Directory (Dist): ${distSharesDir}`);
 
-        // Ensure directory exists
+        // Ensure directories exist
         try {
             await fs.mkdir(publicSharesDir, { recursive: true });
+            
+            // Only create dist/shares if dist exists (indicating a built app)
+            const distExists = await fs.stat(path.join(appRoot, 'dist')).then(() => true).catch(() => false);
+            if (distExists) {
+                 await fs.mkdir(distSharesDir, { recursive: true });
+            }
         } catch (e) {
             console.warn("Could not create directory (might exist):", e.message);
         }
@@ -59,9 +68,17 @@ async function regenerateAllShareableHtmls() {
                 
                 const htmlContent = await generateShareableHtml(plan);
                 const fileName = `${plan.shareId}.html`;
-                const filePath = path.join(publicSharesDir, fileName);
+                const publicFilePath = path.join(publicSharesDir, fileName);
 
-                await fs.writeFile(filePath, htmlContent);
+                // Write to Public
+                await fs.writeFile(publicFilePath, htmlContent);
+                
+                // Check and Write to Dist if applicable
+                const distExists = await fs.stat(path.join(appRoot, 'dist')).then(() => true).catch(() => false);
+                if (distExists) {
+                    const distFilePath = path.join(distSharesDir, fileName);
+                    await fs.writeFile(distFilePath, htmlContent);
+                }
                 
                 console.log(`     ... Success: ${fileName} has been regenerated.`);
                 regeneratedCount++;

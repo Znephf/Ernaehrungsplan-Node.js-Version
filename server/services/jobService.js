@@ -237,7 +237,7 @@ async function saveCustomPlanToDatabase({ name, persons, mealsByDay }) {
 
 
 async function processShareJob(jobId) {
-    console.log(`[Share Job] Verarbeitung für Job ${jobId} gestartet.`);
+    console.error(`[Share Job] Verarbeitung für Job ${jobId} gestartet.`);
     try {
         await pool.query('UPDATE app_jobs SET status = ?, progressText = ? WHERE jobId = ?', ['processing', 'Lade Plandaten...', jobId]);
         
@@ -253,29 +253,36 @@ async function processShareJob(jobId) {
         const htmlContent = await generateShareableHtml({ name: plan.name });
         const fileName = `${shareId}.html`;
         
-        // Nutze absolute Pfade relativ zur Datei jobService.js (server/services/...)
-        const publicSharesDir = path.resolve(__dirname, '../../public/shares');
+        // --- Pfade definieren ---
+        const appRoot = path.resolve(__dirname, '../../');
+        const publicSharesDir = path.resolve(appRoot, 'public', 'shares');
+        const distSharesDir = path.resolve(appRoot, 'dist', 'shares');
 
-        console.log(`[Share Job] Schreibe Datei nach: ${publicSharesDir}`);
-        console.log(`[Share Job] Dateiname: ${fileName}`);
+        console.error(`[Share Job] Speicherort Public: ${publicSharesDir}`);
+        console.error(`[Share Job] Speicherort Dist: ${distSharesDir}`);
         
         try {
-            // Stelle sicher, dass der Ordner existiert
+            // 1. Stelle sicher, dass die Ordner existieren
             await fs.mkdir(publicSharesDir, { recursive: true });
-            const filePath = path.join(publicSharesDir, fileName);
             
-            // 1. Schreibe die Datei
-            await fs.writeFile(filePath, htmlContent, { encoding: 'utf8', mode: 0o644 });
+            const publicFilePath = path.join(publicSharesDir, fileName);
             
-            // 2. Explizit Berechtigungen setzen (für den Fall, dass writeFile mode ignoriert wird)
-            try {
-                await fs.chmod(filePath, 0o644);
-                console.log(`[Share Job] Berechtigungen auf 644 gesetzt für: ${filePath}`);
-            } catch (permErr) {
-                console.warn(`[Share Job] Warnung: Konnte Berechtigungen nicht setzen: ${permErr.message}`);
+            // 2. Schreibe die Datei in den PUBLIC Ordner (Quelle der Wahrheit)
+            await fs.writeFile(publicFilePath, htmlContent, { encoding: 'utf8', mode: 0o644 });
+            await fs.chmod(publicFilePath, 0o644);
+            
+            // 3. Kopiere auch in den DIST Ordner, falls dieser existiert (für sofortige Verfügbarkeit via Nginx)
+            // Wir prüfen nur, ob 'dist' existiert. 'dist/shares' erstellen wir bei Bedarf.
+            const distDirExists = await fs.stat(path.resolve(appRoot, 'dist')).then(() => true).catch(() => false);
+            if (distDirExists) {
+                 await fs.mkdir(distSharesDir, { recursive: true });
+                 const distFilePath = path.join(distSharesDir, fileName);
+                 await fs.copyFile(publicFilePath, distFilePath);
+                 await fs.chmod(distFilePath, 0o644);
+                 console.error(`[Share Job] Kopie in Dist erstellt: ${distFilePath}`);
             }
             
-            console.log(`[Share Job] Datei erfolgreich gespeichert: ${filePath}`);
+            console.error(`[Share Job] Datei erfolgreich gespeichert: ${publicFilePath}`);
         } catch (e) {
             console.error(`[Share Job] FATAL: Konnte Datei nicht speichern: ${e.message}`);
             throw new Error(`Dateisystem-Fehler: ${e.message}`);
@@ -285,7 +292,7 @@ async function processShareJob(jobId) {
         
         const result = { shareUrl: `/shares/${fileName}` };
         await pool.query('UPDATE app_jobs SET status = ?, progressText = ?, resultJson = ? WHERE jobId = ?', ['complete', 'Fertig!', JSON.stringify(result), jobId]);
-        console.log(`[Share Job] Job ${jobId} erfolgreich abgeschlossen. Link: ${result.shareUrl}`);
+        console.error(`[Share Job] Job ${jobId} erfolgreich abgeschlossen. Link: ${result.shareUrl}`);
 
     } catch (error) {
         console.error(`[Share Job] FEHLER bei der Verarbeitung von Job ${jobId}:`, error);
