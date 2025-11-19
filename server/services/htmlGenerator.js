@@ -178,7 +178,8 @@ async function generateShareableHtml(plan) {
                         // Serialize steps for cooking mode
                         const stepsJson = JSON.stringify(recipe.instructions || []);
 
-                        return '<div id="recipe-day-' + escape(dayPlan.day) + '-' + escape(meal.mealType) + '" class="bg-white rounded-lg shadow-lg overflow-hidden recipe-card" data-title="' + escape(recipe.title) + '" data-steps=\'' + stepsJson.replace(/'/g, "&apos;") + '\'>' +
+                        // Use double quotes for attribute to prevent syntax error in client JS string concatenation
+                        return '<div id="recipe-day-' + escape(dayPlan.day) + '-' + escape(meal.mealType) + '" class="bg-white rounded-lg shadow-lg overflow-hidden recipe-card" data-title="' + escape(recipe.title) + '" data-steps="' + stepsJson.replace(/"/g, "&quot;") + '">' +
                             imageUrlHtml +
                             '<div class="p-6">' +
                             '<div class="flex flex-wrap items-center justify-between gap-2">' +
