@@ -433,7 +433,7 @@ async function generateShareableHtml(plan) {
                     const response = await fetch('/api/public/plan/' + shareId);
                     if (!response.ok) {
                         const errText = await response.text().catch(() => '');
-                        throw new Error(`Serverfehler: ${response.status} ${response.statusText} (${errText})`);
+                        throw new Error(\`Serverfehler: \${response.status} \${response.statusText} (\${errText})\`);
                     }
                     const planData = await response.json();
                     console.log("Plan data loaded successfully:", planData);
