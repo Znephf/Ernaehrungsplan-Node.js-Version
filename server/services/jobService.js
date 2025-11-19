@@ -253,18 +253,19 @@ async function processShareJob(jobId) {
         
         const fileName = `${shareId}.html`;
         
-        // FIX: Use process.cwd() to reliably find the public directory relative to the app root
-        const publicSharesDir = path.join(process.cwd(), 'public', 'shares');
-        const filePath = path.join(publicSharesDir, fileName);
+        // FIX: Use absolute path relative to this file to find dist/shares
+        // This ensures we target the correct build output directory even in production
+        const sharesDir = path.join(__dirname, '../../dist/shares');
+        const filePath = path.join(sharesDir, fileName);
         
         console.log(`[Share Job] Schreibe HTML-Datei nach: ${filePath}`);
         
-        // Ensure directory exists (redundant check but safe)
+        // Ensure directory exists
         try {
-            await fs.access(publicSharesDir);
+            await fs.access(sharesDir);
         } catch {
-            console.log(`[Share Job] Verzeichnis existiert nicht, erstelle: ${publicSharesDir}`);
-            await fs.mkdir(publicSharesDir, { recursive: true });
+            console.log(`[Share Job] Verzeichnis existiert nicht, erstelle: ${sharesDir}`);
+            await fs.mkdir(sharesDir, { recursive: true });
         }
 
         await fs.writeFile(filePath, htmlContent, 'utf8');

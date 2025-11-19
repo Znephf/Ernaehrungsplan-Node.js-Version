@@ -38,9 +38,10 @@ if (!process.env.API_KEY && !process.env.API_KEY_FALLBACK) {
 
 
 // Erstelle notwendige öffentliche Verzeichnisse
-const publicSharesDir = path.join(__dirname, '..', 'public', 'shares');
+// Nutze dist/shares für geteilte Pläne, da dies der produktive Pfad ist.
+const distSharesDir = path.join(__dirname, '..', 'dist', 'shares');
 const publicImagesDir = path.join(__dirname, '..', 'public', 'images', 'recipes');
-[publicSharesDir, publicImagesDir].forEach(dir => {
+[distSharesDir, publicImagesDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
         console.log(`Verzeichnis erstellt unter: ${dir}`);
