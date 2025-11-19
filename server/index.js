@@ -7,13 +7,11 @@ const fs = require('fs');
 const { initializeDatabase } = require('./services/database');
 
 // Lade Umgebungsvariablen IMMER aus der .env-Datei im Projekt-Stammverzeichnis.
-// Dies stellt das alte Verhalten wieder her und gewährleistet die Funktion auf dem Plesk-Server.
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 
 // --- Starup-Diagnose ---
 console.log('--- Starte Server und prüfe Umgebungsvariablen ---');
-// API_KEY ist nun optional und wird separat geprüft.
 const requiredVars = ['COOKIE_SECRET', 'APP_PASSWORD', 'DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
 requiredVars.forEach(v => {
     console.log(`Wert für ${v}:`, process.env[v] ? '*** (gesetzt)' : 'NICHT GEFUNDEN');
@@ -30,18 +28,16 @@ if (missingVars.length > 0) {
     process.exit(1);
 }
 
-// Spezifische Prüfung, ob mindestens ein API-Schlüssel vorhanden ist.
 if (!process.env.API_KEY && !process.env.API_KEY_FALLBACK) {
     console.error(`FATAL ERROR: Es muss mindestens eine API-Schlüssel-Umgebungsvariable (API_KEY oder API_KEY_FALLBACK) gesetzt sein. Die Anwendung wird beendet.`);
     process.exit(1);
 }
 
 
-// Erstelle notwendige öffentliche Verzeichnisse (sowohl Source als auch Build/Dist, falls vorhanden)
-// Wir nutzen hier path.resolve, um sicherzustellen, dass wir vom Root ausgehen.
+// Erstelle notwendige öffentliche Verzeichnisse
 const appRoot = path.resolve(__dirname, '..');
-const publicSharesDir = path.join(appRoot, 'public', 'shares');
-const publicImagesDir = path.join(appRoot, 'public', 'images', 'recipes');
+const publicSharesDir = path.resolve(appRoot, 'public', 'shares');
+const publicImagesDir = path.resolve(appRoot, 'public', 'images', 'recipes');
 
 [publicSharesDir, publicImagesDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
@@ -67,14 +63,14 @@ const authRoutes = require('./routes/auth');
 const archiveRoutes = require('./routes/archive');
 const generationRoutes = require('./routes/generation');
 const jobRoutes = require('./routes/jobs');
-const recipeRoutes = require('./routes/recipes'); // Import recipe routes
-const { requireAuth } = require('./routes/auth'); // Import middleware
+const recipeRoutes = require('./routes/recipes'); 
+const { requireAuth } = require('./routes/auth'); 
 
 app.use('/', authRoutes.unprotected);
 app.use('/api', requireAuth, archiveRoutes);
 app.use('/api', requireAuth, generationRoutes);
 app.use('/api/jobs', requireAuth, jobRoutes);
-app.use('/api/recipes', requireAuth, recipeRoutes); // Use recipe routes
+app.use('/api/recipes', requireAuth, recipeRoutes); 
 
 
 // ======================================================
@@ -82,48 +78,53 @@ app.use('/api/recipes', requireAuth, recipeRoutes); // Use recipe routes
 // ======================================================
 
 // MANUELLE ROUTE FÜR /shares/
-// Wir nutzen eine explizite Route anstelle von express.static, um sicherzustellen,
-// dass neu erstellte Dateien sofort gefunden werden und um Debugging-Logs zu erhalten.
 app.get('/shares/:filename', (req, res, next) => {
     const filename = req.params.filename;
     
-    // Sicherheitscheck: Keine Pfad-Manipulation zulassen
     if (filename.includes('..') || filename.includes('/') || !filename.endsWith('.html')) {
         return res.status(400).send('Ungültiger Dateiname.');
     }
 
-    const sharesPath = path.join(__dirname, '../public/shares');
+    // Resolve absolute path to ensure correct lookup
+    const sharesPath = path.resolve(__dirname, '../public/shares');
     const filePath = path.join(sharesPath, filename);
 
     console.log(`[Shares Debug] Anfrage für: ${filename}`);
-    console.log(`[Shares Debug] Suche in: ${filePath}`);
+    console.log(`[Shares Debug] Suche in (Absolut): ${filePath}`);
 
     if (fs.existsSync(filePath)) {
         console.log(`[Shares Debug] Datei gefunden. Sende...`);
-        // Verhindere Caching, damit Änderungen sofort sichtbar sind
+        res.setHeader('Content-Type', 'text/html; charset=UTF-8');
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
-        return res.sendFile(filePath);
+        return res.sendFile(filePath, { root: '/' }); // explicit root for absolute paths
     } else {
-        console.log(`[Shares Debug] Datei NICHT gefunden.`);
-        // Weiter zum nächsten Handler (React Catch-all oder 404)
+        console.log(`[Shares Debug] Datei NICHT gefunden unter: ${filePath}`);
+        
+        // DEBUG: Log directory contents to verify what IS there
+        try {
+            const files = fs.readdirSync(sharesPath);
+            console.log(`[Shares Debug] Inhalt von ${sharesPath}:`, files.join(', '));
+        } catch (e) {
+            console.error(`[Shares Debug] Konnte Verzeichnis nicht lesen: ${e.message}`);
+        }
+        
         next();
     }
 });
 
 
 // 2. Bilder bereitstellen
-app.use('/images', express.static(path.join(__dirname, '../public/images')));
+app.use('/images', express.static(path.resolve(__dirname, '../public/images')));
 
-// 3. Allgemeine statische Dateien (für Production Build)
-app.use(express.static(path.join(__dirname, '../public')));
-app.use(express.static(path.join(__dirname, '../dist')));
+// 3. Allgemeine statische Dateien
+app.use(express.static(path.resolve(__dirname, '../public')));
+app.use(express.static(path.resolve(__dirname, '../dist')));
 
 // Alle übrigen Anfragen an die React-App weiterleiten (SPA Catch-all)
 app.get('*', (req, res) => {
-    // Versuche zuerst index.html aus dist, dann fallback
-    const distIndex = path.join(__dirname, '../dist/index.html');
+    const distIndex = path.resolve(__dirname, '../dist/index.html');
     if (fs.existsSync(distIndex)) {
         res.sendFile(distIndex);
     } else {
@@ -137,7 +138,6 @@ async function startServer() {
     const server = app.listen(port, () => {
         console.log(`Server läuft auf Port ${port}`);
     });
-    // Erhöhtes Timeout für langlaufende Anfragen (z.B. Plan-Generierung)
     server.setTimeout(600000); 
 }
 

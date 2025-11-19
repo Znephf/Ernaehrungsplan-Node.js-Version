@@ -253,9 +253,8 @@ async function processShareJob(jobId) {
         const htmlContent = await generateShareableHtml({ name: plan.name });
         const fileName = `${shareId}.html`;
         
-        // FIX: Use absolute path to public/shares regardless of execution context
-        // __dirname is 'server/services', so we go up two levels to root, then to public/shares
-        const publicSharesDir = path.join(__dirname, '../../public/shares');
+        // FIX: Use absolute resolution for the public/shares directory
+        const publicSharesDir = path.resolve(__dirname, '../../public/shares');
 
         console.log(`[Share Job] Schreibe Datei nach: ${publicSharesDir}`);
         console.log(`[Share Job] Dateiname: ${fileName}`);
@@ -263,7 +262,10 @@ async function processShareJob(jobId) {
         try {
             await fs.mkdir(publicSharesDir, { recursive: true });
             const filePath = path.join(publicSharesDir, fileName);
-            await fs.writeFile(filePath, htmlContent, 'utf8');
+            
+            // FIX: Add file permissions (mode) to ensure readability by web server
+            await fs.writeFile(filePath, htmlContent, { encoding: 'utf8', mode: 0o644 });
+            
             console.log(`[Share Job] Datei erfolgreich gespeichert: ${filePath}`);
         } catch (e) {
             console.error(`[Share Job] FATAL: Konnte Datei nicht speichern: ${e.message}`);
