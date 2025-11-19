@@ -253,18 +253,27 @@ async function processShareJob(jobId) {
         const htmlContent = await generateShareableHtml({ name: plan.name });
         const fileName = `${shareId}.html`;
         
-        // FIX: Use absolute resolution for the public/shares directory
+        // Nutze absolute Pfade relativ zur Datei jobService.js (server/services/...)
         const publicSharesDir = path.resolve(__dirname, '../../public/shares');
 
         console.log(`[Share Job] Schreibe Datei nach: ${publicSharesDir}`);
         console.log(`[Share Job] Dateiname: ${fileName}`);
         
         try {
+            // Stelle sicher, dass der Ordner existiert
             await fs.mkdir(publicSharesDir, { recursive: true });
             const filePath = path.join(publicSharesDir, fileName);
             
-            // FIX: Add file permissions (mode) to ensure readability by web server
+            // 1. Schreibe die Datei
             await fs.writeFile(filePath, htmlContent, { encoding: 'utf8', mode: 0o644 });
+            
+            // 2. Explizit Berechtigungen setzen (für den Fall, dass writeFile mode ignoriert wird)
+            try {
+                await fs.chmod(filePath, 0o644);
+                console.log(`[Share Job] Berechtigungen auf 644 gesetzt für: ${filePath}`);
+            } catch (permErr) {
+                console.warn(`[Share Job] Warnung: Konnte Berechtigungen nicht setzen: ${permErr.message}`);
+            }
             
             console.log(`[Share Job] Datei erfolgreich gespeichert: ${filePath}`);
         } catch (e) {

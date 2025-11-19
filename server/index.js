@@ -58,7 +58,75 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
-// --- Routen-Setup ---
+// --- Logging Middleware für Debugging ---
+app.use((req, res, next) => {
+    // Logge nur Requests, die Shares betreffen, um die Konsole nicht zu fluten
+    if (req.url.startsWith('/shares/')) {
+        console.log(`[REQUEST] ${req.method} ${req.url}`);
+    }
+    next();
+});
+
+// ======================================================
+// --- PRIORITY ROUTE: SHARES ---
+// ======================================================
+// Diese Route MUSS vor allen anderen kommen, um Interferenzen zu vermeiden.
+app.get('/shares/:filename', (req, res) => {
+    const filename = req.params.filename;
+    
+    // 1. Validierung
+    if (filename.includes('..') || filename.includes('/') || !filename.endsWith('.html')) {
+        console.warn(`[Shares Blocked] Ungültiger Dateiname: ${filename}`);
+        return res.status(400).send('Ungültiger Dateiname.');
+    }
+
+    // 2. Pfad-Auflösung
+    // __dirname ist .../server/. Wir gehen hoch zu .../public/shares/
+    const sharesPath = path.resolve(__dirname, '../public/shares');
+    const filePath = path.join(sharesPath, filename);
+
+    // 3. Existenz-Prüfung
+    if (fs.existsSync(filePath)) {
+        console.log(`[Shares Found] Sende Datei: ${filePath}`);
+        
+        // WICHTIG: Caching deaktivieren, damit Browser nicht alte Versionen (z.B. 404s oder Index-Seiten) cachen
+        res.setHeader('Content-Type', 'text/html; charset=UTF-8');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        
+        return res.sendFile(filePath, { root: '/' });
+    } else {
+        console.warn(`[Shares Missing] Datei existiert physisch nicht: ${filePath}`);
+        
+        // Debug-Informationen sammeln
+        let folderContents = [];
+        try {
+            if (fs.existsSync(sharesPath)) {
+                folderContents = fs.readdirSync(sharesPath);
+            }
+        } catch (e) { folderContents = [`Error reading dir: ${e.message}`]; }
+
+        const debugInfo = {
+            requested: filename,
+            fullPath: filePath,
+            dirExists: fs.existsSync(sharesPath),
+            filesInDir: folderContents
+        };
+
+        return res.status(404).send(`
+            <html><body style="font-family:monospace; padding:20px; color:#881337; background:#fff1f2;">
+            <h1>404 - Plan nicht gefunden</h1>
+            <p>Der Server konnte die Datei <strong>${filename}</strong> nicht finden.</p>
+            <hr>
+            <h3>Server Debug Info:</h3>
+            <pre>${JSON.stringify(debugInfo, null, 2)}</pre>
+            </body></html>
+        `);
+    }
+});
+
+// --- Weitere API Routen ---
 const authRoutes = require('./routes/auth');
 const archiveRoutes = require('./routes/archive');
 const generationRoutes = require('./routes/generation');
@@ -73,122 +141,34 @@ app.use('/api/jobs', requireAuth, jobRoutes);
 app.use('/api/recipes', requireAuth, recipeRoutes); 
 
 
-// ======================================================
-// --- BEREITSTELLUNG STATISCHER DATEIEN ---
-// ======================================================
-
-// MANUELLE ROUTE FÜR /shares/ MIT DEBUGGING
-app.get('/shares/:filename', (req, res, next) => {
-    const filename = req.params.filename;
-    
-    // Sicherheitscheck
-    if (filename.includes('..') || filename.includes('/') || !filename.endsWith('.html')) {
-        return res.status(400).send('Ungültiger Dateiname.');
-    }
-
-    // Pfade auflösen
-    // __dirname ist normalerweise .../server/
-    // Wir wollen .../public/shares/
-    const sharesPath = path.resolve(__dirname, '../public/shares');
-    const filePath = path.join(sharesPath, filename);
-
-    console.log(`[Shares Request] ${filename}`);
-
-    // Sammle Debug-Daten (wird im Fehlerfall ausgegeben)
-    const debugInfo = {
-        requestedFilename: filename,
-        serverDirname: __dirname,
-        resolvedSharesPath: sharesPath,
-        resolvedFilePath: filePath,
-        processCwd: process.cwd(),
-        fileExists: false,
-        folderContents: [],
-        stat: null
-    };
-
-    // Prüfe Existenz
-    if (fs.existsSync(filePath)) {
-        debugInfo.fileExists = true;
-        try {
-            const stat = fs.statSync(filePath);
-            debugInfo.stat = {
-                size: stat.size,
-                mode: stat.mode,
-                isFile: stat.isFile(),
-                uid: stat.uid,
-                gid: stat.gid
-            };
-
-            console.log(`[Shares Success] Sende Datei: ${filePath}`);
-            res.setHeader('Content-Type', 'text/html; charset=UTF-8');
-            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-            res.setHeader('Pragma', 'no-cache');
-            res.setHeader('Expires', '0');
-            
-            // Explizit root setzen für absolute Pfade
-            return res.sendFile(filePath, { root: '/' }); 
-        } catch (err) {
-             console.error(`[Shares Error] Zugriff verweigert oder Fehler beim Lesen:`, err);
-             return res.status(500).send(`Serverfehler beim Zugriff auf Datei: ${err.message}`);
-        }
-    } else {
-        // DATEI NICHT GEFUNDEN - DEBUG MODUS
-        console.warn(`[Shares Missing] Datei nicht gefunden: ${filePath}`);
-        
-        try {
-            if (fs.existsSync(sharesPath)) {
-                debugInfo.folderContents = fs.readdirSync(sharesPath);
-            } else {
-                debugInfo.folderError = "Ordner 'public/shares' existiert an diesem Pfad nicht.";
-            }
-        } catch (e) {
-            debugInfo.folderReadError = e.message;
-        }
-
-        // Wir senden KEIN next(), damit nicht die React-App geladen wird.
-        // Stattdessen senden wir eine HTML-Seite mit den Debug-Infos für den Browser.
-        const debugJson = JSON.stringify(debugInfo, null, 2);
-        const htmlResponse = `
-<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Debug: Datei nicht gefunden</title>
-    <style>
-        body { font-family: monospace; background-color: #fff1f2; color: #881337; padding: 2rem; }
-        h1 { color: #9f1239; }
-        pre { background: white; padding: 1rem; border: 1px solid #fecdd3; border-radius: 0.5rem; overflow-x: auto; }
-        .info { margin-bottom: 2rem; line-height: 1.5; }
-    </style>
-</head>
-<body>
-    <h1>404 - Datei nicht gefunden (Debug Modus)</h1>
-    <div class="info">
-        <p>Der Server konnte die angeforderte Share-Datei nicht finden.</p>
-        <p>Bitte prüfen Sie die Konsole (F12), dort wurden die Debug-Informationen ebenfalls ausgegeben.</p>
-    </div>
-    <h2>Server Diagnose:</h2>
-    <pre>${debugJson}</pre>
-    <script>
-        console.warn("SERVER DEBUG INFO:", ${debugJson});
-        console.log("Ordner-Inhalt:", ${JSON.stringify(debugInfo.folderContents)});
-    </script>
-</body>
-</html>
-        `;
-        
-        return res.status(404).send(htmlResponse);
-    }
-});
-
-
 // 2. Bilder bereitstellen
 app.use('/images', express.static(path.resolve(__dirname, '../public/images')));
 
-// 3. Allgemeine statische Dateien
+// 3. Allgemeine statische Dateien (für CSS, JS, etc.)
 app.use(express.static(path.resolve(__dirname, '../public')));
 app.use(express.static(path.resolve(__dirname, '../dist')));
+
+// --- Debug Endpunkt für Datei-Listing ---
+app.get('/api/debug-shares', requireAuth, (req, res) => {
+    const sharesPath = path.resolve(__dirname, '../public/shares');
+    try {
+        if (!fs.existsSync(sharesPath)) {
+            return res.json({ error: 'Shares directory does not exist', path: sharesPath });
+        }
+        const files = fs.readdirSync(sharesPath).map(file => {
+            const stat = fs.statSync(path.join(sharesPath, file));
+            return {
+                name: file,
+                size: stat.size,
+                created: stat.birthtime,
+                mode: stat.mode.toString(8) // Zeigt Berechtigungen oktal an
+            };
+        });
+        res.json({ path: sharesPath, files });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // Alle übrigen Anfragen an die React-App weiterleiten (SPA Catch-all)
 app.get('*', (req, res) => {
@@ -205,6 +185,7 @@ async function startServer() {
     await initializeDatabase();
     const server = app.listen(port, () => {
         console.log(`Server läuft auf Port ${port}`);
+        console.log(`Shares Verzeichnis: ${publicSharesDir}`);
     });
     server.setTimeout(600000); 
 }

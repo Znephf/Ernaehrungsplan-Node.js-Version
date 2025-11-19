@@ -13,7 +13,7 @@ export default defineConfig({
       '/login': 'http://localhost:3001',
       '/logout': 'http://localhost:3001',
       // WICHTIG: Leitet Anfragen für geteilte Pläne direkt an den Express-Server weiter
-      //'/shares': 'http://localhost:3001',
+      '/shares': 'http://localhost:3001',
     },
   },
 })
