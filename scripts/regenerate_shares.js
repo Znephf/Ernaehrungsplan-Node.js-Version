@@ -74,7 +74,7 @@ async function regenerateAllShareableHtmls() {
     } finally {
         if (pool) {
             await pool.end();
-            console.log('Database connection closed.');
+            console.log('Database connection closed!');
         }
     }
 }
