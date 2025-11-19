@@ -444,7 +444,7 @@ async function generateShareableHtml(plan) {
             </button>
         </div>
         <div id="cooking-steps-container" class="flex-grow overflow-hidden bg-slate-50 relative">
-            <!-- Steps injected here -->
+            <!-- Steps injected here! -->
         </div>
         <div class="p-4 border-t bg-white flex justify-between items-center gap-4 z-10 shrink-0">
             <button id="prev-step" class="px-6 py-3 bg-slate-200 text-slate-700 rounded-lg font-bold disabled:opacity-50">Zurück</button>
