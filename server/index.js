@@ -38,18 +38,18 @@ if (!process.env.API_KEY && !process.env.API_KEY_FALLBACK) {
 
 
 // Erstelle notwendige öffentliche Verzeichnisse (sowohl Source als auch Build/Dist, falls vorhanden)
+// Wir nutzen hier path.resolve, um sicherzustellen, dass wir vom Root ausgehen.
 const appRoot = path.resolve(__dirname, '..');
 const publicSharesDir = path.join(appRoot, 'public', 'shares');
-const distSharesDir = path.join(appRoot, 'dist', 'shares');
 const publicImagesDir = path.join(appRoot, 'public', 'images', 'recipes');
 
-[publicSharesDir, distSharesDir, publicImagesDir].forEach(dir => {
+[publicSharesDir, publicImagesDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
         try {
             fs.mkdirSync(dir, { recursive: true });
             console.log(`Verzeichnis erstellt unter: ${dir}`);
         } catch (e) {
-            console.warn(`Konnte Verzeichnis ${dir} nicht erstellen (evtl. existiert 'dist' noch nicht):`, e.message);
+            console.warn(`Konnte Verzeichnis ${dir} nicht erstellen:`, e.message);
         }
     }
 });
@@ -81,23 +81,23 @@ app.use('/api/recipes', requireAuth, recipeRoutes); // Use recipe routes
 // --- BEREITSTELLUNG STATISCHER DATEIEN ---
 // ======================================================
 
-// 1. Priorität: Geteilte Pläne explizit behandeln.
-// Wir prüfen sowohl public/shares als auch dist/shares.
-// Dies verhindert, dass der React-Router diese Anfragen abfängt.
-app.use('/shares', express.static(path.join(__dirname, '..', 'public', 'shares')));
-app.use('/shares', express.static(path.join(__dirname, '..', 'dist', 'shares')));
+// 1. Priorität: Geteilte Pläne explizit aus public/shares behandeln.
+// Wir nutzen einen absoluten Pfad basierend auf __dirname, um sicherzugehen.
+const sharesPath = path.join(__dirname, '../public/shares');
+console.log(`Serving /shares from: ${sharesPath}`);
+app.use('/shares', express.static(sharesPath));
 
 // 2. Bilder bereitstellen
-app.use('/images', express.static(path.join(__dirname, '..', 'public', 'images')));
+app.use('/images', express.static(path.join(__dirname, '../public/images')));
 
-// 3. Allgemeine statische Dateien (React App Assets)
-app.use(express.static(path.join(__dirname, '..', 'public')));
-app.use(express.static(path.join(__dirname, '..', 'dist')));
+// 3. Allgemeine statische Dateien (für Production Build)
+app.use(express.static(path.join(__dirname, '../public')));
+app.use(express.static(path.join(__dirname, '../dist')));
 
 // Alle übrigen Anfragen an die React-App weiterleiten (SPA Catch-all)
 app.get('*', (req, res) => {
     // Versuche zuerst index.html aus dist, dann fallback
-    const distIndex = path.join(__dirname, '..', 'dist', 'index.html');
+    const distIndex = path.join(__dirname, '../dist/index.html');
     if (fs.existsSync(distIndex)) {
         res.sendFile(distIndex);
     } else {

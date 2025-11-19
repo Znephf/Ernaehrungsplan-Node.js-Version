@@ -253,26 +253,22 @@ async function processShareJob(jobId) {
         const htmlContent = await generateShareableHtml({ name: plan.name });
         const fileName = `${shareId}.html`;
         
-        // Robust path resolution: write to BOTH public and dist to handle all serving scenarios
-        const appRoot = path.resolve(__dirname, '../..');
-        const publicSharesDir = path.join(appRoot, 'public', 'shares');
-        const distSharesDir = path.join(appRoot, 'dist', 'shares');
+        // FIX: Use absolute path to public/shares regardless of execution context
+        // __dirname is 'server/services', so we go up two levels to root, then to public/shares
+        const publicSharesDir = path.join(__dirname, '../../public/shares');
 
-        console.log(`[Share Job] Generiere Datei: ${fileName}`);
+        console.log(`[Share Job] Ziel-Verzeichnis: ${publicSharesDir}`);
         
-        const writePromises = [publicSharesDir, distSharesDir].map(async (dir) => {
-            try {
-                await fs.mkdir(dir, { recursive: true });
-                await fs.writeFile(path.join(dir, fileName), htmlContent, 'utf8');
-                console.log(`[Share Job] Datei gespeichert in: ${dir}`);
-            } catch (e) {
-                console.warn(`[Share Job] Konnte Datei nicht in ${dir} speichern: ${e.message}`);
-                // We don't throw here, we try to save to as many locations as possible
-            }
-        });
+        try {
+            await fs.mkdir(publicSharesDir, { recursive: true });
+            const filePath = path.join(publicSharesDir, fileName);
+            await fs.writeFile(filePath, htmlContent, 'utf8');
+            console.log(`[Share Job] Datei erfolgreich gespeichert: ${filePath}`);
+        } catch (e) {
+            console.error(`[Share Job] FATAL: Konnte Datei nicht speichern: ${e.message}`);
+            throw new Error(`Dateisystem-Fehler: ${e.message}`);
+        }
 
-        await Promise.all(writePromises);
-        
         await pool.query('UPDATE plans SET shareId = ? WHERE id = ?', [shareId, plan.id]);
         
         const result = { shareUrl: `/shares/${fileName}` };

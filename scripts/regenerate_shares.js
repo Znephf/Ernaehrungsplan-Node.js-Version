@@ -41,11 +41,17 @@ async function regenerateAllShareableHtmls() {
         let regeneratedCount = 0;
         let errorCount = 0;
         
-        // Define output paths
-        const appRoot = path.resolve(__dirname, '..');
-        const publicSharesDir = path.join(appRoot, 'public', 'shares');
-        const distSharesDir = path.join(appRoot, 'dist', 'shares');
-        const pathsToWrite = [publicSharesDir, distSharesDir];
+        // Define output path: explicitly public/shares
+        const publicSharesDir = path.join(__dirname, '../public/shares');
+
+        console.log(`Target Directory: ${publicSharesDir}`);
+
+        // Ensure directory exists
+        try {
+            await fs.mkdir(publicSharesDir, { recursive: true });
+        } catch (e) {
+            console.warn("Could not create directory (might exist):", e.message);
+        }
 
         for (const plan of plansToUpdate) {
             try {
@@ -53,16 +59,9 @@ async function regenerateAllShareableHtmls() {
                 
                 const htmlContent = await generateShareableHtml(plan);
                 const fileName = `${plan.shareId}.html`;
+                const filePath = path.join(publicSharesDir, fileName);
 
-                await Promise.all(pathsToWrite.map(async (dir) => {
-                    try {
-                        await fs.mkdir(dir, { recursive: true });
-                        const filePath = path.join(dir, fileName);
-                        await fs.writeFile(filePath, htmlContent);
-                    } catch (e) {
-                        // Ignore individual write errors (e.g. if dist doesn't exist in dev environment)
-                    }
-                }));
+                await fs.writeFile(filePath, htmlContent);
                 
                 console.log(`     ... Success: ${fileName} has been regenerated.`);
                 regeneratedCount++;
