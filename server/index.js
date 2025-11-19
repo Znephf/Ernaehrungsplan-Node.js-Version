@@ -60,79 +60,76 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 // ======================================================
-// --- PRIORITY ROUTE: SHARES (MUST BE FIRST) ---
+// --- PRIORITY MIDDLEWARE: SHARES (STRICT ROUTING) ---
 // ======================================================
-app.get('/shares/:filename', (req, res) => {
-    const filename = req.params.filename;
+// Wir nutzen app.use('/shares') anstelle von app.get, um sicherzustellen,
+// dass ALLES was mit /shares beginnt, hier abgehandelt wird.
+// Wenn die Datei nicht existiert, senden wir hier einen 404 und lassen die Anfrage
+// NIEMALS durchrutschen (kein next()), damit nicht versehentlich die React-App geladen wird.
+app.use('/shares', (req, res) => {
+    // req.path ist hier relativ zu /shares. Z.B. bei Anfrage "/shares/abc.html" ist req.path "/abc.html"
+    const rawFilename = req.path.startsWith('/') ? req.path.slice(1) : req.path;
+    const filename = decodeURIComponent(rawFilename); // Sicherheit gegen URL-Encoding Probleme
+
+    console.log(`[Shares Router] Zugriff auf: ${filename}`);
+
+    // 1. Sicherheits-Checks
+    if (!filename || filename === '' || filename === '/') {
+        return res.status(404).send('Directory listing forbidden.');
+    }
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+        console.warn(`[Shares Router] Illegal path traversal attempt: ${filename}`);
+        return res.status(400).send('Invalid filename.');
+    }
     
-    // Validierung: Erlaubt nur normale Dateinamen mit .html Endung
-    if (filename.includes('..') || filename.includes('/') || !filename.endsWith('.html')) {
-        console.warn(`[Shares] Ungültiger Zugriff versucht: ${filename}`);
-        return res.status(400).send('Ungültiger Dateiname.');
+    // 2. Typ-Validierung (Nur HTML erlaubt)
+    if (!filename.endsWith('.html')) {
+        console.warn(`[Shares Router] Blocked non-html access: ${filename}`);
+        return res.status(404).send('Only .html files are supported in this directory.');
     }
 
-    // 1. Suche in public/shares (Primary)
+    // 3. Pfade prüfen
     const publicPath = path.join(publicSharesDir, filename);
-    
-    // Check for file existence
-    if (fs.existsSync(publicPath)) {
-        // Aggressive no-cache headers for share files
+    const distPath = path.join(distSharesDir, filename);
+
+    const serveFile = (filePath) => {
+        // Aggressive No-Cache Header, damit Updates sofort sichtbar sind
         res.setHeader('Content-Type', 'text/html; charset=UTF-8');
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
         
-        return res.sendFile(publicPath, (err) => {
+        res.sendFile(filePath, (err) => {
             if (err) {
-                console.error(`[Shares] Error sending file ${publicPath}:`, err);
-                if (!res.headersSent) {
-                    res.status(500).send('Error serving share file.');
-                }
+                console.error(`[Shares Router] Send error for ${filePath}:`, err);
+                if (!res.headersSent) res.status(500).send('Server Error during file delivery.');
             }
         });
-    }
-
-    // 2. Suche in dist/shares (Secondary/Fallback)
-    const distPath = path.join(distSharesDir, filename);
-    if (fs.existsSync(distPath)) {
-        res.setHeader('Content-Type', 'text/html; charset=UTF-8');
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        return res.sendFile(distPath, (err) => {
-            if (err) {
-                console.error(`[Shares] Error sending file ${distPath}:`, err);
-                if (!res.headersSent) {
-                    res.status(500).send('Error serving share file.');
-                }
-            }
-        });
-    }
-
-    // 3. Nicht gefunden -> Detaillierte Fehlerseite (kein React-Fallback!)
-    console.error(`[Shares] Datei NICHT gefunden: ${filename}`);
-    
-    let dirContentPublic = [];
-    try { dirContentPublic = fs.readdirSync(publicSharesDir); } catch(e) { dirContentPublic = [`Error: ${e.message}`]; }
-    
-    const debugInfo = {
-        requestedFile: filename,
-        searchedPublic: publicPath,
-        existsPublic: false,
-        searchedDist: distPath,
-        existsDist: false,
-        filesInPublic: dirContentPublic
     };
 
+    if (fs.existsSync(publicPath)) {
+        return serveFile(publicPath);
+    }
+
+    if (fs.existsSync(distPath)) {
+        return serveFile(distPath);
+    }
+
+    // 4. Datei nicht gefunden -> Explizite 404 HTML Seite senden.
+    // WICHTIG: Wir rufen NICHT next() auf, damit Express nicht versucht, andere Routen zu matchen.
+    console.error(`[Shares Router] 404 Not Found: ${filename}`);
     return res.status(404).send(`
         <html>
-        <head><title>404 - Plan nicht gefunden</title></head>
-        <body style="font-family:monospace; padding:20px; background:#fef2f2; color:#991b1b;">
-            <h1>404 - Datei nicht gefunden</h1>
-            <p>Der Server konnte die Datei <strong>${filename}</strong> nicht finden.</p>
-            <div style="background:white; padding:15px; border:1px solid #fca5a5; border-radius:5px;">
-                <h3>Server Debug Info:</h3>
-                <pre>${JSON.stringify(debugInfo, null, 2)}</pre>
+        <head>
+            <title>Plan nicht gefunden</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: system-ui, sans-serif; padding: 2rem; text-align: center; color: #334155; background-color: #f1f5f9;">
+            <div style="max-width: 500px; margin: 0 auto; background: white; padding: 2rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+                <h1 style="color: #dc2626; margin-bottom: 1rem;">404 - Plan nicht gefunden</h1>
+                <p style="margin-bottom: 1.5rem;">Die angeforderte Datei <strong>${filename}</strong> existiert nicht auf diesem Server.</p>
+                <p style="font-size: 0.875rem; color: #64748b;">Möglicherweise ist der Link veraltet oder wurde falsch kopiert.</p>
+                <a href="/" style="display: inline-block; margin-top: 1.5rem; padding: 0.75rem 1.5rem; background-color: #059669; color: white; text-decoration: none; border-radius: 0.5rem; font-weight: bold;">Zur Startseite</a>
             </div>
         </body>
         </html>
@@ -160,8 +157,6 @@ app.use('/api/recipes', requireAuth, recipeRoutes);
 
 
 // --- Statische Dateien ---
-// WICHTIG: Statische Dateien kommen NACH der expliziten /shares/ Route, 
-// damit express.static nicht versehentlich eine falsche Datei ausliefert oder 404s verschluckt.
 app.use('/images', express.static(path.resolve(__dirname, '../public/images')));
 app.use(express.static(path.resolve(__dirname, '../public')));
 app.use(express.static(path.resolve(__dirname, '../dist')));
