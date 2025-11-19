@@ -50,8 +50,8 @@ async function regenerateAllShareableHtmls() {
                 const htmlContent = await generateShareableHtml(plan);
 
                 const fileName = `${plan.shareId}.html`;
-                // Target dist/shares to ensure files are accessible in production
-                const filePath = path.join(__dirname, '../dist/shares', fileName);
+                // Revert: Target public/shares
+                const filePath = path.join(__dirname, '../public/shares', fileName);
                 
                 // Ensure dir exists before writing
                 await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -59,7 +59,7 @@ async function regenerateAllShareableHtmls() {
                 // Overwrite the old static file with the new dynamic one.
                 await fs.writeFile(filePath, htmlContent);
                 
-                console.log(`     ... Success: ${fileName} has been updated to the new dynamic format in /dist/shares.`);
+                console.log(`     ... Success: ${fileName} has been updated to the new dynamic format in /public/shares.`);
                 regeneratedCount++;
 
             } catch (err) {

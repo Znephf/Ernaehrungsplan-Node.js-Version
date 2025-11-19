@@ -1,3 +1,4 @@
+
 const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
@@ -253,9 +254,8 @@ async function processShareJob(jobId) {
         
         const fileName = `${shareId}.html`;
         
-        // FIX: Use absolute path relative to this file to find dist/shares
-        // This ensures we target the correct build output directory even in production
-        const sharesDir = path.join(__dirname, '../../dist/shares');
+        // Revert: Save to public/shares using absolute path
+        const sharesDir = path.join(__dirname, '../../public/shares');
         const filePath = path.join(sharesDir, fileName);
         
         console.log(`[Share Job] Schreibe HTML-Datei nach: ${filePath}`);
