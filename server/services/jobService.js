@@ -257,7 +257,8 @@ async function processShareJob(jobId) {
         // __dirname is 'server/services', so we go up two levels to root, then to public/shares
         const publicSharesDir = path.join(__dirname, '../../public/shares');
 
-        console.log(`[Share Job] Ziel-Verzeichnis: ${publicSharesDir}`);
+        console.log(`[Share Job] Schreibe Datei nach: ${publicSharesDir}`);
+        console.log(`[Share Job] Dateiname: ${fileName}`);
         
         try {
             await fs.mkdir(publicSharesDir, { recursive: true });

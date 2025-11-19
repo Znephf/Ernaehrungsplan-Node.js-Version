@@ -81,11 +81,33 @@ app.use('/api/recipes', requireAuth, recipeRoutes); // Use recipe routes
 // --- BEREITSTELLUNG STATISCHER DATEIEN ---
 // ======================================================
 
-// 1. Priorität: Geteilte Pläne explizit aus public/shares behandeln.
-// Wir nutzen einen absoluten Pfad basierend auf __dirname, um sicherzugehen.
-const sharesPath = path.join(__dirname, '../public/shares');
-console.log(`Serving /shares from: ${sharesPath}`);
-app.use('/shares', express.static(sharesPath));
+// MANUELLE ROUTE FÜR /shares/
+// Wir nutzen eine explizite Route anstelle von express.static, um sicherzustellen,
+// dass neu erstellte Dateien sofort gefunden werden und um Debugging-Logs zu erhalten.
+app.get('/shares/:filename', (req, res, next) => {
+    const filename = req.params.filename;
+    
+    // Sicherheitscheck: Keine Pfad-Manipulation zulassen
+    if (filename.includes('..') || filename.includes('/') || !filename.endsWith('.html')) {
+        return res.status(400).send('Ungültiger Dateiname.');
+    }
+
+    const sharesPath = path.join(__dirname, '../public/shares');
+    const filePath = path.join(sharesPath, filename);
+
+    console.log(`[Shares Debug] Anfrage für: ${filename}`);
+    console.log(`[Shares Debug] Suche in: ${filePath}`);
+
+    if (fs.existsSync(filePath)) {
+        console.log(`[Shares Debug] Datei gefunden. Sende...`);
+        return res.sendFile(filePath);
+    } else {
+        console.log(`[Shares Debug] Datei NICHT gefunden.`);
+        // Weiter zum nächsten Handler (React Catch-all oder 404)
+        next();
+    }
+});
+
 
 // 2. Bilder bereitstellen
 app.use('/images', express.static(path.join(__dirname, '../public/images')));
