@@ -1,5 +1,6 @@
+
 import React, { useState, useMemo, DragEvent, useEffect } from 'react';
-import type { Recipe, Diet, DietType, DishComplexity, MealCategory } from '../types';
+import type { Recipe, Diet, DietType, DishComplexity, MealCategory, PlannerState, PlannerSlot } from '../types';
 import { MealCategoryLabels, MEAL_ORDER } from '../types';
 import * as apiService from '../services/apiService';
 import { LoadingSpinnerIcon, CloseIcon, PlusIcon } from './IconComponents';
@@ -26,6 +27,8 @@ interface PlannerComponentProps {
   loadingImages: Set<number>;
   imageErrors: { [id: number]: string | null };
   generateImage: (recipe: Recipe) => Promise<void>;
+  plannerState: PlannerState;
+  setPlannerState: React.Dispatch<React.SetStateAction<PlannerState>>;
 }
 
 const dietPreferenceLabels: Record<Diet, string> = { omnivore: 'Alles', vegetarian: 'Vegetarisch', vegan: 'Vegan' };
@@ -37,9 +40,7 @@ const FilterToggleButton: React.FC<{ label: string; isSelected: boolean; onClick
 
 const WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 
-type WeeklySlots = { [day: string]: { recipe: Recipe; mealType: MealCategory; uniqueId: string }[] };
-
-const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageUrls, loadingImages, imageErrors, generateImage }) => {
+const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageUrls, loadingImages, imageErrors, generateImage, plannerState, setPlannerState }) => {
     const isDesktop = useMediaQuery('(min-width: 1024px)');
     const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
     
@@ -49,6 +50,21 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
             .catch(err => console.error("Could not fetch recipes for planner:", err));
     }, []);
     
+    const { weeklySlots, planName, persons } = plannerState;
+    
+    // Helper functions to update planner state
+    const setWeeklySlots = (valueOrUpdater: any) => {
+        setPlannerState(prev => {
+            const newSlots = typeof valueOrUpdater === 'function' 
+                ? valueOrUpdater(prev.weeklySlots)
+                : valueOrUpdater;
+            return { ...prev, weeklySlots: newSlots };
+        });
+    };
+    
+    const setPlanName = (name: string) => setPlannerState(prev => ({ ...prev, planName: name }));
+    const setPersons = (p: number) => setPlannerState(prev => ({ ...prev, persons: p }));
+
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedMealCategories, setSelectedMealCategories] = useState<Set<MealCategory>>(new Set());
     const [selectedPreferences, setSelectedPreferences] = useState<Set<Diet>>(new Set());
@@ -57,9 +73,6 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
     const [filterGlutenFree, setFilterGlutenFree] = useState(false);
     const [filterLactoseFree, setFilterLactoseFree] = useState(false);
 
-    const [weeklySlots, setWeeklySlots] = useState<WeeklySlots>(WEEKDAYS.reduce((acc, day) => ({ ...acc, [day]: [] }), {}));
-    const [planName, setPlanName] = useState('');
-    const [persons, setPersons] = useState(2);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     
@@ -84,11 +97,13 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
                 return; // User cancelled
             }
             // Remove recipes from weeklySlots
-            const newWeeklySlots = { ...weeklySlots };
-            for (const day in newWeeklySlots) {
-                newWeeklySlots[day] = newWeeklySlots[day].filter(slot => slot.mealType !== mealType);
-            }
-            setWeeklySlots(newWeeklySlots);
+            setWeeklySlots((prev: { [day: string]: PlannerSlot[] }) => {
+                const newWeeklySlots = { ...prev };
+                 for (const day in newWeeklySlots) {
+                    newWeeklySlots[day] = newWeeklySlots[day].filter(slot => slot.mealType !== mealType);
+                }
+                return newWeeklySlots;
+            });
             newVisibleMeals.delete(mealType);
         }
         setVisibleMeals(newVisibleMeals);
@@ -138,7 +153,7 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
     };
     
     const removeRecipeFromSlot = (day: string, uniqueId: string) => {
-        setWeeklySlots(prev => ({
+        setWeeklySlots((prev: { [day: string]: PlannerSlot[] }) => ({
             ...prev,
             [day]: prev[day].filter(slot => slot.uniqueId !== uniqueId)
         }));
@@ -154,7 +169,7 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
             const recipe = JSON.parse(recipeData) as Recipe;
             // Nur droppen, wenn die Kategorie passt
             if (recipe.category === mealType) {
-                 setWeeklySlots(prev => ({
+                 setWeeklySlots((prev: { [day: string]: PlannerSlot[] }) => ({
                     ...prev,
                     [day]: [...prev[day], { recipe, mealType, uniqueId: `${day}-${Date.now()}` }]
                 }));
@@ -177,7 +192,7 @@ const PlannerComponent: React.FC<PlannerComponentProps> = ({ onPlanSaved, imageU
         if (modalDay && modalMealType) {
             // Ensure recipe category matches the slot's meal type before adding
             if (recipeToAdd.category === modalMealType) {
-                setWeeklySlots(prev => ({
+                setWeeklySlots((prev: { [day: string]: PlannerSlot[] }) => ({
                     ...prev,
                     [modalDay]: [...prev[modalDay], { recipe: recipeToAdd, mealType: modalMealType, uniqueId: `${modalDay}-${Date.now()}` }]
                 }));

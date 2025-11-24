@@ -1,7 +1,7 @@
 
 // Fix: Implemented the main App component to manage state, authentication, and orchestrate different views.
 import React, { useState, useEffect, useCallback } from 'react';
-import type { View, PlanSettings, ArchiveEntry, WeeklyPlan, Recipe, MealCategory } from './types';
+import type { View, PlanSettings, ArchiveEntry, WeeklyPlan, Recipe, MealCategory, PlannerState } from './types';
 import * as apiService from './services/apiService';
 
 import Header from './components/Header';
@@ -78,6 +78,15 @@ const App: React.FC = () => {
 
     const [isBulkImageGenerating, setIsBulkImageGenerating] = useState(false);
     const [bulkImageStatus, setBulkImageStatus] = useState('');
+
+    // Planner State (lifted up to persist between tab switches)
+    const [plannerState, setPlannerState] = useState<PlannerState>({
+        planName: '',
+        persons: 2,
+        weeklySlots: {
+            "Montag": [], "Dienstag": [], "Mittwoch": [], "Donnerstag": [], "Freitag": [], "Samstag": [], "Sonntag": []
+        }
+    });
 
     // --- Share Link Safety Check & Auto-Repair ---
     useEffect(() => {
@@ -202,6 +211,14 @@ const App: React.FC = () => {
     const handlePlanSaved = () => {
         fetchArchive();
         setCurrentView('archive');
+        // Reset planner state after successful save
+        setPlannerState({
+            planName: '',
+            persons: 2,
+            weeklySlots: {
+                "Montag": [], "Dienstag": [], "Mittwoch": [], "Donnerstag": [], "Freitag": [], "Samstag": [], "Sonntag": []
+            }
+        });
     };
 
     const handleDeletePlan = async (id: number) => {
@@ -340,6 +357,8 @@ const App: React.FC = () => {
                 isBulkImageGenerating={isBulkImageGenerating}
                 onGenerateAllImages={handleGenerateAllImages}
                 generateMissingImages={(weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void): Promise<{ [key: number]: { full: string; thumb: string; } }> => generateMissingImages(weeklyPlan, activePlan?.id || null, onProgress)}
+                plannerState={plannerState}
+                setPlannerState={setPlannerState}
             />
         </div>
     );

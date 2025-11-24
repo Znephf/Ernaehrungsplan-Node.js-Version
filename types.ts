@@ -112,3 +112,16 @@ export type PlanData = ArchiveEntry;
 
 // UI-related types
 export type View = 'plan' | 'shopping' | 'recipes' | 'archive' | 'planner' | 'recipe-archive';
+
+// Planner Types
+export interface PlannerSlot {
+    recipe: Recipe;
+    mealType: MealCategory;
+    uniqueId: string;
+}
+
+export interface PlannerState {
+    planName: string;
+    persons: number;
+    weeklySlots: { [day: string]: PlannerSlot[] };
+}

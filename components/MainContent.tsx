@@ -1,6 +1,7 @@
+
 // Fix: Implemented the MainContent component to act as a view router, displaying the correct component based on the current view state.
 import React from 'react';
-import type { View, PlanData, PlanSettings, Recipe, ShoppingList, WeeklyPlan, ArchiveEntry, MealCategory } from '../types';
+import type { View, PlanData, PlanSettings, Recipe, ShoppingList, WeeklyPlan, ArchiveEntry, MealCategory, PlannerState } from '../types';
 import WeeklyPlanComponent from './WeeklyPlan';
 import ShoppingListComponent from './ShoppingList';
 import RecipesComponent from './Recipes';
@@ -30,6 +31,8 @@ interface MainContentProps {
   generateMissingImages: (weeklyPlan: WeeklyPlan, planId: number | null, onProgress?: (status: string) => void) => Promise<{ [key: number]: { full: string; thumb: string; } }>;
   isBulkImageGenerating: boolean;
   onGenerateAllImages: () => void;
+  plannerState: PlannerState;
+  setPlannerState: React.Dispatch<React.SetStateAction<PlannerState>>;
 }
 
 const MainContent: React.FC<MainContentProps> = (props) => {
@@ -54,6 +57,8 @@ const MainContent: React.FC<MainContentProps> = (props) => {
     generateMissingImages,
     isBulkImageGenerating,
     onGenerateAllImages,
+    plannerState,
+    setPlannerState,
   } = props;
 
   const renderView = () => {
@@ -109,6 +114,8 @@ const MainContent: React.FC<MainContentProps> = (props) => {
             loadingImages={loadingImages}
             imageErrors={imageErrors}
             generateImage={generateImage}
+            plannerState={plannerState}
+            setPlannerState={setPlannerState}
         />;
       default:
         return (
