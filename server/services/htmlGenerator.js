@@ -7,12 +7,13 @@ const escapeHtml = (unsafe) => {
     return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/, "&quot;").replace(/'/g, "&#039;");
 };
 
-// SVG Icons as strings (Lucide based)
+// SVG Icons as Lucide data tags
+// These will be transformed by the Lucide script in the browser
 const Icons = {
-    fire: `<svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.2-2.2.5-3.3.3.9.4 1.5.5 1.8z"/></svg>`,
-    protein: `<svg class="h-6 w-6 text-emerald-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12.5" cy="8.5" r="2.5"/><path d="M12.5 2a6.5 6.5 0 0 0-6.22 4.6c-1.1 3.13-.78 6.64 3.18 9.77L4.5 21.39a1 1 0 0 0 1.52 1.29l4.99-6.03 5.02 6.04a1 1 0 0 0 1.52-1.29l-4.99-6.03c3.96-3.13 4.28-6.64 3.18-9.77A6.5 6.5 0 0 0 12.5 2Z"/></svg>`,
-    carbs: `<svg class="h-6 w-6 text-emerald-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 22 16 8"/><path d="M3.47 12.53 5 11l1.53 1.53a3.5 3.5 0 0 1 0 4.94L2 22l4.53-4.53a3.5 3.5 0 0 1 4.94 0L13 19l1.53-1.53"/><path d="M6 8 8 6"/><path d="M9.53 16 11 14.53"/><path d="M16 8V5a3 3 0 0 0-3-3h-3"/><path d="M22 2 8 16"/></svg>`,
-    fat: `<svg class="h-6 w-6 text-emerald-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>`,
+    fire: '<i data-lucide="flame" class="h-5 w-5 inline-block align-text-bottom"></i>',
+    protein: '<i data-lucide="beef" class="h-6 w-6 text-emerald-600 inline-block"></i>',
+    carbs: '<i data-lucide="wheat" class="h-6 w-6 text-emerald-600 inline-block"></i>',
+    fat: '<i data-lucide="droplet" class="h-6 w-6 text-emerald-600 inline-block"></i>',
 };
 
 async function generateShareableHtml(plan) {
@@ -25,12 +26,15 @@ async function generateShareableHtml(plan) {
     const buildClientScript = () => {
         return `
         document.addEventListener('DOMContentLoaded', () => {
+            // Initialize icons for static content immediately
+            if (window.lucide) window.lucide.createIcons();
+
             const MealCategoryLabels = { breakfast: 'Frühstück', lunch: 'Mittagessen', coffee: 'Kaffee & Kuchen', dinner: 'Abendessen', snack: 'Snack' };
             const Icons = {
-                fire: '<svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.2-2.2.5-3.3.3.9.4 1.5.5 1.8z"/></svg>',
-                protein: '<svg class="h-6 w-6 text-emerald-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12.5" cy="8.5" r="2.5"/><path d="M12.5 2a6.5 6.5 0 0 0-6.22 4.6c-1.1 3.13-.78 6.64 3.18 9.77L4.5 21.39a1 1 0 0 0 1.52 1.29l4.99-6.03 5.02 6.04a1 1 0 0 0 1.52-1.29l-4.99-6.03c3.96-3.13 4.28-6.64 3.18-9.77A6.5 6.5 0 0 0 12.5 2Z"/></svg>',
-                carbs: '<svg class="h-6 w-6 text-emerald-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 22 16 8"/><path d="M3.47 12.53 5 11l1.53 1.53a3.5 3.5 0 0 1 0 4.94L2 22l4.53-4.53a3.5 3.5 0 0 1 4.94 0L13 19l1.53-1.53"/><path d="M6 8 8 6"/><path d="M9.53 16 11 14.53"/><path d="M16 8V5a3 3 0 0 0-3-3h-3"/><path d="M22 2 8 16"/></svg>',
-                fat: '<svg class="h-6 w-6 text-emerald-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>',
+                fire: '<i data-lucide="flame" class="h-5 w-5 inline-block align-text-bottom"></i>',
+                protein: '<i data-lucide="beef" class="h-6 w-6 text-emerald-600 inline-block"></i>',
+                carbs: '<i data-lucide="wheat" class="h-6 w-6 text-emerald-600 inline-block"></i>',
+                fat: '<i data-lucide="droplet" class="h-6 w-6 text-emerald-600 inline-block"></i>',
             };
             const escape = (str) => String(str).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
             
@@ -140,7 +144,7 @@ async function generateShareableHtml(plan) {
                             '</div>' +
                             '<h3 class="text-2xl font-bold text-slate-800 mt-3">' + escape(recipe.title) + '</h3>' +
                             macrosHtml +
-                            '<div class="mt-6"><button class="start-cooking-btn w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded shadow-md flex items-center justify-center gap-2 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l1.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" /></svg> Koch-Modus starten</button></div>' +
+                            '<div class="mt-6"><button class="start-cooking-btn w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded shadow-md flex items-center justify-center gap-2 transition-colors"><i data-lucide="play" class="w-5 h-5"></i> Koch-Modus starten</button></div>' +
                             '<div class="mt-6 grid grid-cols-1 md:grid-cols-5 gap-x-8 gap-y-6">' +
                             '<div class="md:col-span-2"><h4 class="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Zutaten:</h4>' + ingredientsHtml + '</div>' +
                             '<div class="md:col-span-3 md:border-l md:border-slate-200 md:pl-8"><h4 class="text-lg font-semibold text-slate-700 border-b-2 border-slate-200 pb-2 mb-3">Anleitung:</h4>' + instructionsHtml + '</div>' +
@@ -243,7 +247,7 @@ async function generateShareableHtml(plan) {
                             if (time) {
                                 const timerBtn = document.createElement('button');
                                 timerBtn.className = 'mx-auto flex items-center gap-2 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-full font-bold text-lg shadow transition-colors';
-                                timerBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Timer: ' + time + ' Min';
+                                timerBtn.innerHTML = '<i data-lucide="timer" class="w-6 h-6"></i> Timer: ' + time + ' Min';
                                 timerBtn.onclick = () => startTimer(timerBtn, time);
                                 slide.appendChild(timerBtn);
                             }
@@ -252,6 +256,8 @@ async function generateShareableHtml(plan) {
                         });
 
                         overlay.classList.add('active');
+                        // Ensure icons inside cooking mode are rendered
+                        if (window.lucide) window.lucide.createIcons();
                         requestWakeLock();
                         showStep(0);
                     }
@@ -389,6 +395,10 @@ async function generateShareableHtml(plan) {
                     
                     document.getElementById('loading-state').style.display = 'none';
                     setupEventListeners();
+                    
+                    // Initialize Lucide icons for the dynamic content
+                    if (window.lucide) window.lucide.createIcons();
+                    
                 } catch (error) {
                     console.error('Failed to load plan:', error);
                     document.getElementById('loading-state').style.display = 'none';
@@ -404,7 +414,9 @@ async function generateShareableHtml(plan) {
     
     const clientScript = buildClientScript();
     
-    const shareIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>';
+    const shareIconTag = '<i data-lucide="share-2" class="w-5 h-5"></i>';
+    const backIconTag = '<i data-lucide="arrow-left" class="w-5 h-5"></i>';
+    const closeIconTag = '<i data-lucide="x" class="w-6 h-6"></i>';
 
     return `<!DOCTYPE html>
 <html lang="de" style="scroll-behavior: smooth;">
@@ -413,6 +425,7 @@ async function generateShareableHtml(plan) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${escapeHtml(planName)}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <script>
       // PROACTIVE SERVICE WORKER CLEANUP
       if ('serviceWorker' in navigator) {
@@ -445,7 +458,7 @@ async function generateShareableHtml(plan) {
             <div class="flex items-center gap-4 w-full sm:w-auto justify-center sm:justify-start">
                 <a href="${backLink}" class="flex items-center gap-2 text-slate-500 hover:text-emerald-600 transition-colors group" title="Zurück zum Planer">
                     <div class="p-2 bg-slate-100 rounded-full group-hover:bg-emerald-100 transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                        ${backIconTag}
                     </div>
                     <span class="font-medium text-sm sm:hidden md:inline">Planer</span>
                 </a>
@@ -457,7 +470,7 @@ async function generateShareableHtml(plan) {
                 <button data-view="recipes" class="nav-button px-3 py-2 text-sm font-medium rounded-md text-slate-600 hover:bg-slate-200 whitespace-nowrap">Rezepte</button>
                 <div class="w-px h-6 bg-slate-300 mx-1"></div>
                 <button id="share-btn" class="px-3 py-2 text-sm font-medium rounded-md text-emerald-700 hover:bg-slate-200 flex items-center gap-1 whitespace-nowrap" title="Diesen Plan teilen">
-                    ${shareIconSvg}
+                    ${shareIconTag}
                     <span class="hidden sm:inline">Teilen</span>
                 </button>
             </div>
@@ -484,7 +497,7 @@ async function generateShareableHtml(plan) {
         <div class="p-4 border-b flex justify-between items-center bg-white shadow-sm z-10 shrink-0">
             <span id="cooking-title" class="font-bold text-lg truncate mr-2"></span>
             <button id="close-cooking" class="p-2 rounded-full hover:bg-slate-100 text-slate-500">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                ${closeIconTag}
             </button>
         </div>
         <div id="cooking-steps-container" class="flex-grow overflow-hidden bg-slate-50 relative">
