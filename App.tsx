@@ -197,16 +197,44 @@ const App: React.FC = () => {
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const shareIdParam = params.get('shareId');
-        if (isLoggedIn && archive.length > 0 && shareIdParam) {
-            const plan = archive.find(p => p.shareId === shareIdParam);
-            if (plan) {
-                console.log("Deep linking to plan:", plan.name);
-                handleLoadPlan(plan.id, true);
-                // Clean up the URL
+        
+        if (isLoggedIn && shareIdParam) {
+            // First check if it's in local archive
+            const localPlan = archive.find(p => p.shareId === shareIdParam);
+            if (localPlan) {
+                console.log("Deep linking to local plan:", localPlan.name);
+                handleLoadPlan(localPlan.id, true);
                 window.history.replaceState({}, document.title, window.location.pathname);
+            } else {
+                 // If not in local archive, try fetching from public API
+                 console.log("Deep linking to remote plan:", shareIdParam);
+                 apiService.getPublicPlan(shareIdParam)
+                    .then(planData => {
+                        // Construct a temporary ArchiveEntry from response
+                        // The API returns almost matching structure
+                        const fullPlan = { ...planData, shareId: shareIdParam };
+                        
+                        resetImageState();
+                        setActivePlan(fullPlan);
+                        setSettings(fullPlan.settings);
+                        
+                        const loadedImageUrls: { [id: number]: { full: string; thumb: string; } } = {};
+                        fullPlan.recipes.forEach((recipe: Recipe) => {
+                            if (recipe.image_url && recipe.thumbnail_url) {
+                                loadedImageUrls[recipe.id] = { full: recipe.image_url, thumb: recipe.thumbnail_url };
+                            }
+                        });
+                        setImageUrlsFromArchive(loadedImageUrls);
+                        setCurrentView('plan');
+                        // Clean URL
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    })
+                    .catch(err => {
+                        console.error("Could not load shared plan via deep link:", err);
+                    });
             }
         }
-    }, [isLoggedIn, archive, handleLoadPlan]);
+    }, [isLoggedIn, archive, handleLoadPlan, resetImageState, setImageUrlsFromArchive]);
 
     const handlePlanSaved = () => {
         fetchArchive();

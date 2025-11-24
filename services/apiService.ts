@@ -1,3 +1,4 @@
+
 // Fix: Implemented the apiService module to handle all frontend-backend communication.
 import type { PlanSettings, ArchiveEntry, Recipe, WeeklyPlan } from '../types';
 
@@ -122,5 +123,10 @@ export const startShareJob = async (planId: number): Promise<{ jobId: string }> 
 // Fix: Converted to async/await to fix type inference issues.
 export const getShareJobStatus = async (jobId: string): Promise<{ status: string; progressText?: string; resultJson?: { shareUrl: string }; errorMessage?: string }> => {
     const response = await fetch(`/api/jobs/${jobId}`);
+    return handleResponse(response);
+};
+
+export const getPublicPlan = async (shareId: string): Promise<ArchiveEntry> => {
+    const response = await fetch(`/api/public/plan/${shareId}`);
     return handleResponse(response);
 };

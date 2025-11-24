@@ -308,9 +308,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, allRecipes, onS
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Tägliche Routinen (Optional)</label>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-2">Hier können Sie angeben, ob Sie jeden Tag das gleiche Frühstück, den gleichen Snack etc. essen möchten. Wählen Sie ein bestehendes Rezept aus oder beschreiben Sie es für die KI.</p>
               <div className="space-y-4">
-                  {showBreakfastOption && <RoutineMealSettings mealType="breakfast" label="das gleiche Frühstück" settings={settings} allRecipes={allRecipes} onChange={handleChange} onSettingsChange={onSettingsChange} onOpenSelector={openRecipeSelector} />}
-                  {showSnackOption && <RoutineMealSettings mealType="snack" label="den gleichen Snack" settings={settings} allRecipes={allRecipes} onChange={handleChange} onSettingsChange={onSettingsChange} onOpenSelector={openRecipeSelector} />}
-                  {showCoffeeOption && <RoutineMealSettings mealType="coffee" label="den gleichen Kaffee & Kuchen" settings={settings} allRecipes={allRecipes} onChange={handleChange} onSettingsChange={onSettingsChange} onOpenSelector={openRecipeSelector} />}
+                  {showBreakfastOption && <RoutineMealSettings key="breakfast" mealType="breakfast" label="das gleiche Frühstück" settings={settings} allRecipes={allRecipes} onChange={handleChange} onSettingsChange={onSettingsChange} onOpenSelector={openRecipeSelector} />}
+                  {showSnackOption && <RoutineMealSettings key="snack" mealType="snack" label="den gleichen Snack" settings={settings} allRecipes={allRecipes} onChange={handleChange} onSettingsChange={onSettingsChange} onOpenSelector={openRecipeSelector} />}
+                  {showCoffeeOption && <RoutineMealSettings key="coffee" mealType="coffee" label="den gleichen Kaffee & Kuchen" settings={settings} allRecipes={allRecipes} onChange={handleChange} onSettingsChange={onSettingsChange} onOpenSelector={openRecipeSelector} />}
               </div>
           </div>
       )}
