@@ -270,7 +270,7 @@ async function generateShareableHtml(plan) {
 
             function setupEventListeners() {
                 const views = { plan: document.getElementById('view-plan'), shopping: document.getElementById('view-shopping'), recipes: document.getElementById('view-recipes') };
-                const buttons = document.querySelectorAll('.nav-button');
+                const buttons = document.querySelectorAll('.nav-button[data-view]');
                 buttons.forEach(button => {
                     button.addEventListener('click', () => {
                         const viewName = button.getAttribute('data-view');
@@ -281,6 +281,26 @@ async function generateShareableHtml(plan) {
                         window.scrollTo(0,0);
                     });
                 });
+                
+                const shareBtn = document.getElementById('share-btn');
+                if (shareBtn) {
+                    shareBtn.addEventListener('click', async () => {
+                        if (navigator.share) {
+                            navigator.share({
+                                title: document.title,
+                                url: window.location.href
+                            }).catch(console.error);
+                        } else {
+                            try {
+                                await navigator.clipboard.writeText(window.location.href);
+                                alert('Link in die Zwischenablage kopiert!');
+                            } catch (err) {
+                                console.error('Fehler beim Kopieren:', err);
+                                alert('Konnte Link nicht kopieren.');
+                            }
+                        }
+                    });
+                }
                 
                 const path = window.location.pathname;
                 const shareId = path.substring(path.lastIndexOf('/') + 1).replace('.html', '').split('?')[0];
@@ -375,6 +395,8 @@ async function generateShareableHtml(plan) {
     };
     
     const clientScript = buildClientScript();
+    
+    const shareIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" /></svg>';
 
     return `<!DOCTYPE html>
 <html lang="de" style="scroll-behavior: smooth;">
@@ -421,11 +443,16 @@ async function generateShareableHtml(plan) {
                 </a>
                 <h1 class="text-2xl font-bold text-slate-800">KI Ernährungsplaner</h1>
             </div>
-            <nav class="flex items-center justify-center gap-2 sm:gap-4 p-1 bg-slate-100 rounded-lg">
-                <button data-view="plan" class="nav-button active px-4 py-2 text-sm sm:text-base font-medium rounded-md text-slate-600 hover:bg-slate-200">Wochenplan</button>
-                <button data-view="shopping" class="nav-button px-4 py-2 text-sm sm:text-base font-medium rounded-md text-slate-600 hover:bg-slate-200">Einkaufsliste</button>
-                <button data-view="recipes" class="nav-button px-4 py-2 text-sm sm:text-base font-medium rounded-md text-slate-600 hover:bg-slate-200">Rezepte</button>
-            </nav>
+            <div class="flex items-center justify-center gap-2 p-1 bg-slate-100 rounded-lg overflow-x-auto max-w-full">
+                <button data-view="plan" class="nav-button active px-3 py-2 text-sm font-medium rounded-md text-slate-600 hover:bg-slate-200 whitespace-nowrap">Wochenplan</button>
+                <button data-view="shopping" class="nav-button px-3 py-2 text-sm font-medium rounded-md text-slate-600 hover:bg-slate-200 whitespace-nowrap">Einkaufsliste</button>
+                <button data-view="recipes" class="nav-button px-3 py-2 text-sm font-medium rounded-md text-slate-600 hover:bg-slate-200 whitespace-nowrap">Rezepte</button>
+                <div class="w-px h-6 bg-slate-300 mx-1"></div>
+                <button id="share-btn" class="px-3 py-2 text-sm font-medium rounded-md text-emerald-700 hover:bg-slate-200 flex items-center gap-1 whitespace-nowrap" title="Diesen Plan teilen">
+                    ${shareIconSvg}
+                    <span class="hidden sm:inline">Teilen</span>
+                </button>
+            </div>
         </div>
     </header>
     <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
