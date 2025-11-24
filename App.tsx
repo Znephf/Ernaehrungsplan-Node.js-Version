@@ -1,3 +1,4 @@
+
 // Fix: Implemented the main App component to manage state, authentication, and orchestrate different views.
 import React, { useState, useEffect, useCallback } from 'react';
 import type { View, PlanSettings, ArchiveEntry, WeeklyPlan, Recipe, MealCategory } from './types';
@@ -156,11 +157,13 @@ const App: React.FC = () => {
     };
 
     // This handler handles LOADING an EXISTING plan from the archive
-    const handleLoadPlan = useCallback((id: number) => {
+    // NEU: Added skipRedirect to bypass static page redirect for deep linking
+    const handleLoadPlan = useCallback((id: number, skipRedirect = false) => {
         const planToLoad = loadPlanFromArchive(id);
         if (planToLoad) {
-            // NEU: Wenn der Plan bereits geteilt wurde (shareId existiert), öffne direkt die statische Ansicht.
-            if (planToLoad.shareId) {
+            // Wenn der Plan bereits geteilt wurde (shareId existiert), öffne direkt die statische Ansicht.
+            // Es sei denn, wir kommen gerade von dort (skipRedirect).
+            if (planToLoad.shareId && !skipRedirect) {
                 window.location.href = `/shares/${planToLoad.shareId}.html`;
                 return;
             }
@@ -181,6 +184,21 @@ const App: React.FC = () => {
         }
     }, [loadPlanFromArchive, resetImageState, setImageUrlsFromArchive]);
     
+    // Deep Linking: Handle ?shareId=XYZ in URL to load specific plan
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const shareIdParam = params.get('shareId');
+        if (isLoggedIn && archive.length > 0 && shareIdParam) {
+            const plan = archive.find(p => p.shareId === shareIdParam);
+            if (plan) {
+                console.log("Deep linking to plan:", plan.name);
+                handleLoadPlan(plan.id, true);
+                // Clean up the URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
+    }, [isLoggedIn, archive, handleLoadPlan]);
+
     const handlePlanSaved = () => {
         fetchArchive();
         setCurrentView('archive');

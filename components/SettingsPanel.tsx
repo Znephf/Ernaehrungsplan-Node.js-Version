@@ -80,6 +80,55 @@ const RecipeSelectorModal: React.FC<RecipeSelectorModalProps> = ({ isOpen, onClo
 };
 
 
+// Fix: Moved RoutineMealSettings outside of SettingsPanel to prevent re-creation on every render, which caused focus loss.
+interface RoutineMealSettingsProps {
+    mealType: MealCategory;
+    label: string;
+    settings: PlanSettings;
+    allRecipes: Recipe[];
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+    onSettingsChange: (settings: PlanSettings) => void;
+    onOpenSelector: (mealType: MealCategory) => void;
+}
+
+const RoutineMealSettings: React.FC<RoutineMealSettingsProps> = ({ mealType, label, settings, allRecipes, onChange, onSettingsChange, onOpenSelector }) => {
+    const useSameKey = `useSame${mealType.charAt(0).toUpperCase() + mealType.slice(1)}` as keyof PlanSettings;
+    const customTextKey = `custom${mealType.charAt(0).toUpperCase() + mealType.slice(1)}Text` as keyof PlanSettings;
+    const selectedIdKey = `selected${mealType.charAt(0).toUpperCase() + mealType.slice(1)}RecipeId` as keyof PlanSettings;
+    
+    const selectedRecipe = allRecipes.find(r => r.id === settings[selectedIdKey]);
+    const inputStyles = "mt-1 block w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-white rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm placeholder-slate-400 dark:placeholder-slate-500";
+
+
+    return (
+        <div className="bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-700 p-4 rounded-lg">
+            <label htmlFor={String(useSameKey)} className="flex items-center space-x-2 cursor-pointer font-medium text-slate-700 dark:text-slate-200">
+                <input type="checkbox" name={String(useSameKey)} id={String(useSameKey)} checked={!!settings[useSameKey]} onChange={onChange} className="h-4 w-4 rounded text-emerald-600 focus:ring-emerald-500 border-gray-300 dark:border-slate-600 dark:bg-slate-700" />
+                <span>Jeden Tag {label}</span>
+            </label>
+            {settings[useSameKey] && (
+                <div className="mt-3 space-y-3">
+                    {selectedRecipe ? (
+                        <div className="bg-emerald-50 dark:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800 p-2 rounded-md">
+                           <p className="text-xs text-emerald-800 dark:text-emerald-300">Ausgewähltes Rezept:</p>
+                           <p className="font-semibold text-emerald-900 dark:text-emerald-200">{selectedRecipe.title}</p>
+                           <button type="button" onClick={() => onSettingsChange({ ...settings, [selectedIdKey]: null })} className="text-xs text-red-600 dark:text-red-400 hover:underline mt-1">Auswahl aufheben</button>
+                        </div>
+                    ) : (
+                        <div>
+                            <label htmlFor={String(customTextKey)} className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Beschreiben Sie Ihr(en) {label}:</label>
+                            <textarea name={String(customTextKey)} id={String(customTextKey)} value={settings[customTextKey] as string || ''} onChange={onChange} rows={2} placeholder={`z.B. Protein-Shake mit Haferflocken...`} className={inputStyles}></textarea>
+                        </div>
+                    )}
+                    <div className="text-center text-sm text-slate-500 dark:text-slate-400">oder</div>
+                    <button type="button" onClick={() => onOpenSelector(mealType)} className="w-full px-4 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold rounded-lg shadow-sm hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors">Rezept aus Archiv auswählen</button>
+                </div>
+            )}
+        </div>
+    );
+};
+
+
 interface SettingsPanelProps {
   settings: PlanSettings;
   allRecipes: Recipe[];
@@ -155,40 +204,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, allRecipes, onS
   const inputStyles = "mt-1 block w-full bg-white dark:bg-slate-700 text-slate-900 dark:text-white rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm placeholder-slate-400 dark:placeholder-slate-500";
   const stepButtonStyles = "px-4 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold border border-slate-300 dark:border-slate-600 hover:bg-slate-300 dark:hover:bg-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:z-10 transition-colors";
 
-  const RoutineMealSettings: React.FC<{ mealType: MealCategory, label: string }> = ({ mealType, label }) => {
-    const useSameKey = `useSame${mealType.charAt(0).toUpperCase() + mealType.slice(1)}` as keyof PlanSettings;
-    const customTextKey = `custom${mealType.charAt(0).toUpperCase() + mealType.slice(1)}Text` as keyof PlanSettings;
-    const selectedIdKey = `selected${mealType.charAt(0).toUpperCase() + mealType.slice(1)}RecipeId` as keyof PlanSettings;
-    
-    const selectedRecipe = allRecipes.find(r => r.id === settings[selectedIdKey]);
-
-    return (
-        <div className="bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-700 p-4 rounded-lg">
-            <label htmlFor={String(useSameKey)} className="flex items-center space-x-2 cursor-pointer font-medium text-slate-700 dark:text-slate-200">
-                <input type="checkbox" name={String(useSameKey)} id={String(useSameKey)} checked={!!settings[useSameKey]} onChange={handleChange} className="h-4 w-4 rounded text-emerald-600 focus:ring-emerald-500 border-gray-300 dark:border-slate-600 dark:bg-slate-700" />
-                <span>Jeden Tag {label}</span>
-            </label>
-            {settings[useSameKey] && (
-                <div className="mt-3 space-y-3">
-                    {selectedRecipe ? (
-                        <div className="bg-emerald-50 dark:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800 p-2 rounded-md">
-                           <p className="text-xs text-emerald-800 dark:text-emerald-300">Ausgewähltes Rezept:</p>
-                           <p className="font-semibold text-emerald-900 dark:text-emerald-200">{selectedRecipe.title}</p>
-                           <button onClick={() => onSettingsChange({ ...settings, [selectedIdKey]: null })} className="text-xs text-red-600 dark:text-red-400 hover:underline mt-1">Auswahl aufheben</button>
-                        </div>
-                    ) : (
-                        <div>
-                            <label htmlFor={String(customTextKey)} className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Beschreiben Sie Ihr(en) {label}:</label>
-                            <textarea name={String(customTextKey)} id={String(customTextKey)} value={settings[customTextKey] as string || ''} onChange={handleChange} rows={2} placeholder={`z.B. Protein-Shake mit Haferflocken...`} className={inputStyles}></textarea>
-                        </div>
-                    )}
-                    <div className="text-center text-sm text-slate-500 dark:text-slate-400">oder</div>
-                    <button type="button" onClick={() => openRecipeSelector(mealType)} className="w-full px-4 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold rounded-lg shadow-sm hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors">Rezept aus Archiv auswählen</button>
-                </div>
-            )}
-        </div>
-    );
-  };
 
   return (
     <>
@@ -293,9 +308,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, allRecipes, onS
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Tägliche Routinen (Optional)</label>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-2">Hier können Sie angeben, ob Sie jeden Tag das gleiche Frühstück, den gleichen Snack etc. essen möchten. Wählen Sie ein bestehendes Rezept aus oder beschreiben Sie es für die KI.</p>
               <div className="space-y-4">
-                  {showBreakfastOption && <RoutineMealSettings mealType="breakfast" label="das gleiche Frühstück" />}
-                  {showSnackOption && <RoutineMealSettings mealType="snack" label="den gleichen Snack" />}
-                  {showCoffeeOption && <RoutineMealSettings mealType="coffee" label="den gleichen Kaffee & Kuchen" />}
+                  {showBreakfastOption && <RoutineMealSettings mealType="breakfast" label="das gleiche Frühstück" settings={settings} allRecipes={allRecipes} onChange={handleChange} onSettingsChange={onSettingsChange} onOpenSelector={openRecipeSelector} />}
+                  {showSnackOption && <RoutineMealSettings mealType="snack" label="den gleichen Snack" settings={settings} allRecipes={allRecipes} onChange={handleChange} onSettingsChange={onSettingsChange} onOpenSelector={openRecipeSelector} />}
+                  {showCoffeeOption && <RoutineMealSettings mealType="coffee" label="den gleichen Kaffee & Kuchen" settings={settings} allRecipes={allRecipes} onChange={handleChange} onSettingsChange={onSettingsChange} onOpenSelector={openRecipeSelector} />}
               </div>
           </div>
       )}

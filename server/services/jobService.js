@@ -262,7 +262,8 @@ async function processShareJob(jobId) {
         await pool.query('UPDATE app_jobs SET progressText = ? WHERE jobId = ?', ['Generiere dynamische HTML-Datei...', jobId]);
         
         const shareId = crypto.randomBytes(8).toString('hex');
-        const htmlContent = await generateShareableHtml({ name: plan.name });
+        // Pass shareId here so the back link can be generated correctly
+        const htmlContent = await generateShareableHtml({ name: plan.name, shareId: shareId });
         const fileName = `${shareId}.html`;
         
         // --- Pfade definieren ---

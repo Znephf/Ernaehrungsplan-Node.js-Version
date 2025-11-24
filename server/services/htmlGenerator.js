@@ -9,6 +9,7 @@ const escapeHtml = (unsafe) => {
 
 async function generateShareableHtml(plan) {
     const planName = plan.name || 'Ernährungsplan';
+    const backLink = plan.shareId ? `/?shareId=${plan.shareId}` : '/';
     
     // We use a function to build the script string.
     // CRITICAL FIX: Using concatenation instead of template literals for the client-side script
@@ -412,7 +413,7 @@ async function generateShareableHtml(plan) {
     <header class="bg-white shadow-md sticky top-0 z-30">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="flex items-center gap-4 w-full sm:w-auto justify-center sm:justify-start">
-                <a href="/" class="flex items-center gap-2 text-slate-500 hover:text-emerald-600 transition-colors group" title="Zurück zum Planer">
+                <a href="${backLink}" class="flex items-center gap-2 text-slate-500 hover:text-emerald-600 transition-colors group" title="Zurück zum Planer">
                     <div class="p-2 bg-slate-100 rounded-full group-hover:bg-emerald-100 transition-colors">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
                     </div>
