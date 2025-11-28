@@ -1,10 +1,12 @@
+
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import type { Recipe, Diet, MealCategory, DietType, DishComplexity } from '../types';
 import * as apiService from '../services/apiService';
 import { MealCategoryLabels } from '../types';
 import RecipeDetailModal from './RecipeDetailModal';
 import { useImageGenerator } from '../hooks/useImageGenerator';
-import { ImageIcon } from './IconComponents';
+import { ImageIcon, PlusIcon } from './IconComponents';
+import SingleRecipeGenerator from './SingleRecipeGenerator';
 
 const dietPreferenceLabels: Record<Diet, string> = { omnivore: 'Alles', vegetarian: 'Vegetarisch', vegan: 'Vegan' };
 const dietTypeLabels: Record<DietType, string> = { balanced: 'Ausgewogen', 'low-carb': 'Low-Carb', keto: 'Ketogen', 'high-protein': 'High-Protein', mediterranean: 'Mediterran' };
@@ -49,6 +51,7 @@ const RecipeArchiveComponent: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 60;
     const recipeArchiveContainerRef = useRef<HTMLDivElement>(null);
+    const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
 
 
     const fetchRecipes = useCallback(() => {
@@ -80,6 +83,13 @@ const RecipeArchiveComponent: React.FC = () => {
         });
         setImageUrlsFromArchive(initialImageUrls);
     }, [allRecipes, setImageUrlsFromArchive]);
+
+    const handleNewRecipe = (newRecipe: Recipe) => {
+        // Add new recipe to the list immediately
+        setAllRecipes(prev => [newRecipe, ...prev]);
+        // Open details for the new recipe
+        setSelectedRecipe(newRecipe);
+    };
 
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedMealCategories, setSelectedMealCategories] = useState<Set<MealCategory>>(new Set());
@@ -132,7 +142,15 @@ const RecipeArchiveComponent: React.FC = () => {
             <div className="space-y-6 bg-white/50 dark:bg-slate-800/50 p-6 rounded-lg shadow-sm">
                  <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                     <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-100">Rezepte Archiv</h2>
-                    <input type="text" placeholder="Suche nach Rezeptnamen..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-auto md:max-w-xs px-4 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm" />
+                    <div className="flex gap-2 w-full md:w-auto">
+                        <button 
+                            onClick={() => setIsGeneratorOpen(true)}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-md shadow-sm transition-colors whitespace-nowrap"
+                        >
+                            <PlusIcon /> Neues Rezept
+                        </button>
+                        <input type="text" placeholder="Suche nach Rezeptnamen..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-auto md:max-w-xs px-4 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm" />
+                    </div>
                 </div>
                 <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-medium text-slate-600 dark:text-slate-400 mr-2 shrink-0">Mahlzeit:</span>{(Object.keys(MealCategoryLabels) as MealCategory[]).map(key => <FilterToggleButton key={key} label={MealCategoryLabels[key]} isSelected={selectedMealCategories.has(key)} onClick={() => handleFilterToggle(key, selectedMealCategories, setSelectedMealCategories)} />)}</div>
@@ -204,6 +222,13 @@ const RecipeArchiveComponent: React.FC = () => {
                     isLoading={loadingImages.has(selectedRecipe.id)}
                     error={imageErrors[selectedRecipe.id] || null}
                     onGenerate={generateImage}
+                />
+            )}
+
+            {isGeneratorOpen && (
+                <SingleRecipeGenerator 
+                    onClose={() => setIsGeneratorOpen(false)}
+                    onRecipeGenerated={handleNewRecipe}
                 />
             )}
         </div>

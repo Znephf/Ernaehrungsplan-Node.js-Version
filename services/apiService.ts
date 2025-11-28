@@ -71,6 +71,16 @@ export const getAllRecipes = async (): Promise<Recipe[]> => {
     return handleResponse(response);
 };
 
+// Generate single recipe
+export const generateSingleRecipe = async (data: { prompt: string; includedIngredients?: string; excludedIngredients?: string }): Promise<Recipe> => {
+    const response = await fetch('/api/recipes/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+};
+
 // Plan Generation
 // Fix: Converted to async/await to fix type inference issues.
 export const startPlanGenerationJob = async (data: { settings: PlanSettings; previousPlanRecipes: Recipe[] }): Promise<{ jobId: string }> => {

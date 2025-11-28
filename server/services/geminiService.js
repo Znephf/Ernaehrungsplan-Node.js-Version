@@ -1,3 +1,4 @@
+
 // Fix: Refactored the Gemini service to support batch processing of ingredients, reducing API calls.
 const { GoogleGenAI } = require('@google/genai');
 const { pool } = require('./database');
@@ -265,6 +266,55 @@ Please generate the full plan for the specified meals in the required JSON forma
     }
 };
 
+const generateSingleRecipe = async ({ prompt, includedIngredients, excludedIngredients }) => {
+    const systemInstruction = `You are an expert chef. Create a SINGLE recipe based on the user's request.
+    Your response must be in valid JSON format ONLY.
+    Schema:
+    {
+      "title": "string (German)",
+      "ingredients": [ { "ingredient": "string (German)", "quantity": "number", "unit": "string" } ],
+      "instructions": ["string (German, step-by-step)"],
+      "totalCalories": "number (for ONE PERSON)",
+      "protein": "number (grams, for ONE PERSON)",
+      "carbs": "number (grams, for ONE PERSON)",
+      "fat": "number (grams, for ONE PERSON)",
+      "category": "string (Enum: breakfast, lunch, dinner, snack, coffee)",
+      "dietaryPreference": "string (Enum: omnivore, vegetarian, vegan)",
+      "dietType": "string (Enum: balanced, low-carb, keto, high-protein, mediterranean)",
+      "dishComplexity": "string (Enum: simple, advanced, fancy)",
+      "isGlutenFree": "boolean",
+      "isLactoseFree": "boolean"
+    }
+    
+    CRITICAL: 
+    1. Quantities must be for 1 PERSON.
+    2. Infer the metadata (category, dietType, etc.) from the recipe content.
+    3. Use 'Stück' if no unit applies.
+    `;
+
+    const userPrompt = `
+    Create a recipe for: "${prompt}"
+    ${includedIngredients ? `Must include: ${includedIngredients}` : ''}
+    ${excludedIngredients ? `Must NOT include: ${excludedIngredients}` : ''}
+    `;
+
+    console.log(`Generating single recipe for prompt: "${prompt}"`);
+
+    const { response, keyUsed } = await generateWithFallback({
+        model: 'gemini-2.5-flash',
+        contents: userPrompt,
+        config: { systemInstruction, responseMimeType: 'application/json' }
+    });
+
+    try {
+        const recipeData = JSON.parse(response.text.trim());
+        return { recipe: recipeData, keyUsed };
+    } catch (e) {
+        console.error("Failed to parse Gemini response for single recipe.", e);
+        throw new Error("Invalid AI response.");
+    }
+};
+
 
 const generateImageForRecipe = async (recipe, attempt) => {
     let detailLevel = "A bright, clean, professional food photograph of the finished dish.";
@@ -382,4 +432,5 @@ module.exports = {
     generateImageForRecipe,
     generateShoppingListOnly,
     convertMultipleIngredientsToStructuredFormat,
+    generateSingleRecipe
 };
