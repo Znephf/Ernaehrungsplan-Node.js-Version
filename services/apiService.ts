@@ -1,6 +1,6 @@
 
 // Fix: Implemented the apiService module to handle all frontend-backend communication.
-import type { PlanSettings, ArchiveEntry, Recipe, WeeklyPlan } from '../types';
+import type { PlanSettings, ArchiveEntry, Recipe, WeeklyPlan, MealCategory, Diet, DietType, DishComplexity } from '../types';
 
 // Helper to handle API responses
 // Fix: Refactored API calls to use async/await, which provides the necessary type context to resolve inference issues with this generic handler.
@@ -72,7 +72,17 @@ export const getAllRecipes = async (): Promise<Recipe[]> => {
 };
 
 // Generate single recipe
-export const generateSingleRecipe = async (data: { prompt: string; includedIngredients?: string; excludedIngredients?: string }): Promise<Recipe> => {
+export const generateSingleRecipe = async (data: { 
+    prompt: string; 
+    includedIngredients?: string; 
+    excludedIngredients?: string;
+    mealCategory?: MealCategory;
+    dietaryPreference?: Diet;
+    dietType?: DietType;
+    dishComplexity?: DishComplexity;
+    isGlutenFree?: boolean;
+    isLactoseFree?: boolean;
+}): Promise<Recipe> => {
     const response = await fetch('/api/recipes/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -39,14 +39,34 @@ router.get('/', async (req, res) => {
 
 // Neues Rezept generieren
 router.post('/generate', async (req, res) => {
-    const { prompt, includedIngredients, excludedIngredients } = req.body;
+    const { 
+        prompt, 
+        includedIngredients, 
+        excludedIngredients,
+        mealCategory,
+        dietaryPreference,
+        dietType,
+        dishComplexity,
+        isGlutenFree,
+        isLactoseFree
+    } = req.body;
     
     if (!prompt) {
         return res.status(400).json({ error: 'Prompt ist erforderlich.' });
     }
 
     try {
-        const { recipe, keyUsed } = await generateSingleRecipe({ prompt, includedIngredients, excludedIngredients });
+        const { recipe, keyUsed } = await generateSingleRecipe({ 
+            prompt, 
+            includedIngredients, 
+            excludedIngredients,
+            mealCategory,
+            dietaryPreference,
+            dietType,
+            dishComplexity,
+            isGlutenFree,
+            isLactoseFree
+        });
         
         // Rezept in die Datenbank speichern
         const [result] = await pool.query(
@@ -59,12 +79,12 @@ router.post('/generate', async (req, res) => {
                 JSON.stringify(recipe.instructions),
                 recipe.totalCalories,
                 recipe.protein, recipe.carbs, recipe.fat,
-                recipe.category || 'dinner',
-                recipe.dietaryPreference,
-                recipe.dietType,
-                recipe.dishComplexity,
-                recipe.isGlutenFree,
-                recipe.isLactoseFree,
+                recipe.category || mealCategory || 'dinner',
+                recipe.dietaryPreference || dietaryPreference,
+                recipe.dietType || dietType,
+                recipe.dishComplexity || dishComplexity,
+                recipe.isGlutenFree !== undefined ? recipe.isGlutenFree : isGlutenFree,
+                recipe.isLactoseFree !== undefined ? recipe.isLactoseFree : isLactoseFree,
                 1 // Base persons is always 1 for new generations
             ]
         );

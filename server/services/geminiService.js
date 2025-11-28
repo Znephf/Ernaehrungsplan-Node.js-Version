@@ -266,8 +266,18 @@ Please generate the full plan for the specified meals in the required JSON forma
     }
 };
 
-const generateSingleRecipe = async ({ prompt, includedIngredients, excludedIngredients }) => {
-    const systemInstruction = `You are an expert chef. Create a SINGLE recipe based on the user's request.
+const generateSingleRecipe = async ({ 
+    prompt, 
+    includedIngredients, 
+    excludedIngredients,
+    mealCategory = 'dinner',
+    dietaryPreference = 'omnivore',
+    dietType = 'balanced',
+    dishComplexity = 'simple',
+    isGlutenFree = false,
+    isLactoseFree = false
+}) => {
+    const systemInstruction = `You are an expert chef. Create a SINGLE recipe based on the user's request and strict constraints.
     Your response must be in valid JSON format ONLY.
     Schema:
     {
@@ -286,19 +296,29 @@ const generateSingleRecipe = async ({ prompt, includedIngredients, excludedIngre
       "isLactoseFree": "boolean"
     }
     
-    CRITICAL: 
+    CRITICAL INSTRUCTIONS: 
     1. Quantities must be for 1 PERSON.
-    2. Infer the metadata (category, dietType, etc.) from the recipe content.
+    2. STRICTLY ADHERE to the user's constraints (Diet, Category, Allergies).
     3. Use 'Stück' if no unit applies.
     `;
 
     const userPrompt = `
     Create a recipe for: "${prompt}"
-    ${includedIngredients ? `Must include: ${includedIngredients}` : ''}
-    ${excludedIngredients ? `Must NOT include: ${excludedIngredients}` : ''}
+    
+    CONSTRAINTS:
+    - Meal Category: ${mealCategory}
+    - Dietary Preference: ${dietaryPreference}
+    - Diet Type: ${dietType}
+    - Complexity: ${dishComplexity}
+    - Gluten-Free: ${isGlutenFree ? 'YES' : 'No'}
+    - Lactose-Free: ${isLactoseFree ? 'YES' : 'No'}
+    ${includedIngredients ? `- Must include: ${includedIngredients}` : ''}
+    ${excludedIngredients ? `- Must NOT include: ${excludedIngredients}` : ''}
+    
+    Please ensure the recipe strictly follows these rules.
     `;
 
-    console.log(`Generating single recipe for prompt: "${prompt}"`);
+    console.log(`Generating single recipe for prompt: "${prompt}" with category: ${mealCategory}`);
 
     const { response, keyUsed } = await generateWithFallback({
         model: 'gemini-2.5-flash',
@@ -308,6 +328,8 @@ const generateSingleRecipe = async ({ prompt, includedIngredients, excludedIngre
 
     try {
         const recipeData = JSON.parse(response.text.trim());
+        // Force the category to match what was requested, just in case AI drifts
+        recipeData.category = mealCategory;
         return { recipe: recipeData, keyUsed };
     } catch (e) {
         console.error("Failed to parse Gemini response for single recipe.", e);
